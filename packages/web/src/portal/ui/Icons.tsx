@@ -4,17 +4,30 @@
 // actually use.
 import { SVGProps } from 'react';
 
-const base = (props: SVGProps<SVGSVGElement>) => ({
-  width: 18,
-  height: 18,
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-  ...props,
-});
+const base = (props: SVGProps<SVGSVGElement>) => {
+  const width = props.width ?? 18;
+  const height = props.height ?? 18;
+  return {
+    width,
+    height,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    ...props,
+    // The `width`/`height` SVG *attributes* alone don't reliably establish
+    // CSS box sizing for an inline SVG inside a flex container (a known
+    // cross-browser quirk — Chromium was measured collapsing these icons to
+    // 0 width, full height, i.e. an invisible sliver, even though the
+    // attributes were correctly 17/18 in the DOM). Setting them again here
+    // as real CSS pixel values via `style` — merged after `...props` so an
+    // explicit `style` prop from a caller still wins — makes sizing
+    // unambiguous regardless of layout context.
+    style: { width, height, flexShrink: 0, ...props.style },
+  };
+};
 
 export const IconSearch = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
