@@ -1,0 +1,5 @@
+{
+  "name": "academic-advisor",
+  "private": true,
+  "workspaces": ["packages/*"]
+}

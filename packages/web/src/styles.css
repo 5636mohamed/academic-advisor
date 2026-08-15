@@ -1,0 +1,262 @@
+/* Spec §9's "editorial/paper aesthetic" — a warm, cream-paper reading
+ * surface with serif headings, hairline rules, and a single accent ink
+ * color, rather than a generic SaaS-dashboard look. Night mode keeps the
+ * same warm, editorial character (a dim reading lamp over dark paper, not
+ * a cold blue-black SaaS dark theme) — every token below has a dark
+ * counterpart; nothing in the app reaches for a raw hex color outside
+ * this file (see CgpaTrendChart.tsx's inline SVG, the one place that
+ * needed converting to `var(--token)` for this to hold).
+ *
+ * `--masthead-bg`/`--masthead-fg` and `--neutral-soft`/`--neutral-fg` are
+ * deliberately NOT redefined under dark mode below — the masthead reads as
+ * a fixed dark banner (a printed masthead, not something that inverts with
+ * reading light) in both themes, and the neutral badge stays a low-contrast
+ * gray/on-gray pairing in both. Every other token flips. */
+:root {
+  --paper: #faf7f0;
+  --paper-raised: #ffffff;
+  --ink: #232017;
+  --ink-muted: #6b6455;
+  --rule: #e4ddc9;
+  --accent: #8a3b2b;
+  --accent-soft: #f4e6df;
+  --good: #2f6b3f;
+  --good-soft: #e6f0e3;
+  --warn: #8a5a12;
+  --warn-soft: #faf0d8;
+  --danger: #a3312a;
+  --danger-soft: #f8e2df;
+  --masthead-bg: #232017;
+  --masthead-fg: #faf7f0;
+  --neutral-soft: #eee;
+  --neutral-fg: #555;
+  --venture-border: #c9a227;
+  --venture-bg-from: #fdf6e3;
+  --venture-bg-to: #f7ecc8;
+  --venture-eyebrow: #7a5f0f;
+  --venture-fill: #c9a227;
+  --letter-b: #2a5f8a;
+  --letter-d: #b5560c;
+  --radius: 4px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+}
+
+/* Dark mode: follows the OS preference by default (ThemeContext sets
+ * data-theme explicitly on load and on every OS-preference change, so this
+ * media query is really just a same-paint-frame fallback before React
+ * mounts — see index.html's inline script) and the explicit toggle always
+ * wins via the [data-theme] rule below. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1c1a15;
+    --paper-raised: #262319;
+    --ink: #ece6d8;
+    --ink-muted: #a89f8a;
+    --rule: #3c3527;
+    --accent: #e08b6d;
+    --accent-soft: #3a2a20;
+    --good: #7fcf8d;
+    --good-soft: #1f3324;
+    --warn: #e6b355;
+    --warn-soft: #3a2f16;
+    --danger: #e2857a;
+    --danger-soft: #3a201d;
+    --venture-border: #a9822f;
+    --venture-bg-from: #302711;
+    --venture-bg-to: #241d0e;
+    --venture-eyebrow: #e0bc5c;
+    --venture-fill: #d1a53e;
+    --letter-b: #7fb2e0;
+    --letter-d: #e2965a;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1c1a15;
+  --paper-raised: #262319;
+  --ink: #ece6d8;
+  --ink-muted: #a89f8a;
+  --rule: #3c3527;
+  --accent: #e08b6d;
+  --accent-soft: #3a2a20;
+  --good: #7fcf8d;
+  --good-soft: #1f3324;
+  --warn: #e6b355;
+  --warn-soft: #3a2f16;
+  --danger: #e2857a;
+  --danger-soft: #3a201d;
+  --venture-border: #a9822f;
+  --venture-bg-from: #302711;
+  --venture-bg-to: #241d0e;
+  --venture-eyebrow: #e0bc5c;
+  --venture-fill: #d1a53e;
+  --letter-b: #7fb2e0;
+  --letter-d: #e2965a;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: var(--accent); }
+
+h1, h2, h3 { font-weight: 600; letter-spacing: 0.01em; margin: 0 0 8px; }
+h1 { font-size: 22px; }
+h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); }
+h3 { font-size: 16px; }
+
+.app-shell { display: flex; flex-direction: column; height: 100%; }
+
+.masthead {
+  background: var(--masthead-bg);
+  color: var(--masthead-fg);
+  padding: 14px 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  border-bottom: 3px solid var(--accent);
+}
+.masthead h1 { color: var(--masthead-fg); font-family: inherit; margin: 0; }
+.masthead .tagline { font-size: 12px; color: #cfc8b4; font-style: italic; }
+
+.layout { display: flex; flex: 1; min-height: 0; }
+
+.sidebar {
+  width: 280px;
+  border-right: 1px solid var(--rule);
+  background: var(--paper-raised);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.student-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 18px;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+.student-item:hover { background: var(--accent-soft); }
+.student-item.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.student-item .name { font-weight: 600; }
+.student-item .meta { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+.main { flex: 1; overflow-y: auto; padding: 28px 32px; }
+.main-inner { max-width: 880px; margin: 0 auto; }
+
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+
+.nav-tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+.nav-tabs a, .nav-tabs button.tab-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 13px;
+  background: var(--paper-raised);
+}
+.nav-tabs a.active, .nav-tabs button.tab-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+/* Sub-tabs (e.g. the Curriculum tab's per-semester picker) — same look,
+   slightly tighter so they read as nested under the page's own nav-tabs. */
+.sub-tabs { display: flex; gap: 5px; margin-bottom: 16px; flex-wrap: wrap; }
+.sub-tabs button.tab-btn { padding: 5px 11px; font-size: 12.5px; }
+
+.badge.locked { background: var(--neutral-soft); color: var(--ink-muted); }
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--rule); }
+th { color: var(--ink-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+tr.mandatory-row { background: var(--warn-soft); }
+
+.badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge.ok { background: var(--good-soft); color: var(--good); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.danger { background: var(--danger-soft); color: var(--danger); }
+.badge.neutral { background: var(--neutral-soft); color: var(--neutral-fg); }
+
+button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  cursor: pointer;
+  font-family: inherit;
+}
+button:hover { filter: brightness(1.08); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
+button.secondary:hover { background: var(--accent-soft); filter: none; }
+
+.sub { color: var(--ink-muted); margin-bottom: 16px; }
+.muted { color: var(--ink-muted); font-size: 12.5px; }
+.note { margin-top: 14px; padding: 10px 12px; background: var(--accent-soft); border-radius: var(--radius); font-size: 13px; }
+
+.action-tag { display: inline-block; padding: 5px 12px; border-radius: var(--radius); font-weight: 700; font-size: 13px; letter-spacing: 0.02em; }
+.action-SHOW_PLAN { background: var(--good-soft); color: var(--good); }
+.action-RECOMMEND_INTERNAL_TRANSFER { background: var(--warn-soft); color: var(--warn); }
+.action-RECOMMEND_FACULTY_TRANSFER { background: var(--danger-soft); color: var(--danger); }
+
+.fit-bar-track { background: var(--rule); border-radius: 4px; height: 8px; width: 100%; overflow: hidden; }
+.fit-bar-fill { background: var(--accent); height: 100%; }
+
+.stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
+.stat { min-width: 120px; }
+.stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+.stat .value { font-size: 22px; font-weight: 600; }
+
+.letter-A, .letter-Ap { color: var(--good); font-weight: 600; }
+.letter-B, .letter-Bp { color: var(--letter-b); }
+.letter-C, .letter-Cp { color: var(--warn); }
+.letter-D, .letter-Dp { color: var(--letter-d); }
+.letter-F { color: var(--danger); font-weight: 700; }
+
+.form-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+input, select { padding: 7px 9px; border: 1px solid var(--rule); border-radius: var(--radius); font-size: 13.5px; font-family: inherit; background: var(--paper-raised); color: var(--ink); }
+
+.timeline { border-left: 2px solid var(--rule); padding-left: 16px; }
+.timeline-item { margin-bottom: 14px; position: relative; }
+.timeline-item::before { content: ''; position: absolute; left: -21px; top: 4px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.timeline-item .when { font-size: 11px; color: var(--ink-muted); }
+
+.loading, .empty-state { padding: 40px; text-align: center; color: var(--ink-muted); }
+
+.dept-card { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.dept-card:last-child { border-bottom: none; }
+.dept-card .dept-name { width: 220px; font-weight: 600; flex-shrink: 0; }
+.dept-card .dept-bars { flex: 1; }
+.dept-card .dept-score { width: 54px; text-align: right; font-weight: 600; }
+
+/* §16.4 — gold-highlighted Venture Match card, deliberately distinct from
+ * every other card style (mandatory/optimizer course slips, dept-fit) so
+ * it reads as its own kind of thing, additive to the plan, never a course.
+ * Now genuinely dark-mode-aware via the --venture-* tokens above (a past
+ * session's dark-mode bug here was an unguarded override that fired
+ * unconditionally since this app had no real dark mode at the time — now
+ * that it does, this is the correct, deliberate pairing, gated the same
+ * way every other token is). */
+.venture-card { border: 1px solid var(--venture-border); background: linear-gradient(135deg, var(--venture-bg-from), var(--venture-bg-to)); color: var(--ink); }
+.venture-card .venture-eyebrow { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; font-weight: 700; color: var(--venture-eyebrow); }
+.venture-card .venture-title { font-size: 18px; font-weight: 700; margin: 4px 0 8px; color: var(--ink); }
+.venture-bar-track { background: rgba(127,111,63,0.18); border-radius: 4px; height: 6px; width: 100%; overflow: hidden; }
+.venture-bar-fill { background: var(--venture-fill); height: 100%; }

@@ -1,0 +1,165 @@
+// Spec §9.3 — essential tables. Ported verbatim from the build spec.
+// TODO(next session): run `prisma migrate dev` once DATABASE_URL is set,
+// wire the repository layer in each module to these models.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum StudentStatus {
+  active
+  probation
+  dismissed
+  transferred_internal
+  transferred_external
+  graduated
+}
+
+enum CourseCategory {
+  core
+  program
+  faculty
+  school
+  ur_core
+  ur_elective
+  program_elective
+  special
+}
+
+enum SemesterKind {
+  normal
+  transfer_semester
+}
+
+model Student {
+  id                    String   @id @default(uuid())
+  name                  String
+  facultyId             String
+  departmentId          String
+  status                StudentStatus @default(active)
+  activeBaseSnapshotId  String?
+  semesters             Semester[]
+  probationCounter      ProbationCounter?
+  transferRecords       TransferRecord[]
+  retakePreferences     RetakePreference[]
+  planningRuns          PlanningRun[]
+}
+
+model Course {
+  code            String  @id
+  name            String
+  credits         Int
+  level           Int
+  category        CourseCategory
+  isUR            Boolean @default(false)
+  isBasicScience  Boolean @default(false)
+  departmentId    String?
+  prereq          String[]
+  coreq           String[]
+}
+
+model Semester {
+  id            String   @id @default(uuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id])
+  ordinal       Int
+  kind          SemesterKind @default(normal)
+  creditCap     Int
+  isHalfLoad    Boolean  @default(false)
+  enrollments   Enrollment[]
+  cgpaSnapshot  CgpaSnapshot?
+}
+
+model Enrollment {
+  id            String   @id @default(uuid())
+  semesterId    String
+  semester      Semester @relation(fields: [semesterId], references: [id])
+  courseCode    String
+  attemptNumber Int
+  pct           Float
+  letter        String
+  points        Float
+  isRetake      Boolean  @default(false)
+  countsInCgpa  Boolean  @default(true)
+}
+
+model CgpaSnapshot {
+  id                 String   @id @default(uuid())
+  studentId          String
+  semesterId         String   @unique
+  semester           Semester @relation(fields: [semesterId], references: [id])
+  semesterGpa        Float
+  cgpa               Float
+  cumulativeCredits  Int
+  isBaseSnapshot     Boolean  @default(false)
+}
+
+model ProbationCounter {
+  id          String   @id @default(uuid())
+  studentId   String   @unique
+  student     Student  @relation(fields: [studentId], references: [id])
+  count       Int      @default(0)
+  armed       Boolean  @default(false)
+  logs        ProbationCounterLog[]
+}
+
+model ProbationCounterLog {
+  id                  String   @id @default(uuid())
+  probationCounterId  String
+  probationCounter    ProbationCounter @relation(fields: [probationCounterId], references: [id])
+  semesterId          String
+  previousCount       Int
+  newCount            Int
+  reason              String
+  createdAt           DateTime @default(now())
+}
+
+model TransferRecord {
+  id                    String   @id @default(uuid())
+  studentId             String
+  student               Student  @relation(fields: [studentId], references: [id])
+  type                  String
+  fromDepartmentId      String?
+  toDepartmentId        String?
+  fromFacultyId         String?
+  toFacultyId           String?
+  effectiveSemesterId   String?
+  recommendationBasis   Json
+  counterAction         String
+  createdAt             DateTime @default(now())
+}
+
+model CourseEquivalencyMap {
+  id               String @id @default(uuid())
+  sourceCourseCode String
+  targetFacultyId  String
+  targetCourseCode String?
+}
+
+model RetakePreference {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id])
+  semesterId      String
+  considerRetakes Boolean
+  answeredAt      DateTime @default(now())
+}
+
+model PlanningRun {
+  id             String   @id @default(uuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  input          Json
+  candidates     Json
+  chosenPlan     Json
+  projectedCGPA  Float
+  trendSlope     Float?
+  action         String
+  createdAt      DateTime @default(now())
+}

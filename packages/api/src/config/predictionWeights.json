@@ -1,0 +1,47 @@
+{
+  "expectedPct": {
+    "cohortWeight": 0.45,
+    "studentWeight": 0.40,
+    "difficultyWeight": 0.15
+  },
+  "difficultyAdjustment": {
+    "lowRiskBonus": 5,
+    "toughPenalty": 5
+  },
+  "candidateScore": {
+    "gradeQuality": 46,
+    "chainUnlock": 18,
+    "creditProgress": 12,
+    "retakeReplacement": 30,
+    "riskPenalty": 20,
+    "targetSafe": { "gradeQualityBonus": 20, "creditPenalty": 6 },
+    "targetFast": { "creditBonus": 10 },
+    "probationRepair": { "gradeQualityBonus": 26, "riskPenaltyMultiplier": 2, "creditWeightScale": 0.5 }
+  },
+  "retakeGate": {
+    "chainUnlockBoost": 6
+  },
+  "deptFit": {
+    "quizWeight": 0.5,
+    "gatewayGradeWeight": 0.3,
+    "alumniWeight": 0.2,
+    "neutralGatewayPrior": 0.6,
+    "topDepartmentsForFacultyAggregate": 3
+  },
+  "chainUnlock": {
+    "depth": 3,
+    "decay": 0.6
+  },
+  "trend": {
+    "improvingSlopeThreshold": 0.01,
+    "decliningSlopeThreshold": -0.01,
+    "minSnapshotsForTrend": 3
+  },
+  "ventureFit": {
+    "courseCompetencyWeight": 0.40,
+    "skillAlignmentWeight": 0.40,
+    "trajectoryWeight": 0.20,
+    "matchThreshold": 0.80,
+    "minLevel": 3
+  }
+}

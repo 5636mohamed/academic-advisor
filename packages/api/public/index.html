@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Academic Advisor — Demo</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #f4f5f7; color: #1a1d29; }
+  header { background: #1a1d29; color: white; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; font-size: 13px; color: #aab; }
+  .layout { display: flex; height: calc(100vh - 64px); }
+  .sidebar { width: 260px; background: white; border-right: 1px solid #e2e4e9; overflow-y: auto; }
+  .student-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #eee; }
+  .student-item:hover { background: #f0f1f5; }
+  .student-item.active { background: #eef1ff; border-left: 3px solid #4f5fea; }
+  .student-item .name { font-weight: 600; }
+  .student-item .meta { font-size: 12px; color: #777; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: #e3f8e9; color: #1a7a3d; }
+  .badge.warn { background: #fff2d9; color: #9a6300; }
+  .main { flex: 1; overflow-y: auto; padding: 24px; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .card h2 { margin-top: 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.03em; color: #555; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
+  th { color: #888; font-weight: 600; }
+  .letter-A, .letter-A\+, .letter-A\- { color: #1a7a3d; font-weight: 600; }
+  .letter-B, .letter-B\+ { color: #2a6db0; }
+  .letter-C, .letter-C\+ { color: #9a6300; }
+  .letter-D, .letter-D\+ { color: #b5560c; }
+  .letter-F { color: #c0392b; font-weight: 600; }
+  button { background: #4f5fea; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  button:hover { background: #3d4bd0; }
+  button.secondary { background: #eee; color: #333; }
+  button.secondary:hover { background: #ddd; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  input, select { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+  .action-tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 13px; }
+  .action-SHOW_PLAN { background: #e3f8e9; color: #1a7a3d; }
+  .action-RECOMMEND_INTERNAL_TRANSFER { background: #fff2d9; color: #9a6300; }
+  .action-RECOMMEND_FACULTY_TRANSFER { background: #fde3e3; color: #b5352b; }
+  .plan-row.mandatory { background: #fff7e6; }
+  .muted { color: #888; font-size: 12px; }
+  .fit-bar-track { background: #eee; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; }
+  .fit-bar-fill { background: #4f5fea; height: 100%; }
+  #loading { padding: 40px; text-align: center; color: #888; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Academic Advisor — Demo</h1>
+  <p>Real data, real engine (§3, §4, §6 of the build spec) — served from an in-memory store, not a mock. See <code>PROGRESS.md</code> for what's real vs. still pending.</p>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><div id="loading">Loading students…</div></div>
+  <div class="main" id="main"><div class="muted">Select a student on the left.</div></div>
+</div>
+<script>
+const API = '';
+let students = [];
+let currentId = null;
+
+async function loadStudents() {
+  const res = await fetch(API + '/api/students');
+  students = await res.json();
+  renderSidebar();
+  if (students.length) selectStudent(students[0].id);
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebar');
+  el.innerHTML = students.map(s => `
+    <div class="student-item ${s.id === currentId ? 'active' : ''}" onclick="selectStudent('${s.id}')">
+      <div class="name">${s.name}</div>
+      <div class="meta">Level ${s.level} · ${s.facultyId}/${s.departmentId}</div>
+      <div class="meta">
+        CGPA <b>${s.cgpa.toFixed(2)}</b>
+        <span class="badge ${s.cgpa >= 2.0 ? 'ok' : 'warn'}">${s.cgpa >= 2.0 ? 'good standing' : 'probation risk'}</span>
+      </div>
+      <div class="meta">
+        Warning <b>${s.probationCounter.count}/6</b>
+        ${s.probationCounter.count >= 3 ? '<span class="badge warn">transfer tier</span>' : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function selectStudent(id) {
+  currentId = id;
+  renderSidebar();
+  const main = document.getElementById('main');
+  main.innerHTML = '<div id="loading">Loading student…</div>';
+  const res = await fetch(API + '/api/students/' + id);
+  const student = await res.json();
+  renderStudent(student);
+}
+
+function letterClass(letter) {
+  return 'letter-' + letter.replace('+', '\\+').replace('-', '\\-');
+}
+
+function renderStudent(student) {
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="card">
+      <h2>${student.name}</h2>
+      <p>CGPA <b>${student.cgpa.toFixed(2)}</b> · Level ${student.level} · ${student.status} · Warning <b>${student.probationCounter.count}/6</b></p>
+      <p class="muted">Warning ladder: 1st/2nd = normal recommendation · 3rd = internal department transfer recommended · 4th–5th = faculty transfer recommended · 6th = dismissal.</p>
+      <button onclick="runAdvise('${student.id}')">Run Advising Cycle</button>
+      <div id="advise-result"></div>
+    </div>
+
+    <div class="card">
+      <h2>Transcript (§2.2 — replacement rule applied)</h2>
+      <table>
+        <tr><th>Course</th><th>Sem</th><th>%</th><th>Grade</th><th>Points</th></tr>
+        ${student.transcript.map(r => `
+          <tr>
+            <td>${r.courseCode}</td>
+            <td>${r.semesterOrdinal}</td>
+            <td>${r.pct}</td>
+            <td class="${letterClass(r.letter)}">${r.letter}</td>
+            <td>${r.points.toFixed(2)}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Add / modify a grade (writes to the store, recomputes CGPA live)</h2>
+      <div class="row">
+        <input id="courseCodeInput" placeholder="Course code e.g. ECE324" size="14" />
+        <input id="pctInput" type="number" placeholder="Score %" min="0" max="100" size="6" style="width:80px" />
+        <input id="semInput" type="number" placeholder="Semester #" size="4" style="width:80px" value="${(student.cgpaSnapshots.slice(-1)[0]?.semesterOrdinal || 0) + 1}" />
+        <button onclick="submitEnroll('${student.id}')">Save</button>
+      </div>
+      <div id="enroll-result" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <h2>CGPA snapshot history</h2>
+      <table>
+        <tr><th>Sem</th><th>Semester GPA</th><th>CGPA</th><th>Credits</th></tr>
+        ${student.cgpaSnapshots.map(s => `<tr><td>${s.semesterOrdinal}</td><td>${s.semesterGpa}</td><td>${s.cgpa}</td><td>${s.cumulativeCredits}</td></tr>`).join('')}
+      </table>
+    </div>
+  `;
+}
+
+async function submitEnroll(studentId) {
+  const courseCode = document.getElementById('courseCodeInput').value.trim().toUpperCase();
+  const pct = Number(document.getElementById('pctInput').value);
+  const semesterOrdinal = Number(document.getElementById('semInput').value);
+  const resultEl = document.getElementById('enroll-result');
+  if (!courseCode || Number.isNaN(pct)) {
+    resultEl.textContent = 'Enter a course code and a score.';
+    return;
+  }
+  const res = await fetch(`/api/students/${studentId}/enroll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ courseCode, pct, semesterOrdinal }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    resultEl.textContent = 'Error: ' + data.error;
+    return;
+  }
+  resultEl.textContent = `Saved ${courseCode} = ${data.recordedAttempt.letter} (${data.recordedAttempt.pct}%). New CGPA: ${data.newCgpa}`;
+  await loadStudents(); // refresh sidebar CGPA
+  selectStudent(studentId); // refresh transcript view
+}
+
+async function runAdvise(studentId) {
+  const resultEl = document.getElementById('advise-result');
+  resultEl.innerHTML = '<p class="muted">Running §4.2 orchestrator…</p>';
+  const res = await fetch(`/api/students/${studentId}/advise`, { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) {
+    resultEl.innerHTML = '<p class="muted">Error: ' + data.error + '</p>';
+    return;
+  }
+  resultEl.innerHTML = `
+    <p><span class="action-tag action-${data.action}">${data.action.replace(/_/g, ' ')}</span></p>
+    <p class="muted">${data.explain} — projected CGPA ${data.projectedCGPA}, trend slope ${data.trendSlope ?? 'insufficient history'}</p>
+    ${data.suggestedDepartmentId ? `<p>Suggested department: <b>${data.suggestedDepartmentId}</b></p>` : ''}
+    ${data.suggestedFaculties && data.suggestedFaculties.length ? `<p>Suggested faculties: ${data.suggestedFaculties.map(f => f.name + ' (' + f.total + ')').join(', ')}</p>` : ''}
+    <table>
+      <tr><th>Course</th><th>Expected grade</th><th>Score</th><th></th></tr>
+      ${data.plan.map(c => `
+        <tr class="plan-row ${c.mandatory ? 'mandatory' : ''}">
+          <td>${c.courseCode}</td>
+          <td class="${letterClass(c.expectedLetter)}">${c.expectedLetter} (${c.expectedPct}%)</td>
+          <td>${c.score}</td>
+          <td>${c.mandatory ? '<span class="badge warn">mandatory retake</span>' : ''}</td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+}
+
+loadStudents();
+</script>
+</body>
+</html>

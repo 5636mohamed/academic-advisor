@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Academic Advisor</title>
+    <!-- Sets data-theme before first paint so there's no flash of the wrong
+         theme while React/ThemeContext boot — kept in sync with the same
+         localStorage key + OS-preference fallback ThemeContext uses. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('academic-advisor-theme');
+          var theme = stored === 'light' || stored === 'dark'
+            ? stored
+            : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          /* localStorage/matchMedia unavailable — default light styling still applies */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
