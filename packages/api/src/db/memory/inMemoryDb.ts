@@ -10,8 +10,10 @@
 import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown } from '@advisor/shared';
 import { CATALOG } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
+import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
 import { PROFESSORS, VENTURE_PROJECTS, COURSE_SKILL_TAGS, ELECTIVE_COURSE_CODES } from '../seed/seedVentureProjects';
 import { computeCGPA, latestAttemptPerCourse } from '../../modules/grading/cgpa';
+import { levelFromCredits } from '../../modules/grading/level';
 import { gradeFromPct } from '@advisor/shared';
 import { replayProbationHistory } from '../../modules/probation/probationHistory';
 import { executeInternalTransfer } from '../../modules/transfer/internalTransfer.service';
@@ -478,6 +480,77 @@ const seedStudents: SeedStudent[] = [
   },
 ];
 
+/** Small stable hash, same technique as seedCourseOfferings.ts — deterministic
+ *  per (studentId, courseCode) pair so a re-seed always fills in the exact
+ *  same filler grade, rather than a fresh random one on every server start. */
+function fillerHash(str: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/** §14/handbook consistency fix: a hand-authored seed literal only ever
+ *  listed a handful of "illustrative" courses per semester (see the
+ *  original comment above `seedStudents`), which left real gaps — a
+ *  student credited with reaching semester N who was nonetheless missing
+ *  several of semester N's required courses entirely (E-JUST's program is
+ *  lock-step: every course scheduled for a semester the student has
+ *  already reached should be on their transcript, not a hand-picked
+ *  subset). This fills every such gap, up through the highest semester the
+ *  seed literal already has ANY attempt in — it never removes or overwrites
+ *  an existing hand-authored attempt (every specific grade an existing unit
+ *  test asserts on is untouched), it only adds the ones that were missing.
+ *
+ *  Filler grades are derived, not arbitrary: centered on the student's own
+ *  already-demonstrated average (so a strong/weak student's filled-in
+ *  courses read as strong/weak too), nudged by that specific course's real
+ *  seeded difficulty (seedCourseOfferings.ts) and a small deterministic
+ *  per-course jitter — the same "logical, not flat" philosophy as the
+ *  grade-prediction fix in repositoryBackedPorts.ts. */
+function completeTranscript(s: SeedStudent): SeedStudent {
+  if (s.allAttempts.length === 0) return s; // nothing to anchor a fill against yet (e.g. a genuinely fresh Level-1 student)
+
+  const existingCodes = new Set(s.allAttempts.map(a => a.courseCode));
+  // The fill boundary is the student's officially-closed-semester record
+  // (cgpaSnapshots' own max ordinal), not however far their individual
+  // `allAttempts` entries happen to scatter — a couple of demo students
+  // (e.g. Sara) have a few illustrative grades a semester or two ahead of
+  // their actual recorded progress, which is fine to leave as-is; those
+  // don't retroactively count as "reached that semester" for fill purposes.
+  // Only falls back to the attempts' own max when there's no snapshot
+  // history at all yet (a brand-new student with no semester closed).
+  const snapshotOrdinals = s.cgpaSnapshots.map(sn => sn.semesterOrdinal);
+  const maxOrdinal = snapshotOrdinals.length > 0 ? Math.max(...snapshotOrdinals) : Math.max(...s.allAttempts.map(a => a.semesterOrdinal));
+  const studentAvgPct = s.allAttempts.reduce((sum, a) => sum + a.pct, 0) / s.allAttempts.length;
+
+  const missing = CATALOG.filter(c => c.semesterOrdinal <= maxOrdinal && !existingCodes.has(c.code)).sort(
+    (a, b) => a.semesterOrdinal - b.semesterOrdinal || a.code.localeCompare(b.code)
+  );
+  if (missing.length === 0) return s;
+
+  const filled: EnrollmentRecord[] = missing.map(course => {
+    const offerings = OFFERINGS_BY_COURSE[course.code] ?? [];
+    const courseMean = offerings.length > 0 ? offerings.reduce((sum, o) => sum + o.meanPct, 0) / offerings.length : 75;
+    const seed = fillerHash(`${s.id}:${course.code}`);
+    const jitter = (seed % 9) - 4; // -4..+4, deterministic per student+course
+    const pct = Math.max(45, Math.min(99, Math.round(studentAvgPct + (courseMean - 75) * 0.35 + jitter)));
+    return attempt(course.code, pct, course.semesterOrdinal);
+  });
+
+  const allAttempts = [...s.allAttempts, ...filled];
+  // Recompute credits/level from the now-complete transcript instead of
+  // trusting the separately hand-typed `cumulativeEarnedCredits`/`level`
+  // fields, which is exactly what let a student be credited with a level
+  // their actual (incomplete) course history didn't support.
+  const latest = latestAttemptPerCourse(allAttempts);
+  const cumulativeEarnedCredits = latest.reduce((sum, rec) => sum + (courseByCode[rec.courseCode]?.credits ?? 0), 0);
+
+  return { ...s, allAttempts, cumulativeEarnedCredits, level: levelFromCredits(cumulativeEarnedCredits) };
+}
+
 /** Turns a raw seed literal into a full `StoredStudent` by replaying its
  *  `cgpaSnapshots` through the real §4.1/§4.5 state machine
  *  (`replayProbationHistory`) to derive `probationLog` — and, for every
@@ -501,7 +574,7 @@ function deriveStudent(s: SeedStudent): StoredStudent {
   };
 }
 
-const students = new Map<string, StoredStudent>(seedStudents.map(s => [s.id, deriveStudent(s)]));
+const students = new Map<string, StoredStudent>(seedStudents.map(s => [s.id, deriveStudent(completeTranscript(s))]));
 
 /** §16.8 fixture — Ahmed is seeded with an already-`accepted` match against
  *  `proj-rf-full` (capacity 1), so that project is at capacity from the
@@ -648,7 +721,7 @@ seedInitialRegisteredCourses();
 export function __resetForTests(): void {
   students.clear();
   for (const s of seedStudents) {
-    students.set(s.id, deriveStudent(s));
+    students.set(s.id, deriveStudent(completeTranscript(s)));
   }
   retakePreferences.clear();
   ventureGateAnswers.clear();
