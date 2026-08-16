@@ -8,6 +8,30 @@ approval-and-registration workflow, advisor PDF reporting (§15), and the
 Innovation & Venture Catalyst — a research/spin-off matching engine with its
 own student, advisor, and Faculty Console surfaces (§16).
 
+## Screenshots
+
+The student portal and advisor console were redesigned to match the
+project's E-JUST UI mockups (`UI Design Student/`, `UI Design Professor/`) —
+a shared red/white design system, dark mode throughout, and smooth
+transitions on every interactive surface. The Faculty Console keeps its
+original look (out of scope for this pass).
+
+**Student portal**
+
+| Dashboard | Dashboard (dark mode) |
+|---|---|
+| ![Student dashboard](docs/screenshots/student-dashboard-light.png) | ![Student dashboard, dark mode](docs/screenshots/student-dashboard-dark.png) |
+
+| Course Plan | Department Quiz | Venture Board |
+|---|---|---|
+| ![Course plan roster](docs/screenshots/student-course-plan.png) | ![Department fit quiz wizard](docs/screenshots/student-department-quiz.png) | ![Venture board](docs/screenshots/student-venture-board.png) |
+
+**Advisor console**
+
+| Dashboard | All Students | Venture Board |
+|---|---|---|
+| ![Advisor dashboard](docs/screenshots/advisor-dashboard.png) | ![All students roster](docs/screenshots/advisor-all-students.png) | ![Advisor venture board](docs/screenshots/advisor-venture-board.png) |
+
 ## Status
 See `PROGRESS.md` for exactly what is implemented vs. still to be built, and
 which spec section each file maps to (read the newest "SESSION N NOTE" at
