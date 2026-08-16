@@ -327,6 +327,16 @@
   border-radius: var(--su-radius);
   padding: 20px 22px;
   box-shadow: var(--su-shadow-sm);
+  /* Explicit, not inherited: a couple of screens use `.su-card` as a
+     clickable `<button>` (the Venture Board's professor picker cards), and
+     the base app's un-scoped `button { color: white }` (styles.css, still
+     used by the untouched Login/advisor-console-adjacent pages) otherwise
+     wins over inherited color there — a directly-authored declaration on
+     an element always beats an inherited value, regardless of specificity.
+     Same reasoning applies to every other `.su-*` class below that's ever
+     used as a button and renders its own text (`.su-quick-item`,
+     `.su-choice-card`, `.su-option`) — each sets `color` explicitly too. */
+  color: var(--su-text);
 }
 .su-card + .su-card { margin-top: 16px; }
 .su-card.su-hover:hover { box-shadow: var(--su-shadow-md); transform: translateY(-2px); border-color: var(--su-border-strong); }
@@ -403,6 +413,7 @@
   display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px;
   border: 1px solid var(--su-border); border-radius: var(--su-radius-sm); background: var(--su-surface);
   cursor: pointer; text-align: left; width: 100%;
+  color: var(--su-text); /* explicit — see .su-card's comment on why */
 }
 .su-quick-item:hover { border-color: var(--su-accent-soft-strong); box-shadow: var(--su-shadow-md); transform: translateX(3px); }
 .su-quick-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
@@ -547,6 +558,7 @@
   display: flex; align-items: center; gap: 12px; padding: 13px 16px;
   border: 1.5px solid var(--su-border); border-radius: var(--su-radius-sm); background: var(--su-surface);
   cursor: pointer; text-align: left; width: 100%; font-size: 13.5px; font-weight: 500;
+  color: var(--su-text); /* explicit — see .su-card's comment on why */
 }
 .su-option:hover { border-color: var(--su-accent-soft-strong); background: var(--su-accent-soft); transform: translateY(-1px); }
 .su-option.selected { border-color: var(--su-accent); background: var(--su-accent-soft); box-shadow: var(--su-shadow-sm); }
@@ -594,6 +606,7 @@
 .su-choice-card {
   border: 1.5px solid var(--su-border); border-radius: var(--su-radius); padding: 18px 20px;
   cursor: pointer; background: var(--su-surface); text-align: left; width: 100%;
+  color: var(--su-text); /* explicit — see .su-card's comment on why */
 }
 .su-choice-card:hover { border-color: var(--su-accent-soft-strong); transform: translateY(-2px); box-shadow: var(--su-shadow-md); }
 .su-choice-card.selected { border-color: var(--su-accent); box-shadow: var(--su-shadow-sm); }

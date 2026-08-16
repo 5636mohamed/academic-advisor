@@ -15,12 +15,18 @@ export function FastGraduationTab({
   catalog,
   completedCredits,
   onGoToRecommendations,
+  submitLabel = 'Submit to Advisor',
+  submitMessage = 'Submitted — see the "My Recommendations" tab once your advisor reviews it.',
+  recommendationsLinkLabel = 'View',
 }: {
   studentId: string;
   student: StudentDetail;
   catalog: Map<string, CatalogEntry>;
   completedCredits: number | null;
   onGoToRecommendations: () => void;
+  submitLabel?: string;
+  submitMessage?: string;
+  recommendationsLinkLabel?: string;
 }) {
   const [plan, setPlan] = useState<RosterCourse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +47,7 @@ export function FastGraduationTab({
     setSubmitMsg(null);
     try {
       await api.generateProposals(studentId);
-      setSubmitMsg('Submitted — see the "My Recommendations" tab once your advisor reviews it.');
+      setSubmitMsg(submitMessage);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -65,13 +71,13 @@ export function FastGraduationTab({
         </div>
         <div className="su-flex su-gap-10">
           <button className="su-btn su-btn-secondary" onClick={load}>Recalculate Path</button>
-          <button className="su-btn" disabled={busy} onClick={submit}>Submit to Advisor</button>
+          <button className="su-btn" disabled={busy} onClick={submit}>{submitLabel}</button>
         </div>
       </div>
       {submitMsg && (
         <div className="su-note good su-mt-16 su-pop">
           {submitMsg}{' '}
-          <button className="su-btn su-btn-sm su-btn-outline" style={{ marginLeft: 8 }} onClick={onGoToRecommendations}>View</button>
+          <button className="su-btn su-btn-sm su-btn-outline" style={{ marginLeft: 8 }} onClick={onGoToRecommendations}>{recommendationsLinkLabel}</button>
         </div>
       )}
     </div>

@@ -1,14 +1,4 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { Layout } from './Layout';
-import { StudentFile } from '../pages/Dashboard/StudentFile';
-import { Curriculum } from '../pages/Curriculum/Curriculum';
-import { AdviseFlow } from '../pages/AdviseFlow/AdviseFlow';
-import { TargetCgpaPlanner } from '../pages/TargetCgpaPlanner/TargetCgpaPlanner';
-import { DepartmentFitQuiz } from '../pages/DepartmentFitQuiz/DepartmentFitQuiz';
-import { ProbationHistory } from '../pages/ProbationHistory/ProbationHistory';
-import { ProposalReview } from '../pages/Proposals/ProposalReview';
-import { AdvisorConsole } from '../pages/AdvisorConsole/AdvisorConsole';
-import { Home } from '../pages/Home';
 import { Login } from '../pages/Login/Login';
 import { PortalLayout } from '../portal/PortalLayout';
 import { PortalHome } from '../portal/PortalHome';
@@ -19,6 +9,18 @@ import { PortalVentureBoard } from '../portal/PortalVentureBoard';
 import { FacultyLayout } from '../faculty/FacultyLayout';
 import { FacultyProjects } from '../faculty/FacultyProjects';
 import { FacultyProjectCandidates } from '../faculty/FacultyProjectCandidates';
+import { AdvisorLayout } from '../advisorConsole/AdvisorLayout';
+import { AdvisorDashboard } from '../advisorConsole/AdvisorDashboard';
+import { AdvisorAllStudents } from '../advisorConsole/AdvisorAllStudents';
+import { AdvisorStudentShell } from '../advisorConsole/studentFile/AdvisorStudentShell';
+import { Overview } from '../advisorConsole/studentFile/Overview';
+import { AdvisorCoursePlanPage } from '../advisorConsole/studentFile/AdvisorCoursePlanPage';
+import { AdvisorCurriculumPage } from '../advisorConsole/studentFile/AdvisorCurriculumPage';
+import { AdvisorQuizPage } from '../advisorConsole/studentFile/AdvisorQuizPage';
+import { AdvisorProbationHistoryPage } from '../advisorConsole/studentFile/AdvisorProbationHistoryPage';
+import { AdvisorVentureBoard } from '../advisorConsole/venture/AdvisorVentureBoard';
+import { AdvisorProfessorProjects } from '../advisorConsole/venture/AdvisorProfessorProjects';
+import { AdvisorProjectCandidates } from '../advisorConsole/venture/AdvisorProjectCandidates';
 import { RequireAdvisor, RequireStudent, RequireProfessor } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -26,21 +28,39 @@ export const router = createBrowserRouter([
   {
     // Every route under here requires an advisor session (auth/RequireRole.tsx)
     // — a student or professor session is redirected to their own pages instead.
+    // Rebuilt to match /UI Design Professor/*.pdf — see advisorConsole/*.
+    // §16.6's Faculty Console venture-project management is now also
+    // reachable here (venture-board/:professorId/*), since every professor
+    // at E-JUST is also an academic advisor; the standalone Faculty Console
+    // below is left in place unchanged as its own login path.
     element: <RequireAdvisor />,
     children: [
       {
         path: '/',
-        element: <Layout />,
+        element: <AdvisorLayout />,
         children: [
-          { index: true, element: <Home /> },
-          { path: 'students/:id', element: <StudentFile /> },
-          { path: 'students/:id/curriculum', element: <Curriculum /> },
-          { path: 'students/:id/advise', element: <AdviseFlow /> },
-          { path: 'students/:id/target-cgpa', element: <TargetCgpaPlanner /> },
-          { path: 'students/:id/quiz', element: <DepartmentFitQuiz /> },
-          { path: 'students/:id/probation-history', element: <ProbationHistory /> },
-          { path: 'students/:id/proposals', element: <ProposalReview /> },
-          { path: 'advisor-console', element: <AdvisorConsole /> },
+          { index: true, element: <AdvisorDashboard /> },
+          { path: 'students', element: <AdvisorAllStudents /> },
+          {
+            path: 'students/:id',
+            element: <AdvisorStudentShell />,
+            children: [
+              { index: true, element: <Overview /> },
+              { path: 'course-plan', element: <AdvisorCoursePlanPage /> },
+              { path: 'curriculum', element: <AdvisorCurriculumPage /> },
+              { path: 'quiz', element: <AdvisorQuizPage /> },
+              { path: 'probation-history', element: <AdvisorProbationHistoryPage /> },
+              // Old §10 route names, kept as redirects in case anything has
+              // them bookmarked/linked from before this redesign.
+              { path: 'advise', element: <Navigate to="../course-plan?mode=probation" replace /> },
+              { path: 'target-cgpa', element: <Navigate to="../course-plan?mode=target" replace /> },
+              { path: 'proposals', element: <Navigate to="../course-plan?mode=proposals" replace /> },
+            ],
+          },
+          { path: 'venture-board', element: <AdvisorVentureBoard /> },
+          { path: 'venture-board/:professorId', element: <AdvisorProfessorProjects /> },
+          { path: 'venture-board/:professorId/:projectId', element: <AdvisorProjectCandidates /> },
+          { path: 'advisor-console', element: <Navigate to="/students" replace /> },
         ],
       },
     ],
@@ -74,6 +94,8 @@ export const router = createBrowserRouter([
   {
     // Spec §16.6 — the Faculty Console. Same own-id-only shape as the
     // student portal — a professor can only ever land on their own console.
+    // Left as its own separate login/UI (unchanged) — the advisor console's
+    // new Venture Board (above) is an additive superset, not a replacement.
     path: '/faculty/:id',
     element: <RequireProfessor />,
     children: [
