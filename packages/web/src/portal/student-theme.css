@@ -657,3 +657,57 @@
 .su-muted { color: var(--su-text-muted); }
 .su-two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: flex-start; }
 @media (max-width: 900px) { .su-two-col { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------------- *
+ * Login page — /login.pdf: black masthead banner, centered card, a subtle
+ * repeating red-ring pattern behind it. The pattern is one small inline SVG
+ * tile (a stroked circle, no fill) repeated via background-size — no image
+ * asset, no network request.
+ * ---------------------------------------------------------------------- */
+.su-login-page {
+  min-height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  position: relative;
+  background-color: var(--su-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23d6241f' stroke-opacity='0.16' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-size: 48px 48px;
+}
+:root[data-theme='dark'] .su-login-page {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23ef5b53' stroke-opacity='0.14' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .su-login-page {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23ef5b53' stroke-opacity='0.14' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+}
+
+.su-login-theme-btn { position: absolute; top: 20px; right: 20px; }
+
+.su-login-card {
+  width: 100%; max-width: 440px;
+  background: var(--su-surface);
+  border-radius: var(--su-radius-lg);
+  box-shadow: var(--su-shadow-lg);
+  overflow: hidden;
+  animation: su-pop-in 380ms var(--su-ease) both;
+}
+.su-login-masthead {
+  background: #17181c; color: #fff;
+  padding: 20px 28px;
+  text-align: center;
+}
+.su-login-masthead-title { font-weight: 800; font-size: 14.5px; letter-spacing: 0.01em; line-height: 1.35; }
+.su-login-masthead-sub { font-size: 12px; color: var(--su-banner-eyebrow); margin-top: 4px; font-weight: 600; }
+
+.su-login-body { padding: 30px 32px 26px; }
+.su-login-heading { font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+.su-login-heading-bar { width: 4px; height: 22px; background: var(--su-accent); border-radius: 2px; flex-shrink: 0; }
+.su-login-heading-accent { color: var(--su-accent); }
+
+.su-login-forgot { background: none; border: none; padding: 0; color: var(--su-accent); font-size: 12.5px; font-weight: 600; cursor: pointer; margin-bottom: 6px; }
+.su-login-forgot:hover { text-decoration: underline; }
+
+.su-login-submit { margin-top: 20px; padding: 12px; font-size: 14px; }
+
+.su-login-footer { margin-top: 20px; text-align: center; font-size: 12px; color: var(--su-text-muted); line-height: 1.5; }

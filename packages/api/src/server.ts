@@ -626,9 +626,48 @@ app.post('/api/students/:id/venture-projects/:projectId/express-interest', block
   }
 });
 
+/** A candidate is "pending the advisor's attention" if they've actually
+ *  acted (applied/suggested-and-touched) OR their live score already
+ *  clears §16's real match threshold even though no row has been
+ *  materialized for it yet (see the route below). */
+function isPendingCandidate(c: { status: string; total: number }): boolean {
+  return c.status === 'applied' || c.status === 'suggested' || (c.status === 'unscored' && c.total >= weights.ventureFit.matchThreshold);
+}
+
 // --- Faculty Console (role: professor) ---
 app.get('/api/professors', (_req, res) => {
-  res.json(db.listProfessors());
+  // 'advisor-owned' (seedVentureProjects.ts) is an internal attribution
+  // anchor for ventures the advisor console posts directly — not a real
+  // professor a student should see hosting a project list or a login this
+  // route should ever surface as choosable.
+  res.json(db.listProfessors().filter(p => p.id !== 'advisor-owned'));
+});
+
+// Advisor console's own Venture Board (advisorConsole/venture/*) — the
+// advisor "owns" every venture directly rather than browsing a directory of
+// separate professors, so this returns every project across every
+// professor in one shot (each item still carries its real owning
+// professorId, which the client uses to call the existing per-professor
+// edit/candidates routes below — those still enforce that a project can
+// only be edited via ITS OWN professorId, unchanged).
+app.get('/api/advisor/venture-projects', (_req, res) => {
+  const projects = db.listVentureProjects().map(project => {
+    const candidates = db.getVentureProjectCandidates(project.id);
+    return {
+      project,
+      candidates,
+      acceptedCount: candidates.filter(c => c.status === 'accepted').length,
+      // §16.2's "no need to store noise" means a candidate who clears the
+      // 0.80 match threshold only gets a real, actionable StudentVentureMatch
+      // row (status 'suggested'/'applied') once THEY visit their own
+      // Venture Board — a qualifying match nobody has looked at yet still
+      // reads 'unscored' here. Counting those too (isPendingCandidate) means
+      // the advisor's queue reflects real qualifying matches immediately,
+      // not just the ones a student happened to trigger materialization for.
+      pendingCount: candidates.filter(isPendingCandidate).length,
+    };
+  });
+  res.json(projects);
 });
 
 app.get('/api/professors/:id', (req, res) => {

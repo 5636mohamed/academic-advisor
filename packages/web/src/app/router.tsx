@@ -19,8 +19,6 @@ import { AdvisorCurriculumPage } from '../advisorConsole/studentFile/AdvisorCurr
 import { AdvisorQuizPage } from '../advisorConsole/studentFile/AdvisorQuizPage';
 import { AdvisorProbationHistoryPage } from '../advisorConsole/studentFile/AdvisorProbationHistoryPage';
 import { AdvisorVentureBoard } from '../advisorConsole/venture/AdvisorVentureBoard';
-import { AdvisorProfessorProjects } from '../advisorConsole/venture/AdvisorProfessorProjects';
-import { AdvisorProjectCandidates } from '../advisorConsole/venture/AdvisorProjectCandidates';
 import { RequireAdvisor, RequireStudent, RequireProfessor } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -29,10 +27,10 @@ export const router = createBrowserRouter([
     // Every route under here requires an advisor session (auth/RequireRole.tsx)
     // — a student or professor session is redirected to their own pages instead.
     // Rebuilt to match /UI Design Professor/*.pdf — see advisorConsole/*.
-    // §16.6's Faculty Console venture-project management is now also
-    // reachable here (venture-board/:professorId/*), since every professor
-    // at E-JUST is also an academic advisor; the standalone Faculty Console
-    // below is left in place unchanged as its own login path.
+    // The advisor's own Venture Board manages ventures directly (post/edit/
+    // review candidates) since every professor at E-JUST is also an
+    // academic advisor; the standalone Faculty Console below is left in
+    // place unchanged as its own login path.
     element: <RequireAdvisor />,
     children: [
       {
@@ -57,9 +55,10 @@ export const router = createBrowserRouter([
               { path: 'proposals', element: <Navigate to="../course-plan?mode=proposals" replace /> },
             ],
           },
+          // The advisor owns every venture directly — a single-page 3-pane
+          // dashboard (My ventures / Pending approvals / candidate detail),
+          // no per-professor sub-routes needed.
           { path: 'venture-board', element: <AdvisorVentureBoard /> },
-          { path: 'venture-board/:professorId', element: <AdvisorProfessorProjects /> },
-          { path: 'venture-board/:professorId/:projectId', element: <AdvisorProjectCandidates /> },
           { path: 'advisor-console', element: <Navigate to="/students" replace /> },
         ],
       },

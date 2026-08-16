@@ -13,6 +13,7 @@ import { FastGraduationTab } from './coursePlan/FastGraduationTab';
 import { TargetCgpaTab } from './coursePlan/TargetCgpaTab';
 import { ProbationRepairTab } from './coursePlan/ProbationRepairTab';
 import { MyRecommendationsTab } from './coursePlan/MyRecommendationsTab';
+import { TransferAlertBanner } from './coursePlan/TransferAlertBanner';
 
 type Mode = 'fast' | 'target' | 'probation' | 'recommendations';
 
@@ -35,6 +36,8 @@ export function PortalCoursePlan() {
 
   return (
     <div>
+      <TransferAlertBanner studentId={id} onViewRecommendation={() => setMode('probation')} />
+
       <div className="su-flex su-justify-between su-items-center su-mt-16" style={{ marginTop: 0, marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div className="su-eyebrow">Auto-balanced algorithm strictly matching your credit limit</div>

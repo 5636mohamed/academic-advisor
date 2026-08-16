@@ -258,6 +258,13 @@ export interface VentureCandidateDTO {
   cvDataUrl?: string;
 }
 
+export interface AdvisorVentureProjectRowDTO {
+  project: VentureProjectDTO;
+  candidates: VentureCandidateDTO[];
+  acceptedCount: number;
+  pendingCount: number;
+}
+
 export const api = {
   listStudents: () => request<StudentSummary[]>('/students'),
   getStudent: (id: string) => request<StudentDetail>(`/students/${id}`),
@@ -358,6 +365,10 @@ export const api = {
     request<VentureCandidateDTO[]>(`/professors/${professorId}/venture-projects/${projectId}/candidates`),
   setVentureMatchStatus: (matchId: string, status: 'accepted' | 'declined') =>
     request<{ id: string; status: VentureMatchStatus }>(`/venture-matches/${matchId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  /** Advisor console's own Venture Board — every project across every
+   *  professor in one shot, since the advisor manages ventures directly
+   *  rather than browsing a per-professor directory (see server.ts). */
+  advisorVentureProjects: () => request<AdvisorVentureProjectRowDTO[]>('/advisor/venture-projects'),
 
   predictionWeights: () => request<Record<string, unknown>>('/admin/prediction-weights'),
   updatePredictionWeights: (patch: Record<string, unknown>) =>

@@ -44,6 +44,24 @@ export const PROFESSORS: ProfessorProfile[] = [
     researchTags: ['machine_learning', 'data_science'],
     acceptingUndergrads: true,
   },
+  // Product decision: every professor at E-JUST is also an academic
+  // advisor, and there's a single shared advisor account (no per-advisor
+  // identity — see auth/AuthContext.tsx). This entry is the attribution
+  // anchor for ventures the advisor posts directly through the advisor
+  // console's own Venture Board (advisorConsole/venture/*) — it deliberately
+  // does NOT get a login credential (docs/LOGIN_CREDENTIALS.md) and is
+  // filtered out of the student-facing "who hosts this" labels, since the
+  // advisor console's venture board is explicitly "my ventures" (§ the
+  // advisor manages everything directly, not a directory of other
+  // professors) rather than a person a student would ever see named.
+  {
+    id: 'advisor-owned',
+    facultyId: 'ENG',
+    departmentId: 'ECE',
+    name: 'E-JUST Academic Advising',
+    researchTags: [],
+    acceptingUndergrads: true,
+  },
 ];
 
 export const VENTURE_PROJECTS: VentureProject[] = [
