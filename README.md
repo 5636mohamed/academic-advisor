@@ -157,6 +157,17 @@ across all three workspace packages.
 Department of Electronics and Communication Engineering
 Egypt-Japan University of Science and Technology (E-JUST)
 
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](.github/CONTRIBUTING.md)
+for local setup, coding conventions, and how to submit a pull request. This
+project follows a [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+
+## Security
+
+See [SECURITY.md](.github/SECURITY.md) for the project's supported version,
+known limitations, and how to privately report a vulnerability.
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
