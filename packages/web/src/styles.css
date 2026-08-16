@@ -103,6 +103,11 @@ body {
   color: var(--ink);
   font-size: 15px;
   line-height: 1.5;
+  /* Guards every page (both this base theme and the su-* portals/console
+     that layer on top of it) against an accidental page-level horizontal
+     scrollbar — individual wide elements (data tables) scroll within their
+     own container instead; nothing should ever need the whole page to. */
+  overflow-x: hidden;
 }
 
 a { color: var(--accent); }

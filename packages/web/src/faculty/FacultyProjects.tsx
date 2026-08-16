@@ -1,8 +1,12 @@
 // Spec §16.6 — a professor's own VentureProjects: post/edit, toggle
-// isActive, and jump to each one's ranked candidate list.
-import { useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+// isActive, and jump to each one's ranked candidate list. Rebuilt onto
+// the su-* design system (same visual language as the student portal and
+// advisor console) instead of the old base editorial theme.
+import { FormEvent, useState } from 'react';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { api, ProfessorDetailDTO, VentureProjectType } from '../api/client';
+import { Loading } from '../portal/ui/Primitives';
+import { IconPlus } from '../portal/ui/Icons';
 
 interface OutletCtx {
   professor: ProfessorDetailDTO | null;
@@ -20,6 +24,7 @@ const emptyForm = {
 
 export function FacultyProjects() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { professor, reload } = useOutletContext<OutletCtx>();
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -27,8 +32,10 @@ export function FacultyProjects() {
   const [error, setError] = useState<string | null>(null);
 
   if (!id) return null;
+  if (!professor) return <Loading label="Loading your projects…" />;
 
-  const create = async () => {
+  const create = async (e: FormEvent) => {
+    e.preventDefault();
     setBusy(true);
     setError(null);
     try {
@@ -58,61 +65,56 @@ export function FacultyProjects() {
 
   return (
     <div>
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <h2>My Venture Projects</h2>
-          <button className="secondary" onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Cancel' : 'Post New Project'}
-          </button>
+      <div className="su-flex su-justify-between su-items-center" style={{ marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div className="su-eyebrow">Innovation &amp; Venture Catalyst</div>
+          <div className="su-title" style={{ fontSize: 24 }}>My Venture Projects</div>
         </div>
-        {showForm && (
-          <div style={{ marginTop: 10 }}>
-            <div className="form-row">
-              <input placeholder="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={{ flex: 1 }} />
-            </div>
-            <div className="form-row">
-              <input placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={{ flex: 1 }} />
-            </div>
-            <div className="form-row">
-              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as VentureProjectType })}>
+        <button className="su-btn" onClick={() => setShowForm(!showForm)}>
+          {showForm ? 'Cancel' : (<><IconPlus width={15} height={15} /> Post New Project</>)}
+        </button>
+      </div>
+
+      {showForm && (
+        <form className="su-card su-pop" onSubmit={create} style={{ marginBottom: 16 }}>
+          <div className="su-title" style={{ fontSize: 15, marginBottom: 14 }}>New venture project</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input className="su-input" placeholder="Title" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+            <input className="su-input" placeholder="Description" required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+            <div className="su-flex su-gap-10" style={{ flexWrap: 'wrap' }}>
+              <select className="su-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value as VentureProjectType })}>
                 <option value="academic_research">Academic research</option>
                 <option value="commercial_spinoff">Commercial spin-off</option>
               </select>
-              <input type="number" min="1" placeholder="Capacity" value={form.capacity} onChange={e => setForm({ ...form, capacity: Number(e.target.value) })} style={{ width: 90 }} />
+              <input className="su-input" type="number" min="1" placeholder="Capacity" value={form.capacity} onChange={e => setForm({ ...form, capacity: Number(e.target.value) })} style={{ width: 110 }} />
             </div>
-            <div className="form-row">
-              <input placeholder="Required course codes (comma-separated)" value={form.requiredCourseCodes} onChange={e => setForm({ ...form, requiredCourseCodes: e.target.value })} style={{ flex: 1 }} />
-            </div>
-            <div className="form-row">
-              <input placeholder="Preferred skills (comma-separated, e.g. embedded_systems, machine_learning)" value={form.preferredSkills} onChange={e => setForm({ ...form, preferredSkills: e.target.value })} style={{ flex: 1 }} />
-            </div>
-            {error && <div className="note" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>{error}</div>}
-            <button disabled={busy || !form.title || !form.description} onClick={create}>Create Project</button>
+            <input className="su-input" placeholder="Required course codes (comma-separated)" value={form.requiredCourseCodes} onChange={e => setForm({ ...form, requiredCourseCodes: e.target.value })} />
+            <input className="su-input" placeholder="Preferred skills (comma-separated, e.g. embedded_systems, machine_learning)" value={form.preferredSkills} onChange={e => setForm({ ...form, preferredSkills: e.target.value })} />
           </div>
-        )}
-      </div>
+          {error && <div className="su-note danger su-mt-16">{error}</div>}
+          <button className="su-btn su-mt-16" disabled={busy || !form.title || !form.description} type="submit">Create Project</button>
+        </form>
+      )}
 
-      {professor?.projects.map(p => (
-        <div className="card" key={p.id}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <h3>{p.title}</h3>
-            <span className={`badge ${p.isActive ? 'ok' : 'neutral'}`}>{p.isActive ? 'active' : 'archived'}</span>
+      <div className="su-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        {professor.projects.map(p => (
+          <div className="su-card" key={p.id}>
+            <div className="su-flex su-justify-between su-items-center">
+              <div className="su-title" style={{ fontSize: 16 }}>{p.title}</div>
+              <span className={`su-badge ${p.isActive ? 'ok' : 'neutral'}`}>{p.isActive ? 'active' : 'archived'}</span>
+            </div>
+            <div className="su-subtitle">{p.description}</div>
+            <div className="su-muted" style={{ fontSize: 12, marginBottom: 12 }}>
+              {p.type === 'commercial_spinoff' ? 'Commercial spin-off' : 'Academic research'} · capacity {p.capacity} · required: {p.requiredCourseCodes.join(', ') || '—'} · skills: {p.preferredSkills.join(', ') || '—'}
+            </div>
+            <div className="su-flex su-gap-10">
+              <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => navigate(`/faculty/${id}/${p.id}`)}>View candidates</button>
+              <button className="su-btn su-btn-sm su-btn-ghost" onClick={() => toggleActive(p.id, p.isActive)}>{p.isActive ? 'Archive' : 'Reactivate'}</button>
+            </div>
           </div>
-          <p className="sub">{p.description}</p>
-          <p className="muted">
-            {p.type === 'commercial_spinoff' ? 'Commercial spin-off' : 'Academic research'} · capacity {p.capacity} · required: {p.requiredCourseCodes.join(', ') || '—'} · skills: {p.preferredSkills.join(', ') || '—'}
-          </p>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link to={`/faculty/${id}/${p.id}`}>
-              <button className="secondary">View candidates</button>
-            </Link>
-            <button className="secondary" onClick={() => toggleActive(p.id, p.isActive)}>
-              {p.isActive ? 'Archive' : 'Reactivate'}
-            </button>
-          </div>
-        </div>
-      ))}
-      {professor && professor.projects.length === 0 && <div className="empty-state">No projects yet — post one above.</div>}
+        ))}
+      </div>
+      {professor.projects.length === 0 && <div className="su-empty su-mt-16">No projects yet — post one above.</div>}
     </div>
   );
 }

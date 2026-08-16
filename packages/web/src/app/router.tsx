@@ -16,7 +16,6 @@ import { AdvisorStudentShell } from '../advisorConsole/studentFile/AdvisorStuden
 import { Overview } from '../advisorConsole/studentFile/Overview';
 import { AdvisorCoursePlanPage } from '../advisorConsole/studentFile/AdvisorCoursePlanPage';
 import { AdvisorCurriculumPage } from '../advisorConsole/studentFile/AdvisorCurriculumPage';
-import { AdvisorQuizPage } from '../advisorConsole/studentFile/AdvisorQuizPage';
 import { AdvisorProbationHistoryPage } from '../advisorConsole/studentFile/AdvisorProbationHistoryPage';
 import { AdvisorVentureBoard } from '../advisorConsole/venture/AdvisorVentureBoard';
 import { RequireAdvisor, RequireStudent, RequireProfessor } from '../auth/RequireRole';
@@ -46,10 +45,13 @@ export const router = createBrowserRouter([
               { index: true, element: <Overview /> },
               { path: 'course-plan', element: <AdvisorCoursePlanPage /> },
               { path: 'curriculum', element: <AdvisorCurriculumPage /> },
-              { path: 'quiz', element: <AdvisorQuizPage /> },
               { path: 'probation-history', element: <AdvisorProbationHistoryPage /> },
               // Old §10 route names, kept as redirects in case anything has
-              // them bookmarked/linked from before this redesign.
+              // them bookmarked/linked from before this redesign. The
+              // Best-Fit Department Quiz was removed from the advisor
+              // console entirely (product-owner decision — student-only
+              // feature now) — redirects to Overview instead of 404ing.
+              { path: 'quiz', element: <Navigate to=".." replace /> },
               { path: 'advise', element: <Navigate to="../course-plan?mode=probation" replace /> },
               { path: 'target-cgpa', element: <Navigate to="../course-plan?mode=target" replace /> },
               { path: 'proposals', element: <Navigate to="../course-plan?mode=proposals" replace /> },

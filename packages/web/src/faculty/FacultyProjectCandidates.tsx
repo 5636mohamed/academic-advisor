@@ -1,13 +1,16 @@
 // Spec §16.6 — ranked, auto-generated candidate list for one project, with
 // Accept/Decline on any applied/suggested match. Capacity is enforced
 // server-side (§16.8) — an accept beyond capacity comes back as an error,
-// shown here rather than silently allowed.
+// shown here rather than silently allowed. Rebuilt onto the su-* design
+// system.
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, VentureCandidateDTO } from '../api/client';
+import { Loading, ScoreRow } from '../portal/ui/Primitives';
 
 export function FacultyProjectCandidates() {
   const { id, projectId } = useParams<{ id: string; projectId: string }>();
+  const navigate = useNavigate();
   const [candidates, setCandidates] = useState<VentureCandidateDTO[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +19,6 @@ export function FacultyProjectCandidates() {
   const load = () => {
     if (id && projectId) api.ventureCandidates(id, projectId).then(setCandidates);
   };
-
   useEffect(load, [id, projectId]);
 
   if (!id || !projectId) return null;
@@ -36,78 +38,64 @@ export function FacultyProjectCandidates() {
 
   return (
     <div>
-      <div className="card">
-        <h2>Ranked Candidates</h2>
-        <p className="sub">Every opted-in Level 3+ student who answered the Venture Gate, scored against this project — not just the ones who've already applied.</p>
-        {error && <div className="note" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>{error}</div>}
+      <button className="su-btn su-btn-ghost su-btn-sm" onClick={() => navigate(`/faculty/${id}`)} style={{ marginBottom: 12 }}>← My Projects</button>
+
+      <div className="su-card">
+        <div className="su-title" style={{ fontSize: 16 }}>Ranked Candidates</div>
+        <div className="su-subtitle">Every opted-in Level 3+ student who answered the Venture Gate, scored against this project — not just the ones who've already applied.</div>
+        {error && <div className="su-note danger su-mt-16">{error}</div>}
       </div>
-      <div className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Course competency</th>
-              <th>Skill alignment</th>
-              <th>Trajectory</th>
-              <th>Total</th>
-              <th>Status</th>
-              <th>CV</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {candidates?.map(c => (
-              <tr key={c.studentId}>
-                <td>{c.studentName}</td>
-                <td>{Math.round(c.courseCompetencyScore * 100)}%</td>
-                <td>{Math.round(c.skillAlignmentScore * 100)}%</td>
-                <td>{Math.round(c.academicTrajectoryScore * 100)}%</td>
-                <td><b>{Math.round(c.total * 100)}%</b></td>
-                <td><span className="badge neutral">{c.status}</span></td>
-                <td>
-                  {c.cvDataUrl ? (
-                    <button
-                      className="secondary"
-                      onClick={() => setViewingCv({ studentName: c.studentName, fileName: c.cvFileName ?? 'CV', dataUrl: c.cvDataUrl! })}
-                    >
-                      View CV
-                    </button>
-                  ) : (
-                    <span className="muted">none</span>
-                  )}
-                </td>
-                <td>
-                  {c.matchId && (c.status === 'applied' || c.status === 'suggested') && (
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button disabled={busyId === c.matchId} onClick={() => act(c.matchId!, 'accepted')}>Accept</button>
-                      <button className="secondary" disabled={busyId === c.matchId} onClick={() => act(c.matchId!, 'declined')}>Decline</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
+
+      <div className="su-card su-mt-16">
+        {candidates === null ? (
+          <Loading />
+        ) : candidates.length === 0 ? (
+          <div className="su-empty">No opted-in candidates yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {candidates.map(c => (
+              <div key={c.studentId} style={{ borderBottom: '1px solid var(--su-border)', paddingBottom: 16 }}>
+                <div className="su-flex su-justify-between su-items-center" style={{ flexWrap: 'wrap', gap: 10 }}>
+                  <div>
+                    <b>{c.studentName}</b>
+                    <span className="su-badge neutral" style={{ marginLeft: 8 }}>{c.status}</span>
+                  </div>
+                  <div className="su-flex su-gap-10 su-items-center">
+                    {c.cvDataUrl ? (
+                      <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => setViewingCv({ studentName: c.studentName, fileName: c.cvFileName ?? 'CV', dataUrl: c.cvDataUrl! })}>View CV</button>
+                    ) : (
+                      <span className="su-muted" style={{ fontSize: 12 }}>no CV</span>
+                    )}
+                    {c.matchId && (c.status === 'applied' || c.status === 'suggested') && (
+                      <>
+                        <button className="su-btn su-btn-sm" disabled={busyId === c.matchId} onClick={() => act(c.matchId!, 'accepted')}>Accept</button>
+                        <button className="su-btn su-btn-sm su-btn-ghost" disabled={busyId === c.matchId} onClick={() => act(c.matchId!, 'declined')}>Decline</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="su-mt-16">
+                  <ScoreRow name="Course competency" pct={c.courseCompetencyScore} />
+                  <ScoreRow name="Skill alignment" pct={c.skillAlignmentScore} />
+                  <ScoreRow name="Trajectory" pct={c.academicTrajectoryScore} />
+                  <div style={{ marginTop: 6 }}><span className="su-badge solid">Total {Math.round(c.total * 100)}%</span></div>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-        {candidates && candidates.length === 0 && <div className="empty-state">No opted-in candidates yet.</div>}
+          </div>
+        )}
       </div>
 
       {viewingCv && (
-        <div
-          role="dialog"
-          aria-label={`${viewingCv.studentName}'s CV`}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24,
-          }}
-          onClick={() => setViewingCv(null)}
-        >
-          <div className="card" style={{ width: '100%', maxWidth: 900, height: '85vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h2 style={{ margin: 0 }}>{viewingCv.studentName}'s CV — {viewingCv.fileName}</h2>
-              <button className="secondary" onClick={() => setViewingCv(null)}>Close</button>
+        <div className="su-modal-overlay" role="dialog" aria-label={`${viewingCv.studentName}'s CV`} onMouseDown={e => e.target === e.currentTarget && setViewingCv(null)}>
+          <div className="su-modal su-pop" style={{ maxWidth: 900, width: '90vw' }}>
+            <div className="su-card" style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="su-flex su-justify-between su-items-center" style={{ marginBottom: 10 }}>
+                <div className="su-title" style={{ fontSize: 15 }}>{viewingCv.studentName}'s CV — {viewingCv.fileName}</div>
+                <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => setViewingCv(null)}>Close</button>
+              </div>
+              <iframe title={`${viewingCv.studentName}'s CV`} src={viewingCv.dataUrl} style={{ flex: 1, width: '100%', border: '1px solid var(--su-border)', borderRadius: 8 }} />
             </div>
-            {/* Rendered inline via the browser's built-in PDF viewer — no download, stays on the site. */}
-            <iframe title={`${viewingCv.studentName}'s CV`} src={viewingCv.dataUrl} style={{ flex: 1, width: '100%', border: '1px solid var(--rule)', borderRadius: 4 }} />
           </div>
         </div>
       )}

@@ -76,7 +76,7 @@ export function AdvisorVentureBoard() {
       </div>
       {error && <div className="su-note danger su-mt-16" style={{ marginTop: 0, marginBottom: 16 }}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) minmax(300px, 1.3fr) minmax(300px, 1.4fr)', gap: 16, alignItems: 'flex-start' }}>
+      <div className="su-venture-3col">
         {/* --- Left: My venture --- */}
         <div>
           <CreateVentureCard onCreated={load} />

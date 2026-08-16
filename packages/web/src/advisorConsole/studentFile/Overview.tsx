@@ -117,9 +117,9 @@ export function Overview() {
                 <span className="body"><span className="head">Generate Plan</span><span className="desc">Run the recovery planner within their {cap.cap}-credit registration limit.</span></span>
                 <IconArrowRight className="chev" width={16} height={16} />
               </button>
-              <button className="su-quick-item" onClick={() => navigate(`/students/${id}/quiz`)}>
+              <button className="su-quick-item" onClick={() => navigate(`/students/${id}/probation-history`)}>
                 <span className="su-quick-dot" style={{ background: 'var(--su-warn)' }} />
-                <span className="body"><span className="head">Department Fit Quiz</span><span className="desc">See their best-fit department results.</span></span>
+                <span className="body"><span className="head">Probation History</span><span className="desc">Full warning-counter timeline and why it changed.</span></span>
                 <IconArrowRight className="chev" width={16} height={16} />
               </button>
               <button className="su-quick-item" onClick={() => navigate(`/students/${id}/curriculum`)}>

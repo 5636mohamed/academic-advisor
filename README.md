@@ -30,12 +30,6 @@ not a mockup.
 |---|---|
 | ![Student portal walkthrough](docs/media/student-portal-demo.gif) | ![Advisor console walkthrough](docs/media/advisor-console-demo.gif) |
 
-*(Regenerate these anytime the UI changes: `packages/web`'s `playwright` +
-`ffmpeg-static` devDependencies are exactly what recorded them — script a
-flow with Playwright's `recordVideo` context option, then run it through
-`ffmpeg`'s two-pass palette-generation filter to get a small, clean GIF.
-No dedicated npm script for it yet — this was run ad hoc.)*
-
 ### Static screenshots
 
 **Student portal**

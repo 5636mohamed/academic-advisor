@@ -1,9 +1,12 @@
 // Per-student drill-down shell — reached from Dashboard/All Students. Not
 // its own mockup screen (the mockups only show the Overview tab's content),
 // but every other existing advisor feature per student (course plan modes,
-// curriculum, quiz, probation history, proposal review) needs a home, so
-// this is a lightweight sub-nav + outlet in the same su-* chrome, one level
-// under the main topbar — same pattern PortalLayout uses for the top level.
+// curriculum, probation history, proposal review) needs a home, so this is
+// a lightweight sub-nav + outlet in the same su-* chrome, one level under
+// the main topbar — same pattern PortalLayout uses for the top level.
+// Product-owner decision: the Best-Fit Department Quiz is a student-only
+// feature — removed from the advisor's per-student tabs entirely (it still
+// lives on the student's own portal, unchanged).
 import { NavLink, Outlet, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api, StudentSummary } from '../../api/client';
@@ -26,7 +29,6 @@ export function AdvisorStudentShell() {
     { to: `/students/${id}`, label: 'Overview', end: true },
     { to: `/students/${id}/course-plan`, label: 'Course Plan' },
     { to: `/students/${id}/curriculum`, label: 'Curriculum' },
-    { to: `/students/${id}/quiz`, label: 'Department Quiz' },
     { to: `/students/${id}/probation-history`, label: 'Probation History' },
   ];
 

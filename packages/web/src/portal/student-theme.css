@@ -315,8 +315,47 @@
 .su-icon-btn.danger:hover { background: var(--su-danger-soft); color: var(--su-danger); border-color: var(--su-danger); }
 .su-icon-btn:active { transform: translateY(0) scale(0.94); }
 
-.su-body { flex: 1; padding: 26px 30px 60px; }
+.su-body { flex: 1; padding: 26px 30px 60px; min-width: 0; }
 .su-inner { max-width: 1180px; margin: 0 auto; }
+
+/* ---------------------------------------------------------------------- *
+ * Responsiveness — every portal in the system shares this shell
+ * (PortalLayout, AdvisorLayout, FacultyLayout), so these rules cover all
+ * three, no exception. The topbar was the one genuinely fixed-width
+ * assumption: brand + role tag + nav + user block all fighting for one
+ * row works fine at desktop widths but has nowhere to go on a phone. Below
+ * 860px the nav drops to its own full-width row (horizontally scrollable
+ * if it still doesn't fit, rather than wrapping into a multi-row tangle)
+ * and the name/ID text next to the avatar hides — the avatar and icon
+ * buttons alone are enough to orient a signed-in session on a small
+ * screen. Below 520px, tightened further for phones specifically.
+ * ---------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .su-topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 16px; }
+  .su-topbar-nav { order: 3; flex-basis: 100%; justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .su-topbar-nav a { flex-shrink: 0; }
+  .su-topbar-user .su-user-meta { display: none; }
+  .su-body { padding: 18px 16px 40px; }
+  .su-stat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+}
+@media (max-width: 520px) {
+  .su-brand-text .su-brand-sub { display: none; }
+  .su-role-tag { font-size: 12px; }
+  .su-brand-divider { display: none; }
+  .su-title { font-size: 18px; }
+  .su-body { padding: 14px 12px 32px; }
+  .su-card, .su-stat-card { padding: 14px 16px; }
+  .su-wizard-steps { display: flex; flex-wrap: wrap; gap: 6px 14px; } /* sidebar step list -> compact wrapped row on a phone */
+}
+/* Wide data tables already scroll horizontally within their own
+   .su-table-wrap rather than squeezing columns unreadably — max-width
+   guarantees that container itself never forces the whole PAGE to scroll
+   sideways on a narrow viewport. Page-level overflow-x is guarded on
+   `body` itself (styles.css) rather than here — setting it on `.su` would
+   make `.su` compute its own overflow-y too (the CSS "auto" pairing rule)
+   and become an unwanted second scroll container underneath the already-
+   sticky topbar. Merged into .su-table-wrap's own rule further down (kept
+   as one declaration block, not duplicated) — see min-width: 0 there. */
 
 /* ---------------------------------------------------------------------- *
  * Cards / surfaces
@@ -337,6 +376,14 @@
      used as a button and renders its own text (`.su-quick-item`,
      `.su-choice-card`, `.su-option`) — each sets `color` explicitly too. */
   color: var(--su-text);
+  /* Grid/flex items default to `min-width: auto`, which floors their size
+     at their CONTENT's natural width — so a card holding a wide table
+     (inside .su-two-col, .su-venture-3col, etc.) was growing the whole
+     card (and its column) to fit the table instead of letting the table's
+     own .su-table-wrap scroll internally, blowing the layout out past the
+     viewport on mobile. min-width: 0 lets the card shrink to its grid/flex
+     track's actual size; the table still scrolls horizontally inside it. */
+  min-width: 0;
 }
 .su-card + .su-card { margin-top: 16px; }
 .su-card.su-hover:hover { box-shadow: var(--su-shadow-md); transform: translateY(-2px); border-color: var(--su-border-strong); }
@@ -448,7 +495,7 @@
 /* ---------------------------------------------------------------------- *
  * Tables
  * ---------------------------------------------------------------------- */
-.su-table-wrap { overflow-x: auto; border-radius: var(--su-radius-sm); border: 1px solid var(--su-border); }
+.su-table-wrap { overflow-x: auto; max-width: 100%; min-width: 0; border-radius: var(--su-radius-sm); border: 1px solid var(--su-border); }
 .su-table { font-size: 13px; }
 .su-table th {
   text-align: left; padding: 11px 14px; background: var(--su-bg-soft);
@@ -463,10 +510,10 @@
 .su-table tbody tr.mandatory { background: var(--su-accent-soft); }
 .su-table tbody tr.mandatory:hover { background: var(--su-accent-soft-strong); }
 
-.su-search { position: relative; }
+.su-search { position: relative; max-width: 100%; }
 .su-search input {
   padding: 8px 12px 8px 32px; border: 1px solid var(--su-border-strong); border-radius: 999px;
-  font-size: 13px; background: var(--su-surface); color: var(--su-text); width: 220px;
+  font-size: 13px; background: var(--su-surface); color: var(--su-text); width: 220px; max-width: 100%;
 }
 .su-search input:focus { outline: none; border-color: var(--su-accent); box-shadow: 0 0 0 3px var(--su-accent-soft); }
 .su-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--su-text-faint); pointer-events: none; }
@@ -657,6 +704,23 @@
 .su-muted { color: var(--su-text-muted); }
 .su-two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: flex-start; }
 @media (max-width: 900px) { .su-two-col { grid-template-columns: 1fr; } }
+
+/* Venture Board's 3-pane dashboard (My venture / Pending approvals /
+   candidate detail) — was a fixed 3-column inline style with no fallback,
+   which forced roughly 900px+ of width no matter the viewport. Two steps
+   down (2-col, then 1-col stacked) instead of one hard cutoff, since each
+   pane is a full card in its own right and reads fine stacked. */
+.su-venture-3col { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.3fr) minmax(300px, 1.4fr); gap: 16px; align-items: flex-start; }
+@media (max-width: 1150px) { .su-venture-3col { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .su-venture-3col { grid-template-columns: 1fr; } }
+
+/* Grid/flex items default to `min-width: auto`, i.e. their content's natural
+   width is a hard floor no matter how narrow the track is — .su-card already
+   guards itself against this, but its *direct* column wrapper (often a plain
+   unstyled <div> grouping several cards, e.g. AdvisorAllStudents's two-col
+   layout) is a grid item too and needs the same override, one level up, or a
+   wide table inside can still blow the whole column out past the viewport. */
+.su-two-col > *, .su-venture-3col > * { min-width: 0; }
 
 /* ---------------------------------------------------------------------- *
  * Login page — /login.pdf: black masthead banner, centered card, a subtle
