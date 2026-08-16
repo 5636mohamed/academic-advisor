@@ -156,3 +156,7 @@ across all three workspace packages.
 **Mohamed Elhariry**
 Department of Electronics and Communication Engineering
 Egypt-Japan University of Science and Technology (E-JUST)
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).

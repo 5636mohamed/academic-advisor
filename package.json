@@ -2,5 +2,6 @@
   "name": "academic-advisor",
   "private": true,
   "author": "Mohamed Elhariry, Department of Electronics and Communication Engineering, Egypt-Japan University of Science and Technology (E-JUST)",
+  "license": "Apache-2.0",
   "workspaces": ["packages/*"]
 }
