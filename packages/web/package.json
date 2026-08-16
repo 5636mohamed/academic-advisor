@@ -2,6 +2,7 @@
   "name": "@advisor/web",
   "version": "0.1.0",
   "private": true,
+  "author": "Mohamed Elhariry, Department of Electronics and Communication Engineering, Egypt-Japan University of Science and Technology (E-JUST)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -19,6 +20,7 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "ffmpeg-static": "^5.3.0",
     "playwright": "^1.62.1",
     "typescript": "^5.5.0",
     "vite": "^5.4.0"

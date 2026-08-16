@@ -1,5 +1,8 @@
 # Academic Advising & Early-Warning System
 
+**Author:** Mohamed Elhariry — Department of Electronics and Communication
+Engineering, Egypt-Japan University of Science and Technology (E-JUST)
+
 Implementation of `docs/BUILD_SPEC.md` — the full specification for the
 probation/dismissal state machine, retake-gate planning, department/faculty
 best-fit engine, internal/external transfer execution, a role-restricted
@@ -15,6 +18,25 @@ project's E-JUST UI mockups (`UI Design Student/`, `UI Design Professor/`) —
 a shared red/white design system, dark mode throughout, and smooth
 transitions on every interactive surface. The Faculty Console keeps its
 original look (out of scope for this pass).
+
+### Live demo
+
+Recorded straight off the running app (Playwright, headless Chromium) —
+login → dashboard → course plan → department quiz → venture board → dark
+mode, and the equivalent advisor flow, each real navigation and real data,
+not a mockup.
+
+| Student portal | Advisor console |
+|---|---|
+| ![Student portal walkthrough](docs/media/student-portal-demo.gif) | ![Advisor console walkthrough](docs/media/advisor-console-demo.gif) |
+
+*(Regenerate these anytime the UI changes: `packages/web`'s `playwright` +
+`ffmpeg-static` devDependencies are exactly what recorded them — script a
+flow with Playwright's `recordVideo` context option, then run it through
+`ffmpeg`'s two-pass palette-generation filter to get a small, clean GIF.
+No dedicated npm script for it yet — this was run ad hoc.)*
+
+### Static screenshots
 
 **Student portal**
 
@@ -112,7 +134,7 @@ npm install --workspaces
 
 # backend — tests + API server
 cd packages/api
-npx vitest run                # 172 tests
+npx vitest run                # 179 tests
 npx tsx src/server.ts         # API on http://localhost:3001
 
 # frontend — in a second terminal
@@ -120,14 +142,23 @@ cd packages/web
 npx vite                      # app on http://localhost:5173, proxies /api to :3001
 ```
 
-Open `http://localhost:5173/login` — sign in as the Advisor, as a student,
-or as a professor (each a demo identity, no password). The demo roster
-includes personas for every worked example in spec §11 (a good-standing
-student, a mid-probation warning-ladder student, a mandatory-retake-
-overflow case, a dismissed student, a faculty-transfer candidate,
-**Mohamed for the §16 venture-match scenario**, etc.) so every branch of
-the system is reachable through the UI, not just through unit tests.
+Open `http://localhost:5173/login` and sign in with a real email + password
+(still a demo gate — client-side only, no server-side session) — the
+Advisor, a student, or a professor. The full credential roster (every
+student/professor email is derived straight from their real seeded id) is
+in `docs/LOGIN_CREDENTIALS.md`. The demo roster includes personas for
+every worked example in spec §11 (a good-standing student, a mid-probation
+warning-ladder student, a mandatory-retake-overflow case, a dismissed
+student, a faculty-transfer candidate, **Mohamed for the §16 venture-match
+scenario**, etc.) so every branch of the system is reachable through the
+UI, not just through unit tests.
 
 No `node_modules` are committed. `npm install --workspaces` installs
 everything (Express, Vitest, React, Vite, jsPDF, Prisma client, etc.)
 across all three workspace packages.
+
+## Author
+
+**Mohamed Elhariry**
+Department of Electronics and Communication Engineering
+Egypt-Japan University of Science and Technology (E-JUST)
