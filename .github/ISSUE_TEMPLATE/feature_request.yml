@@ -1,0 +1,69 @@
+name: Feature request
+description: Suggest an enhancement or a new capability for the advising system.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project deliberately keeps advising behavior grounded in
+        [`docs/BUILD_SPEC.md`](../../docs/BUILD_SPEC.md) and
+        [`docs/HANDBOOK_RULES.md`](../../docs/HANDBOOK_RULES.md) rather than adding
+        rules that aren't backed by the spec/handbook. If your request changes
+        advising behavior (grading, probation, transfers, registration, venture
+        matching), please explain how it fits one of those documents, or that it's
+        a deliberate proposal to extend them.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What's missing, or what's currently awkward/impossible?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Describe the solution you'd like
+    validations:
+      required: true
+
+  - type: textarea
+    id: spec-basis
+    attributes:
+      label: Spec / handbook basis (if this changes advising behavior)
+      description: Which section of BUILD_SPEC.md or HANDBOOK_RULES.md supports this, or is this a proposed addition to them?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: portal
+    attributes:
+      label: Which part of the system does this affect?
+      multiple: true
+      options:
+        - Student portal
+        - Advisor console
+        - Faculty console
+        - Login / auth
+        - API / business logic
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this hasn't already been requested
+          required: true

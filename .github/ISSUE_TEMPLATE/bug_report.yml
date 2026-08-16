@@ -1,0 +1,95 @@
+name: Bug report
+description: Something isn't working as expected in the student portal, advisor console, faculty console, or API.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Before filing, please check
+        whether the behavior is actually documented as intentional in
+        [`docs/BUILD_SPEC.md`](../../docs/BUILD_SPEC.md) or
+        [`docs/HANDBOOK_RULES.md`](../../docs/HANDBOOK_RULES.md) — this project's
+        advising logic follows those documents closely, so what looks like a bug
+        is sometimes a rule you haven't seen yet.
+
+  - type: dropdown
+    id: portal
+    attributes:
+      label: Where did this happen?
+      options:
+        - Student portal
+        - Advisor console
+        - Faculty console
+        - Login / auth
+        - API (backend)
+        - Not sure / other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: Tell us what you saw.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      description: Include which spec/handbook rule this should follow, if you know it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Log in as ...
+        2. Navigate to ...
+        3. Click ...
+        4. See error
+    validations:
+      required: true
+
+  - type: input
+    id: role
+    attributes:
+      label: Which demo account did you use? (if applicable)
+      description: e.g. a student id from docs/LOGIN_CREDENTIALS.md, or "advisor"
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, OS, and whether you're on `master` or a specific commit.
+      placeholder: |
+        - Browser: Chrome 128
+        - OS: Windows 11
+        - Commit/branch: master @ <sha>
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / logs
+      description: Drag and drop images here, or paste console/server output.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked `docs/BUILD_SPEC.md` and `docs/HANDBOOK_RULES.md` and this isn't documented as intentional behavior
+          required: false
+        - label: I searched existing issues and this hasn't already been reported
+          required: true
