@@ -44,7 +44,7 @@ Instead, report it privately using one of these two channels:
 1. **GitHub Security Advisories** (preferred): go to the
    [Security tab](https://github.com/5636mohamed/academic-advisor/security/advisories)
    of this repository and click **"Report a vulnerability"**.
-2. **Email**: send details to **mado.ehab138@gmail.com** with a subject
+2. **Email**: send details to **mohamed.e.elhariry@gmail.com** with a subject
    line starting with `[SECURITY]`.
 
 Please include, as applicable:
