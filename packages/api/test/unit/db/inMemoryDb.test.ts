@@ -52,6 +52,27 @@ describe('in-memory store — seed / read', () => {
     const eligible = db.getEligibleCourses('ahmed-1');
     expect(eligible.some(e => e.course.code === 'MTH111')).toBe(false); // Ahmed passed this with an A
   });
+
+  // BUILD_SPEC.md §"Course categories": "ur_core/ur_elective (LRA/
+  // University-Requirement courses, may be taken from any year's list)" —
+  // a flat exemption from level-gating, distinct from core/program/
+  // faculty/school courses which "must be taken at-or-before the
+  // student's current level".
+  it('a semester-7 LRA/UR elective is eligible even for a Level 2 student (LRA courses are never level-gated)', () => {
+    const eligible = db.getEligibleCourses('karim-1'); // karim-1 is Level 2
+    expect(eligible.some(e => e.course.code === 'LRAE4')).toBe(true);
+  });
+
+  it('a semester-7 program elective (not LRA/UR) stays locked for a Level 2 student, same course with no prereqs to confound it', () => {
+    const eligible = db.getEligibleCourses('karim-1');
+    expect(eligible.some(e => e.course.code === 'ECEEL1')).toBe(false);
+  });
+
+  it('getCurriculum marks that same LRA elective "eligible" (not "locked") for a Level 2 student', () => {
+    const rows = db.getCurriculum('karim-1');
+    const lra = rows.find(r => r.course.code === 'LRAE4');
+    expect(lra?.status).toBe('eligible');
+  });
 });
 
 describe('in-memory store — write / modify', () => {

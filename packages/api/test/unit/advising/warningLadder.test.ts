@@ -78,13 +78,13 @@ describe('AMENDMENT 1 — warning-ladder tier escalation', () => {
   it('warningCount = 3 but currentCgpa has recovered above 3.0 -> SHOW_PLAN, not a transfer', () => {
     const result = decideAdvisingAction(baseParams({ warningCount: 3, currentCgpa: 3.2 }));
     expect(result.action).toBe('SHOW_PLAN');
-    expect(result.explain).toBe('warning_ladder_overridden_by_recovered_cgpa');
+    expect(result.explain).toBe('cgpa_comfortably_above_3_no_transfer_needed');
   });
 
   it('warningCount = 4 but currentCgpa has recovered above 3.0 -> SHOW_PLAN, not a transfer', () => {
     const result = decideAdvisingAction(baseParams({ warningCount: 4, currentCgpa: 3.5 }));
     expect(result.action).toBe('SHOW_PLAN');
-    expect(result.explain).toBe('warning_ladder_overridden_by_recovered_cgpa');
+    expect(result.explain).toBe('cgpa_comfortably_above_3_no_transfer_needed');
   });
 
   it('warningCount = 3 with currentCgpa AT exactly 3.0 (not above) still escalates — the recovery bar is > 3.0, not >=', () => {

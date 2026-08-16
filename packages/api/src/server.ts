@@ -181,11 +181,16 @@ app.post('/api/students/:id/advise', blockIfDismissed, async (req, res) => {
   if (!student) return res.status(404).json({ error: 'student not found' }); // unreachable after blockIfDismissed, kept for type-safety
   try {
     const result = await runAdvisingCycle(student, ports);
-    // §8 step 12 (§16) — independent of the branch decision above; never
-    // reads or changes `action`/`plan`, just attaches a card if one qualifies.
-    const topMatch = db.getTopVentureCardMatch(req.params.id);
-    const ventureMatch = topMatch ? withProfessorName(topMatch) : null;
-    res.json({ ...result, plan: attachBestCase(req.params.id, result.plan), ventureMatch }); // §15.2 + §16.4
+    // Product-owner decision: venture/project recommendations only ever
+    // show on the Venture Board — Course Plan (this route) never injects
+    // one, regardless of whether a qualifying match exists. §16.4's gold
+    // card used to be attached here (§8 step 12); removed from this
+    // response entirely rather than just hidden client-side, so nothing
+    // reachable from Course Plan can surface it. getTopVentureCardMatch
+    // (db) still exists and is still tested — this is the one place it
+    // used to be wired into a response, not a claim that the underlying
+    // §16.4 threshold logic itself was wrong.
+    res.json({ ...result, plan: attachBestCase(req.params.id, result.plan) }); // §15.2
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

@@ -100,6 +100,28 @@ describe('decideAdvisingAction — §4.2', () => {
     expect(result.action).toBe('RECOMMEND_FACULTY_TRANSFER');
   });
 
+  // Product-owner refinement: the original Tier 2 (§4.2) branch only ever
+  // required currentCgpa >= 2.00 — no UPPER bound — so a student doing
+  // genuinely well overall (cgpa > 3.0) but with a recently flat/declining
+  // trend (e.g. right after a department switch) could still get pushed
+  // into an internal transfer recommendation. That's exactly the case this
+  // covers: a comfortably-above-3.0 student never gets a transfer pushed,
+  // regardless of trend or how much better a different department scores.
+  it('a student with cgpa > 3.0 and a declining trend (e.g. right after joining a new department) still gets SHOW_PLAN, not a transfer', () => {
+    const result = decideAdvisingAction({
+      currentCgpa: 3.4,
+      plan: emptyPlan,
+      projectedCGPA: 3.41,
+      trend: { slope: -0.05, reading: 'declining' }, // a real, large post-transfer dip
+      bestInternalDept: cse,
+      simulateBestInternal: { projectedCGPA: 3.6, trend: { slope: 0.05, reading: 'improving' } },
+      alreadyTransferredInternallyOnce: false,
+      facultyFit: [commerce],
+    });
+    expect(result.action).toBe('SHOW_PLAN');
+    expect(result.explain).toBe('cgpa_comfortably_above_3_no_transfer_needed');
+  });
+
   it('Example L — insufficient trend history defaults to SHOW_PLAN when the plan itself improves', () => {
     const result = decideAdvisingAction({
       currentCgpa: 2.6,

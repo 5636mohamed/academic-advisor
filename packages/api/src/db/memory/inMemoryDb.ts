@@ -767,13 +767,20 @@ export function getCurrentCgpa(id: string): number {
 
 /** Product-owner rule: the general one-level lookahead below (a student may
  *  preview next level's courses before formally reaching it) explicitly
- *  does NOT extend into Level 4 — semester 7/8 subjects can never be
- *  eligible-for-recommendation until the student has actually reached
- *  Level 4. Shared by `getEligibleCourses` (feeds every recommendation
- *  route — /eligible-courses, /advise, /plan/fast, /plan/target, proposals)
- *  and `getCurriculum` (the Curriculum tab) so the two views never
- *  disagree about what's reachable. */
-function isLevelReachable(courseLevel: number, studentLevel: number): boolean {
+ *  does NOT extend into Level 4 — semester 7/8 SUBJECT-SPECIFIC courses can
+ *  never be eligible-for-recommendation until the student has actually
+ *  reached Level 4. §BUILD_SPEC.md's own course-category rule ("core/
+ *  program/faculty/school ... must be taken at-or-before the student's
+ *  current level, ur_core/ur_elective ... may be taken from any year's
+ *  list") is a flat exemption on TOP of that — a semester 7/8 UR/LRA
+ *  elective (e.g. LRAE4, LRA201) is open to every level, same as a
+ *  semester-1 one, never gated by level at all. Shared by
+ *  `getEligibleCourses` (feeds every recommendation route —
+ *  /eligible-courses, /advise, /plan/fast, /plan/target, proposals) and
+ *  `getCurriculum` (the Curriculum tab) so the two views never disagree
+ *  about what's reachable. */
+function isLevelReachable(courseLevel: number, studentLevel: number, isUR: boolean): boolean {
+  if (isUR) return true;
   if (courseLevel >= 4) return studentLevel >= courseLevel;
   return courseLevel <= studentLevel + 1;
 }
@@ -803,7 +810,7 @@ export function getEligibleCourses(id: string): Array<{ course: Course; isRetake
       continue;
     }
     if (rec) continue; // already passed with C or better — not offered again
-    if (!isLevelReachable(course.level, student.level)) continue; // not yet reachable
+    if (!isLevelReachable(course.level, student.level, course.isUR)) continue; // not yet reachable
     const prereqsMet = course.prereq.every(p => passedCodes.has(p));
     if (!prereqsMet) continue;
     results.push({ course, isRetake: false, oldLetter: null, oldPoints: null });
@@ -916,7 +923,7 @@ export function getCurriculum(id: string): CurriculumCourseView[] {
     if (reg) {
       return { course, status: 'registered', letter: null, pct: null, points: null, attemptNumber: null, registeredAt: reg.registeredAt };
     }
-    const reachable = isLevelReachable(course.level, student.level);
+    const reachable = isLevelReachable(course.level, student.level, course.isUR);
     const prereqsMet = course.prereq.every(p => passedCodes.has(p));
     return {
       course, status: reachable && prereqsMet ? 'eligible' : 'locked',

@@ -119,9 +119,9 @@ export interface AdvisingActionDTO {
   explain: string;
   suggestedDepartmentId?: string;
   suggestedFaculties?: DeptFitResultDTO[];
-  /** §8 step 12 / §16.4 — independent of the branch decision above; null
-   *  when nothing qualifies for the gold card. */
-  ventureMatch?: VentureMatchResultDTO | null;
+  // Product-owner decision: project/venture recommendations only ever show
+  // on the Venture Board — /advise's response no longer carries one (see
+  // server.ts). No `ventureMatch` field here on purpose.
 }
 
 export interface QuizQuestionDTO {

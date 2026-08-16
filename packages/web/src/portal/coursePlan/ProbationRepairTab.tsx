@@ -2,8 +2,10 @@
 // one PortalAdvise.tsx used to drive on its own "Advise Me" tab): retake
 // gate → POST /students/:id/advise → either the SHOW_PLAN roster
 // (course-plan.pdf) or a transfer recommendation (transfer-recommendation.pdf)
-// depending on what the real branch logic decides, with the §16.4 venture
-// match card injected the same way it always was.
+// depending on what the real branch logic decides. Product-owner decision:
+// project/venture recommendations only ever show on the Venture Board —
+// the §16.4 gold card that used to be injected here was removed, from the
+// /advise response itself (server.ts), not just hidden in this component.
 import { useState } from 'react';
 import { api, AdvisingActionDTO, DeptFitResultDTO, StudentDetail } from '../../api/client';
 import { categoryTag, creditCapDisplay } from '../lib/studentUiHelpers';
@@ -14,7 +16,6 @@ import { defaultCategoryTag, PlanRosterTable } from './PlanRosterTable';
 import { computePlanProjection, PlanSummary } from './PlanSummary';
 import { TransferConfirm } from './TransferConfirm';
 import { TransferRecommendation } from './TransferRecommendation';
-import { VentureMatchGoldCard } from './VentureMatchGoldCard';
 
 type Step =
   | { kind: 'gate' }
@@ -95,13 +96,6 @@ export function ProbationRepairTab({
           <b>Probation-repair mode active.</b> Because your CGPA is below 2.00, this plan is weighted toward expected
           grade quality over speed-to-graduation.
         </div>
-      )}
-
-      {result.ventureMatch && (
-        <VentureMatchGoldCard
-          match={result.ventureMatch}
-          onExpressInterest={async cv => { await api.expressInterestInProject(studentId, result.ventureMatch!.project.id, cv); }}
-        />
       )}
 
       {showPlan ? (

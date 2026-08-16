@@ -217,21 +217,26 @@ export function decideAdvisingAction(params: {
     };
   }
 
-  // --- Product-owner refinement (post-AMENDMENT-1): the warning-ladder
-  // tiers below exist to catch a student who is STILL struggling after
-  // repeated warnings — they were never meant to keep insisting on a
-  // transfer once the student has clearly recovered. A student who has
-  // pulled their CURRENT cgpa comfortably above the 3.0 "doing well" bar
-  // (regardless of how many warnings sit in their history) gets the normal
-  // plan, not a transfer push. Only intercepts the two transfer-producing
-  // tiers (3 and 4+) — 1st/2nd warning already just shows the plan above. ---
-  if (warningCount >= 3 && currentCgpa > 3.0) {
+  // --- Product-owner refinement: NEITHER the warning-ladder tiers below
+  // NOR the original trend-based Tier 2/3 further down were ever meant to
+  // push a transfer on a student who is currently doing well — a
+  // comfortably-above-3.0 CGPA is "good performing" full stop, even if
+  // their trend recently dipped (e.g. right after a department switch) or
+  // their warning history says otherwise. Placed AFTER the 1st/2nd-warning
+  // check above (no conflict — that's already SHOW_PLAN) but BEFORE the
+  // ladder's own transfer tiers, and again further down between Tier 1 and
+  // Tier 2/3 — never before Tier 1 itself, so a genuinely improving >3.0
+  // case still gets Tier 1's own more specific explain reason rather than
+  // this generic one. A narrower version of this guard once only covered
+  // warningCount >= 3 and missed the Tier 2 trend-based branch entirely,
+  // which had no upper CGPA bound at all. ---
+  if (currentCgpa > 3.0 && warningCount >= 3) {
     return {
       action: 'SHOW_PLAN',
       plan,
       projectedCGPA,
       trendSlope: trend.slope,
-      explain: 'warning_ladder_overridden_by_recovered_cgpa',
+      explain: 'cgpa_comfortably_above_3_no_transfer_needed',
     };
   }
 
@@ -287,6 +292,22 @@ export function decideAdvisingAction(params: {
       projectedCGPA,
       trendSlope: trend.slope,
       explain: 'plan_projected_to_raise_cgpa',
+    };
+  }
+
+  // Same product-owner refinement as above, for the original Tier 2/3
+  // trend-based branches: Tier 1 just failed (this student's trend doesn't
+  // read as "improving" by that stricter test — e.g. a real dip right
+  // after a department switch), but a CGPA comfortably above 3.0 is still
+  // "doing well" and was never meant to get a transfer pushed on it either
+  // way. Tier 2 below had no upper CGPA bound at all before this existed.
+  if (currentCgpa > 3.0) {
+    return {
+      action: 'SHOW_PLAN',
+      plan,
+      projectedCGPA,
+      trendSlope: trend.slope,
+      explain: 'cgpa_comfortably_above_3_no_transfer_needed',
     };
   }
 
