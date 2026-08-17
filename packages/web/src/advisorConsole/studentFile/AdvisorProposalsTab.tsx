@@ -33,6 +33,7 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
   const [preview, setPreview] = useState<Record<string, AlternateScorePreviewDTO | null>>({});
   const [previewSlot, setPreviewSlot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showFinalPlan, setShowFinalPlan] = useState(false);
 
   const load = () => {
     api.getProposals(studentId).then(r => {
@@ -64,6 +65,19 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
     setBusySlot(proposalId);
     try { await api.approveProposal(proposalId); load(); } finally { setBusySlot(null); }
   };
+  const approveAll = async () => {
+    setBusySlot('__approve_all__');
+    setError(null);
+    try {
+      const r = await api.approveAllProposals(studentId);
+      setProposals(r.proposals);
+      setImpact({ expectedProjectedCGPA: r.expectedProjectedCGPA, bestCaseProjectedCGPA: r.bestCaseProjectedCGPA });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusySlot(null);
+    }
+  };
   const decline = async (proposalId: string) => {
     setBusySlot(proposalId);
     try { await api.declineProposal(proposalId); load(); } finally { setBusySlot(null); }
@@ -88,6 +102,17 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
   };
 
   const slots = groupBySlot(proposals);
+  // A slot is "still pending" once its final word — the advisor's alternate
+  // if there is one, otherwise the system's own proposal — hasn't been
+  // approved yet. That's exactly the set §15.3.2 step 3 sends to the
+  // "contact your advisor" prompt when the student tries to register it.
+  const finalForSlot = (slot: Slot) => slot.advisor ?? slot.system;
+  const pendingSlots = slots.filter(s => finalForSlot(s)?.status === 'pending');
+  // "Approve all" only ever touches system proposals the advisor hasn't
+  // already overridden with their own alternate — count that subset so the
+  // button can honestly say how many it's about to approve, and hide once
+  // there's nothing left for it to do.
+  const bulkApprovableCount = slots.filter(s => !s.advisor && s.system?.status === 'pending').length;
 
   return (
     <div className="su-fade">
@@ -100,9 +125,16 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
               grades are computed live before you confirm.
             </div>
           </div>
-          <button className="su-btn su-btn-sm" disabled={busySlot === '__generate__'} onClick={generate}>
-            {proposals.length === 0 ? 'Generate proposals from plan' : 'Refresh from latest plan'}
-          </button>
+          <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap' }}>
+            {bulkApprovableCount > 0 && (
+              <button className="su-btn su-btn-sm su-btn-secondary" disabled={busySlot === '__approve_all__'} onClick={approveAll}>
+                Approve all ({bulkApprovableCount})
+              </button>
+            )}
+            <button className="su-btn su-btn-sm" disabled={busySlot === '__generate__'} onClick={generate}>
+              {proposals.length === 0 ? 'Generate proposals from plan' : 'Refresh from latest plan'}
+            </button>
+          </div>
         </div>
         {error && <div className="su-note danger su-mt-16">{error}</div>}
         {impact && (
@@ -157,13 +189,18 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
 
           {!slot.advisor && (
             <div className="su-mt-16">
+              {slot.system && (
+                <div className="su-muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
+                  <b>{slot.system.courseCode}</b> is already recommended by the system for this slot — it's excluded
+                  from the list below{slot.system.status === 'pending'
+                    ? ' (approve it above instead of re-proposing it)'
+                    : ` (already ${slot.system.status.replace('_', ' ')} above)`}; pick a genuinely different course
+                  here only if you want to override it.
+                </div>
+              )}
               <div className="su-flex su-gap-10 su-items-center" style={{ flexWrap: 'wrap' }}>
                 <div className="su-field" style={{ flex: 1, minWidth: 220 }}>
                   <label>Propose alternate</label>
-                  {/* The system's own recommendation for this slot is deliberately
-                      excluded here — proposing it back as an "alternate" isn't a
-                      real alternative, and Approve above already covers that case.
-                      (Backend still rejects it too, in case of a stale course list.) */}
                   <select className="su-input" value={altPicker[slot.slotKey] ?? ''} onChange={e => pickAlternate(slot.slotKey, e.target.value)}>
                     <option value="">Choose a course…</option>
                     {eligible.filter(e => e.course.code !== slot.system?.courseCode).map(e => <option key={e.course.code} value={e.course.code}>{e.course.code} — {e.course.name}</option>)}
@@ -178,17 +215,24 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
                 const p = preview[slot.slotKey]!;
                 const recommended = slot.system;
                 const delta = recommended ? p.expectedPoints - recommended.expectedPoints : null;
+                const bestCaseDelta = recommended ? p.bestCasePoints - recommended.bestCasePoints : null;
                 const deltaTone = delta === null ? 'neutral' : delta > 0 ? 'ok' : delta < 0 ? 'danger' : 'neutral';
                 const deltaLabel = delta === null ? null : delta === 0 ? 'no change' : `${delta > 0 ? '+' : ''}${delta.toFixed(2)} grade points`;
+                const bestCaseDeltaLabel = bestCaseDelta === null ? null : bestCaseDelta === 0 ? 'no change' : `${bestCaseDelta > 0 ? '+' : ''}${bestCaseDelta.toFixed(2)} grade points`;
                 return (
                   <div className="su-note su-mt-16">
                     <b>{p.courseCode}</b> expected grade: <span className={letterClass(p.expectedLetter)}>{p.expectedLetter} ({p.expectedPct.toFixed(1)}%)</span>
                     {' · '}best case: <span className={letterClass(p.bestCaseLetter)}>{p.bestCaseLetter} ({p.bestCasePct.toFixed(1)}%)</span>
                     {recommended && (
                       <div className="su-mt-16" style={{ marginTop: 6 }}>
-                        Consequence of choosing this instead of the recommended <b>{recommended.courseCode}</b>{' '}
-                        (<span className={letterClass(recommended.expectedLetter)}>{recommended.expectedLetter}</span>):{' '}
-                        <span className={`su-badge ${deltaTone}`}>{deltaLabel}</span>
+                        How this changes the student's registered/recommended course versus the system's <b>{recommended.courseCode}</b>{' '}
+                        (<span className={letterClass(recommended.expectedLetter)}>{recommended.expectedLetter}</span>):
+                        <div className="su-flex su-gap-8 su-items-center" style={{ marginTop: 4, flexWrap: 'wrap' }}>
+                          <span className="su-muted" style={{ fontSize: 12 }}>Expected:</span>
+                          <span className={`su-badge ${deltaTone}`}>{deltaLabel}</span>
+                          <span className="su-muted" style={{ fontSize: 12 }}>Best case:</span>
+                          <span className={`su-badge ${bestCaseDelta === null ? 'neutral' : bestCaseDelta > 0 ? 'ok' : bestCaseDelta < 0 ? 'danger' : 'neutral'}`}>{bestCaseDeltaLabel}</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -198,6 +242,57 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
           )}
         </div>
       ))}
+
+      {slots.length > 0 && (
+        <div className="su-card su-mt-16">
+          <div className="su-flex su-justify-between su-items-center" style={{ flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <div className="su-title" style={{ fontSize: 15 }}>Modified Plan</div>
+              <div className="su-subtitle" style={{ marginTop: 4 }}>
+                {pendingSlots.length === 0
+                  ? "Every slot has a decision — this is the plan the student will see."
+                  : `${pendingSlots.length} of ${slots.length} slot${slots.length === 1 ? '' : 's'} ${pendingSlots.length === 1 ? 'is' : 'are'} still unreviewed — the student will be asked to contact you if they try to register ${pendingSlots.length === 1 ? 'it' : 'them'} before you decide.`}
+              </div>
+            </div>
+            <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => setShowFinalPlan(!showFinalPlan)}>
+              {showFinalPlan ? 'Hide' : 'Activate'} modified plan
+            </button>
+          </div>
+
+          {showFinalPlan && (
+            <>
+              <div className="su-table-wrap su-mt-16">
+                <table className="su-table">
+                  <thead><tr><th>Slot</th><th>Course the student will receive</th><th>Source</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {slots.map(slot => {
+                      const final = finalForSlot(slot);
+                      const isPending = final?.status === 'pending';
+                      return (
+                        <tr key={slot.slotKey}>
+                          <td className="su-muted">{slot.slotKey}</td>
+                          <td><b>{final?.courseCode ?? '—'}</b></td>
+                          <td className="su-muted">{slot.advisor ? 'Advisor alternate' : 'System recommendation'}</td>
+                          <td>{isPending ? <span className="su-badge warn">Not yet approved</span> : <span className="su-badge ok">{final?.status}</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {pendingSlots.length > 0 && (
+                <div className="su-note warn su-mt-16">
+                  <b>{pendingSlots.map(s => s.slotKey).join(', ')}</b> — not yet approved. If the student tries to
+                  register {pendingSlots.length === 1 ? 'this course' : 'these courses'} first, they'll be shown a
+                  "contact your advisor" notice instead of registering automatically (§15.3.2 step 3) — approve or
+                  propose an alternate above to clear it.
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

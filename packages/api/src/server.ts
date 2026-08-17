@@ -458,6 +458,19 @@ app.post('/api/advisor/proposals/:proposalId/approve', (req, res) => {
   }
 });
 
+// "Approve all" — accept the system's whole plan in one click. Skips any
+// slot the advisor already replaced with their own alternate; returns the
+// same shape as GET/generate so the frontend can reuse one response handler.
+app.post('/api/advisor/students/:id/proposals/approve-all', (req, res) => {
+  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+  try {
+    db.approveAllPendingSystemProposals(req.params.id);
+    res.json(proposalsWithImpact(req.params.id));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.post('/api/advisor/proposals/:proposalId/decline', (req, res) => {
   try {
     res.json(db.declineProposalById(req.params.proposalId));

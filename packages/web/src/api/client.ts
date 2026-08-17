@@ -316,6 +316,7 @@ export const api = {
   getProposals: (id: string) => request<ProposalsWithImpactDTO>(`/students/${id}/proposals`),
   approveProposal: (proposalId: string) => request<CourseProposalDTO>(`/advisor/proposals/${proposalId}/approve`, { method: 'POST' }),
   declineProposal: (proposalId: string) => request<CourseProposalDTO>(`/advisor/proposals/${proposalId}/decline`, { method: 'POST' }),
+  approveAllProposals: (studentId: string) => request<ProposalsWithImpactDTO>(`/advisor/students/${studentId}/proposals/approve-all`, { method: 'POST' }),
   proposeAlternate: (studentId: string, slotKey: string, courseCode: string) =>
     request<CourseProposalDTO>(`/advisor/students/${studentId}/proposals/${slotKey}/alternate`, {
       method: 'POST',

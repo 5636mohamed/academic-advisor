@@ -171,3 +171,46 @@ describe('advisor alternate proposals — cannot re-propose the system\'s own re
     expect(alt.courseCode).toBe('ECE314'); // now allowed — the system's recommendation is no longer live
   });
 });
+
+// "Approve all" — the advisor accepting the system's whole plan in one
+// click instead of clicking Approve on every slot.
+describe('approveAllPendingSystemProposals', () => {
+  function candidate(courseCode: string) {
+    return {
+      courseCode, isRetake: false, oldPoints: null,
+      expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0,
+      deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
+    };
+  }
+
+  it('approves every pending system proposal for the student', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314'), candidate('ECE316')]);
+    db.approveAllPendingSystemProposals('ahmed-1');
+    const proposals = db.getProposals('ahmed-1').filter(p => ['ECE314', 'ECE316'].includes(p.slotKey));
+    expect(proposals.every(p => p.status === 'advisor_approved' && p.advisorApproved)).toBe(true);
+  });
+
+  it('leaves a slot alone once the advisor has already replaced it with their own alternate', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314'), candidate('ECE316')]);
+    db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 84, expectedLetter: 'B', expectedPoints: 3.0 });
+    db.approveAllPendingSystemProposals('ahmed-1');
+    const all = db.getProposals('ahmed-1');
+    // the system's original ECE314 proposal stays pending, untouched, underneath the advisor's alternate
+    expect(all.find(p => p.slotKey === 'ECE314' && p.origin === 'system')!.status).toBe('pending');
+    expect(all.find(p => p.slotKey === 'ECE314' && p.origin === 'advisor')!.status).toBe('advisor_approved');
+    // the untouched slot is bulk-approved as normal
+    expect(all.find(p => p.slotKey === 'ECE316')!.status).toBe('advisor_approved');
+  });
+
+  it('is idempotent and never touches a declined proposal', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const p = db.getProposals('ahmed-1').find(x => x.slotKey === 'ECE314')!;
+    db.declineProposalById(p.id);
+    db.approveAllPendingSystemProposals('ahmed-1');
+    expect(db.getProposals('ahmed-1').find(x => x.slotKey === 'ECE314')!.status).toBe('declined');
+  });
+
+  it('throws for an unknown student', () => {
+    expect(() => db.approveAllPendingSystemProposals('nobody')).toThrow();
+  });
+});

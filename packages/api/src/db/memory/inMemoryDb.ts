@@ -1178,6 +1178,28 @@ export function approveProposalById(proposalId: string): CourseProposal {
   return student.proposals[idx];
 }
 
+/** "Approve all" — the advisor accepting the system's whole plan in one
+ *  click instead of clicking Approve on every slot individually. Only
+ *  touches still-pending SYSTEM proposals; a slot the advisor has already
+ *  replaced with their own alternate (any status but declined) is left
+ *  alone — that alternate is the advisor's actual decision for the slot,
+ *  approving the system's original underneath it would silently overrule
+ *  it. Idempotent: re-running it after some slots are already
+ *  approved/declined/alternated just approves whatever is still pending. */
+export function approveAllPendingSystemProposals(studentId: string): CourseProposal[] {
+  const student = students.get(studentId);
+  if (!student) throw new Error(`no such student ${studentId}`);
+  const advisorHandledSlots = new Set(
+    student.proposals.filter(p => p.origin === 'advisor' && p.status !== 'declined').map(p => p.slotKey)
+  );
+  student.proposals = student.proposals.map(p =>
+    p.origin === 'system' && p.status === 'pending' && !advisorHandledSlots.has(p.slotKey)
+      ? approveProposal(p)
+      : p
+  );
+  return student.proposals;
+}
+
 export function declineProposalById(proposalId: string): CourseProposal {
   const student = findStudentByProposalId(proposalId);
   const idx = student.proposals.findIndex(p => p.id === proposalId);
