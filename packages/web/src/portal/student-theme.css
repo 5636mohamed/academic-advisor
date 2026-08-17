@@ -464,9 +464,15 @@
 }
 .su-quick-item:hover { border-color: var(--su-accent-soft-strong); box-shadow: var(--su-shadow-md); transform: translateX(3px); }
 .su-quick-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-.su-quick-item .body { flex: 1; }
-.su-quick-item .head { font-weight: 700; font-size: 13.5px; }
-.su-quick-item .desc { font-size: 12px; color: var(--su-text-muted); margin-top: 3px; line-height: 1.45; }
+.su-quick-item .body { flex: 1; min-width: 0; }
+/* .head and .desc are <span>s (so the button's own text-node whitespace
+   rules don't force an unwanted gap before .chev), which defaults them to
+   inline — with no literal whitespace between the two tags in the JSX,
+   that let "Generate Plan" and its description run together on one line
+   with zero separation. display:block puts each on its own line again,
+   same look these were always meant to have. */
+.su-quick-item .head { display: block; font-weight: 700; font-size: 13.5px; }
+.su-quick-item .desc { display: block; font-size: 12px; color: var(--su-text-muted); margin-top: 3px; line-height: 1.45; }
 .su-quick-item .chev { color: var(--su-text-faint); align-self: center; flex-shrink: 0; transform: translateX(0); }
 .su-quick-item:hover .chev { transform: translateX(3px); color: var(--su-accent); }
 
