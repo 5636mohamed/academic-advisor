@@ -689,6 +689,11 @@
    a dialog (click-outside-to-close, Esc-friendly framing) rather than a
    full page navigation. */
 .su-modal-fullscreen { max-width: 96vw; width: 96vw; height: 94vh; }
+/* The CV/document viewer's own Close button — turns the brand accent red
+   on hover, rather than the plain neutral-gray hover every other
+   .su-btn-secondary gets, since this is the one button on that whole
+   fullscreen surface and deserves to read as unmistakably clickable. */
+.su-modal-fullscreen .su-btn-secondary:hover { background: var(--su-accent); color: var(--su-accent-contrast); border-color: var(--su-accent); }
 
 .su-toast {
   position: fixed; bottom: 22px; right: 22px; z-index: 200;

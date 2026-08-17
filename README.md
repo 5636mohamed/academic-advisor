@@ -3,6 +3,18 @@
 **Author:** Mohamed Elhariry — Department of Electronics and Communication
 Engineering, Egypt-Japan University of Science and Technology (E-JUST)
 
+### 🔗 Live demo — try it now
+
+**https://5636mohamed.github.io/academic-advisor/**
+
+The real, fully working system — not a static mockup. Frontend on GitHub
+Pages, backend API live on Railway; log in with any credential from
+`docs/LOGIN_CREDENTIALS.md` (advisor: `advisor@ejust.edu.eg` / `admin`) and
+click through the real dashboard, course plans, and venture board with real
+seeded data. The API's free tier can spin down after a period of
+inactivity — the very first request after a quiet stretch may take up to
+~30–60 seconds to wake back up; every request after that is normal speed.
+
 Implementation of `docs/BUILD_SPEC.md` — the full specification for the
 probation/dismissal state machine, retake-gate planning, department/faculty
 best-fit engine, internal/external transfer execution, a role-restricted
@@ -13,11 +25,11 @@ own student, advisor, and Faculty Console surfaces (§16).
 
 ## Screenshots
 
-The student portal and advisor console were redesigned to match the
-project's E-JUST UI mockups (`UI Design Student/`, `UI Design Professor/`) —
-a shared red/white design system, dark mode throughout, and smooth
-transitions on every interactive surface. The Faculty Console keeps its
-original look (out of scope for this pass).
+The student portal, advisor console, **and** Faculty Console were all
+redesigned to match the project's E-JUST UI mockups (`UI Design Student/`,
+`UI Design Professor/`) — one shared red/white design system, dark mode
+throughout, smooth transitions on every interactive surface, and verified
+responsive from mobile (375px) through desktop across all three portals.
 
 ### Live demo
 
@@ -51,26 +63,24 @@ not a mockup.
 ## Status
 See `PROGRESS.md` for exactly what is implemented vs. still to be built, and
 which spec section each file maps to (read the newest "SESSION N NOTE" at
-the top first). As of session 9, on top of sessions 6–8's core (grading,
-prediction, probation/dismissal, retake gate, department/faculty fit,
-transfer execution, the full advisor/student frontend, best-case grading,
-the proposal/approval workflow, and real advisor/student/professor access
-separation):
+the top first). On top of the core engine (grading, prediction,
+probation/dismissal, retake gate, department/faculty fit, transfer
+execution, the full advisor/student frontend, best-case grading, and real
+advisor/student/professor access separation):
 
 - **§16 Innovation & Venture Catalyst** — a `ventureFitScore` weighted-sum
   engine (course competency / skill alignment / academic trajectory)
   matches students to professors' research projects and commercial
-  spin-offs. The Venture Gate + Interest Form live entirely on the
-  student's **Venture Board** tab (never inside "Advise Me" — answering
-  them has zero effect on course recommendation); a qualifying match also
-  shows as a gold card on the Plan Results screen (both the student's and
-  the advisor's), purely additively. The Venture Board shows which
-  professor hosts each project and lets the student attach a PDF CV while
-  expressing interest in **any** listed project, not only ones that
-  cleared the match-score threshold. Professors get their own **Faculty
+  spin-offs. The Venture Gate + Interest Form live entirely on each
+  student's own **Venture Board** tab — never inside Course Plan, which
+  shows course recommendations only; venture/project matches are never
+  mixed into it. On the advisor side, the advisor owns and manages every
+  venture directly (post/edit/archive, review candidates) rather than
+  browsing a per-professor directory. Professors get their own **Faculty
   Console** (`/faculty/:professorId`) to post projects and review a
-  ranked, auto-generated candidate list — each row's CV opens in an
-  inline, in-page viewer, never a download. Every Level 3+, non-dismissed
+  ranked, auto-generated candidate list — each row's CV opens in a
+  near-fullscreen, in-page viewer (never a download), with a Close button
+  that turns the brand accent color on hover. Every Level 3+, non-dismissed
   demo student — Mohamed included — comes with a pre-seeded Venture Gate
   opt-in, so the whole eligible cohort shows up ranked from a cold boot;
   Level 1–2 students never see the gate at all (real eligibility rule) and
@@ -93,10 +103,15 @@ separation):
   student views.
 - **Course proposal / dual-approval workflow** (§15.3) — the advisor
   reviews the system's recommended courses, can approve them or swap in an
-  alternate (scored live by the same prediction engine); the student sees
-  both options and picks one — picking the advisor-approved option
-  registers it immediately, picking the other prompts a "contact your
-  advisor" popup instead.
+  alternate (scored live by the same prediction engine, always excluding
+  the system's own recommendation from the alternate picker — that's not
+  a real alternative); the student sees both options and picks one —
+  picking the advisor-approved option registers it immediately, picking
+  the other prompts a "contact your advisor" popup instead. A one-click
+  **Approve all** bulk-approves every still-pending recommendation at
+  once, and a **Modified Plan** summary shows the advisor exactly what the
+  student is about to see before they do, flagging anything still
+  unreviewed.
 - **Advisor PDF report** (§15.4) — one click in the Advisor Console exports
   a roster PDF with each student's pending / advisor-approved / registered
   course counts.
@@ -128,7 +143,7 @@ npm install --workspaces
 
 # backend — tests + API server
 cd packages/api
-npx vitest run                # 179 tests
+npx vitest run                # 187 tests
 npx tsx src/server.ts         # API on http://localhost:3001
 
 # frontend — in a second terminal
@@ -150,6 +165,25 @@ UI, not just through unit tests.
 No `node_modules` are committed. `npm install --workspaces` installs
 everything (Express, Vitest, React, Vite, jsPDF, Prisma client, etc.)
 across all three workspace packages.
+
+## Deployment
+
+The live demo linked near the top of this README is two separately-deployed
+pieces, wired together with CORS:
+
+- **`packages/web`** (the frontend) → **GitHub Pages**, built and deployed
+  automatically on every push to `master` by
+  `.github/workflows/pages.yml`.
+- **`packages/api`** (the backend) → **Railway**, since GitHub Pages only
+  serves static files and can't run a real Node server. `railway.json`
+  configures the build/start commands (this is an npm-workspaces monorepo,
+  so the install step has to run from the repo root, not per-package).
+
+The frontend build is pointed at the live API via a `VITE_API_BASE_URL`
+GitHub Actions repo variable — if the Railway URL ever changes, update
+that variable and re-run the Pages workflow. `render.yaml` is also in the
+repo as a ready-to-go alternative if you'd rather deploy the API to Render
+instead of Railway.
 
 ## Author
 
