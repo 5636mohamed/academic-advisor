@@ -32,6 +32,31 @@ import { VENTURE_QUIZ } from './modules/venture/ventureQuiz';
 import weights from './config/predictionWeights.json';
 
 const app = express();
+
+// Only relevant once this server is deployed somewhere separate from the
+// frontend that calls it (e.g. this API on Render, the built web app on
+// GitHub Pages — see packages/web/src/api/client.ts's VITE_API_BASE_URL).
+// Same-origin local dev (Vite's /api proxy) never sends an Origin header
+// that needs this. CORS_ALLOWED_ORIGINS is a comma-separated allow-list
+// (e.g. "https://5636mohamed.github.io"); unset means no cross-origin
+// caller is allowed — safer default than a wide-open '*' for a real
+// deployment, even a demo one.
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // §16.4 — CVs are uploaded as base64 data: URLs in the JSON body (no file-
 // storage layer in this demo); the default 100kb limit is nowhere near
 // enough for a real PDF/DOC once base64-inflated, so it's raised here.

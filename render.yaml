@@ -1,0 +1,28 @@
+# Render Blueprint — deploys packages/api as a free web service.
+#
+# This is a Node/npm-workspaces monorepo: @advisor/api depends on
+# @advisor/shared via a local workspace link, not a published package, so
+# the install step MUST run from the repo root with --workspaces (a
+# per-package `rootDir` install would try to fetch @advisor/shared from
+# npm and fail). buildCommand/startCommand below are deliberately written
+# to run from repo root for exactly that reason.
+#
+# The frontend (GitHub Pages, see .github/workflows/pages.yml) is a
+# separate deploy — once this service is live, set VITE_API_BASE_URL to
+# its https://<service>.onrender.com URL as a GitHub Actions repo variable
+# and re-run the Pages workflow so the built frontend actually points here.
+services:
+  - type: web
+    name: academic-advisor-api
+    runtime: node
+    plan: free
+    buildCommand: npm install --workspaces && npm run build --workspace=@advisor/api
+    startCommand: npm run start --workspace=@advisor/api
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: CORS_ALLOWED_ORIGINS
+        # The GitHub Pages origin this API needs to accept requests from
+        # (scheme + host only, no trailing slash/path) — see server.ts's
+        # CORS middleware. Update this if the Pages URL ever changes.
+        value: https://5636mohamed.github.io
