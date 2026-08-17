@@ -145,32 +145,73 @@ docs/
 
 ## Tech Stack
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+### Frontend
+
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![React Router](https://img.shields.io/badge/React_Router-6.26-CA4245?logo=reactrouter&logoColor=white)](https://reactrouter.com/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
+### Backend
+
 [![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-4.19-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-5.18-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+
+### Prediction engine
+
+[![Linear Regression](https://img.shields.io/badge/Linear_Regression-OLS-4B8BBE)](packages/api/src/modules/prediction/linearRegression.ts)
+[![Statistical Modeling](https://img.shields.io/badge/Grade_%26_CGPA_Trend-Statistical_Model-4B8BBE)](packages/api/src/modules/prediction/cgpaTrendProjection.ts)
+
+Every trend projection in the system — cohort grade trends, an individual
+student's own ability trend, and CGPA trajectory — is driven by a small,
+dependency-free **Ordinary Least Squares linear regression** implementation
+(`packages/api/src/modules/prediction/linearRegression.ts`'s `ols()`,
+fitting `y = a + b·x` over a student's or cohort's own history, then
+projecting the next term). No ML library — just the real math, unit-tested
+directly (`test/unit/prediction/linearRegression.test.ts`) and reused by
+every one of `cgpaTrendProjection.ts`, `cohortTrend.ts`, and
+`studentTrend.ts` so cohort, individual, and CGPA trends can never compute
+a trend line differently from one another.
+
+### Testing & tooling
+
 [![Vitest](https://img.shields.io/badge/Vitest-2.0-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.62-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
-[![Prisma](https://img.shields.io/badge/Prisma-5.18-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![npm workspaces](https://img.shields.io/badge/npm-workspaces-CB3837?logo=npm&logoColor=white)](https://docs.npmjs.com/cli/v10/using-npm/workspaces)
 
-Every dependency actually used, and what it's for:
+### Packages used
+
+Every package actually in `package.json` across the three workspaces, and
+what it's for:
+
+**Frontend (`packages/web`)**
 
 | Package | Version | Used for |
 |---|---|---|
-| TypeScript | 5.5 | The language across all 3 workspace packages — `strict` mode throughout |
-| React | 18.3 | Frontend UI |
-| React Router | 6.26 | Client-side routing — three separate route trees (advisor, student, faculty), each behind its own `RequireRole` guard |
-| Vite | 5.4 | Frontend dev server and production build |
-| Express | 4.19 | Backend HTTP API (`packages/api/src/server.ts`) |
-| Vitest | 2.0 | Backend unit tests — 187 passing, run in CI on every push |
-| jsPDF + jspdf-autotable | 4.2 / 5.0 | Client-side advisor roster PDF export (§15.4) |
-| Prisma / `@prisma/client` | 5.18 | A real schema is scaffolded (`packages/api/src/db/prisma/schema.prisma`) for the eventual database layer — the live app currently runs on an in-memory store (`db/memory/inMemoryDb.ts`), documented as a deliberate simplification, not a hidden gap |
-| Playwright | 1.62 | Dev-only — screenshot/E2E verification during development, not shipped in the app itself |
-| ffmpeg-static | 5.3 | Dev-only — generates this README's demo GIFs from Playwright recordings |
-| npm workspaces | — | Monorepo package management (`shared`/`api`/`web`), no extra tooling (Lerna/Nx/Turborepo) needed at this size |
+| `react` / `react-dom` | 18.3 | UI |
+| `react-router-dom` | 6.26 | Client-side routing — three separate route trees (advisor, student, faculty), each behind its own `RequireRole` guard |
+| `vite` | 5.4 | Dev server and production build |
+| `@vitejs/plugin-react` | 4.3 | Vite's React integration (JSX/Fast Refresh) |
+| `jspdf` + `jspdf-autotable` | 4.2 / 5.0 | Client-side advisor roster PDF export (§15.4) |
+| `typescript` | 5.5 | Type-checking (`npm run typecheck`) |
+| `playwright` *(dev)* | 1.62 | Screenshot/E2E verification during development — not shipped in the built app |
+| `ffmpeg-static` *(dev)* | 5.3 | Generates this README's demo GIFs from Playwright recordings |
+
+**Backend (`packages/api`)**
+
+| Package | Version | Used for |
+|---|---|---|
+| `express` | 4.19 | HTTP API (`src/server.ts`) |
+| `@prisma/client` / `prisma` | 5.18 | A real schema is scaffolded (`src/db/prisma/schema.prisma`) for the eventual database layer — the live app currently runs on an in-memory store (`db/memory/inMemoryDb.ts`), a documented simplification, not a hidden gap |
+| `tsx` | 4.16 | Runs the server directly from TypeScript source, in both dev (`tsx watch`) **and** the deployed production `start` script — see the Deployment section below for why |
+| `typescript` | 5.5 | Type-checking / the `build` script (used as a CI gate; its compiled output isn't what actually runs — `tsx` is) |
+| `vitest` | 2.0 | Unit tests — 187 passing, run in CI on every push |
+
+**Shared (`packages/shared`)** — plain TypeScript types and grading tables imported directly as source by both `api` and `web` (no build step of its own); only dependency is `typescript` for its own type-checking.
+
+**Root** — `npm workspaces` for monorepo package management across all three, no extra tooling (Lerna/Nx/Turborepo) needed at this size.
 
 ### Hosting & CI
 
