@@ -1,13 +1,15 @@
 # Academic Advising & Early-Warning System
 
-**Author:** Mohamed Elhariry — Department of Electronics and Communication
-Engineering, Egypt-Japan University of Science and Technology (E-JUST)
+**Author:** Mohamed Elsayed Elhariry — Department of Electronics and Communication
+Engineering @ Egypt-Japan University of Science and Technology (E-JUST)
+Yamen Hany Ezzat - Faculty of Art and Design , Department Digital media @ Egypt-Japan University of Science and Technology
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/ci.yml?branch=master&label=tests&logo=vitest&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/ci.yml)
 [![Pages Deploy](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/pages.yml?branch=master&label=pages%20deploy&logo=githubpages&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/pages.yml)
 [![Release](https://img.shields.io/github/v/release/5636mohamed/academic-advisor?label=release)](https://github.com/5636mohamed/academic-advisor/releases/latest)
 [![License](https://img.shields.io/github/license/5636mohamed/academic-advisor?color=blue)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/live%20demo-online-success?logo=googlechrome&logoColor=white)](https://5636mohamed.github.io/academic-advisor/)
+[![API Status](https://img.shields.io/website?url=https%3A%2F%2Facademic-advisor-api-production.up.railway.app%2Fapi%2Fstudents&label=api&up_message=online&down_message=offline&up_color=success&down_color=critical)](https://academic-advisor-api-production.up.railway.app/)
 
 ### 🔗 Live demo — try it now
 
@@ -20,6 +22,10 @@ click through the real dashboard, course plans, and venture board with real
 seeded data. The API's free tier can spin down after a period of
 inactivity — the very first request after a quiet stretch may take up to
 ~30–60 seconds to wake back up; every request after that is normal speed.
+(The **api** badge above does a real live check on every page load, so it
+can briefly show *offline* right as the API is waking from that idle
+state — not a sign anything's actually broken, just the free tier's cold
+start racing the badge's own timeout.)
 
 Implementation of `docs/BUILD_SPEC.md` — the full specification for the
 probation/dismissal state machine, retake-gate planning, department/faculty
@@ -127,16 +133,27 @@ still a documented simplification (no real login backend, in-memory
 store, etc.).
 
 ## Structure
+
+Three npm workspace packages ("subspaces" of the monorepo) — each is its
+own `package.json` with its own version, but none are published to a
+registry (all `"private": true`); the badges just identify which package
+is which at a glance.
+
+[![@advisor/shared](https://img.shields.io/badge/%40advisor%2Fshared-v0.1.0-8250DF)](packages/shared)
+[![@advisor/api](https://img.shields.io/badge/%40advisor%2Fapi-v0.1.0-000000?logo=express&logoColor=white)](packages/api)
+[![@advisor/web](https://img.shields.io/badge/%40advisor%2Fweb-v0.1.0-61DAFB?logo=react&logoColor=black)](packages/web)
+
 ```
 packages/
-  shared/   → types + grading tables shared by api & web
-  api/      → Node/TS backend: grading, prediction, probation, retake-gate,
-              fit-engine, transfer-execution, proposal, and venture-matching
-              modules + the full HTTP API (src/server.ts) over an
-              in-memory data layer
-  web/      → React/TS frontend — Vite + React Router. Three route trees:
-              the advisor app, the student portal (/portal/:id), and the
-              Faculty Console (/faculty/:id), each behind its own auth guard
+  shared/   → @advisor/shared — types + grading tables shared by api & web
+  api/      → @advisor/api — Node/TS backend: grading, prediction, probation,
+              retake-gate, fit-engine, transfer-execution, proposal, and
+              venture-matching modules + the full HTTP API (src/server.ts)
+              over an in-memory data layer
+  web/      → @advisor/web — React/TS frontend — Vite + React Router. Three
+              route trees: the advisor app, the student portal
+              (/portal/:id), and the Faculty Console (/faculty/:id), each
+              behind its own auth guard
 docs/
   BUILD_SPEC.md      → full specification (the single source of truth)
   HANDBOOK_RULES.md  → every business rule restated in plain language, cross-referenced to code
