@@ -1,3 +1,5 @@
+<div align="center">
+
 # Academic Advising & Early-Warning System
 
 **Author:** Mohamed Elsayed Elhariry — Department of Electronics and Communication
@@ -10,6 +12,8 @@ Yamen Hany Ezzat - Faculty of Art and Design , Department Digital media @ Egypt-
 [![License](https://img.shields.io/github/license/5636mohamed/academic-advisor?color=blue)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/live%20demo-online-success?logo=googlechrome&logoColor=white)](https://5636mohamed.github.io/academic-advisor/)
 [![API Status](https://img.shields.io/website?url=https%3A%2F%2Facademic-advisor-api-production.up.railway.app%2Fapi%2Fstudents&label=api&up_message=online&down_message=offline&up_color=success&down_color=critical)](https://academic-advisor-api-production.up.railway.app/)
+
+</div>
 
 ### 🔗 Live demo — try it now
 
