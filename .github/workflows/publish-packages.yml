@@ -1,0 +1,63 @@
+name: Publish packages to GitHub Packages
+
+# Publishes all three workspace packages (@advisor/shared, @advisor/api,
+# @advisor/web) to this repo's GitHub Packages npm registry, under their
+# publish-time identity (@5636mohamed/academic-advisor-*) -- see
+# scripts/prepare-for-publish.mjs for exactly why the rename happens and
+# why it's safe (runs only in this checkout, never committed).
+#
+# @advisor/shared is a genuine reusable library (types + grading tables).
+# @advisor/api and @advisor/web are a server and a full application,
+# respectively -- publishing them is for visibility/completeness in the
+# repo's Packages tab, not because they're meant to be `npm install`'d as
+# libraries elsewhere; they ship the same raw TypeScript source the
+# workspace itself uses (no separate bundle/declaration build step).
+#
+# Runs on every published GitHub Release (keeps published package versions
+# aligned with tagged releases) and can also be run on demand.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: '@5636mohamed'
+
+      - name: Install dependencies
+        run: npm install --workspaces
+
+      - name: Rewrite package.json files for GitHub Packages
+        run: node scripts/prepare-for-publish.mjs
+
+      - name: Publish @advisor/shared
+        working-directory: packages/shared
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish @advisor/api
+        working-directory: packages/api
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish @advisor/web
+        working-directory: packages/web
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -205,7 +205,18 @@ a trend line differently from one another.
 ### Packages used
 
 Every package actually in `package.json` across the three workspaces, and
-what it's for:
+what it's for. All three of *this project's own* workspace packages are
+also published to
+[GitHub Packages](https://github.com/5636mohamed/academic-advisor/packages)
+(`.github/workflows/publish-packages.yml`, on every GitHub Release) under
+`@5636mohamed/academic-advisor-{shared,api,web}` — `-shared` is the one
+genuinely meant for reuse (types + grading tables); `-api`/`-web` are
+published for visibility more than as installable libraries, since one's
+a server and the other's a full application. Installing from GitHub
+Packages (unlike the public npm registry) always needs a GitHub token
+with `read:packages`, even for a public repo like this one — see
+[GitHub's docs](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry#installing-a-package)
+if you want to pull one down yourself.
 
 **Frontend (`packages/web`)**
 
