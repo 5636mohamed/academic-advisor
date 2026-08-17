@@ -1,12 +1,19 @@
-// Typed fetch client for every route this frontend calls. Talks to the
-// Express demo server (packages/api/src/server.ts) via the /api proxy set
-// up in vite.config.ts. Deliberately plain fetch + small helpers rather
-// than a data-fetching library — keeps the surface easy to read alongside
-// the routes it calls.
+// Typed fetch client for every route this frontend calls. In local dev,
+// talks to the Express demo server (packages/api/src/server.ts) via the
+// /api proxy set up in vite.config.ts — VITE_API_BASE_URL is unset there,
+// so this resolves to the same-origin relative `/api${path}` it always
+// has. A static deploy (e.g. GitHub Pages) has nowhere to proxy to — it
+// can only serve files — so VITE_API_BASE_URL lets a build point at a
+// separately-hosted copy of packages/api instead (set as a build-time env
+// var; the API itself needs CORS enabled for the Pages origin). Deliberately
+// plain fetch + small helpers rather than a data-fetching library — keeps
+// the surface easy to read alongside the routes it calls.
 import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course } from '@advisor/shared';
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE_URL}/api${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });

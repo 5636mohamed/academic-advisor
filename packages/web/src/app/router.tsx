@@ -110,4 +110,10 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
-]);
+], {
+  // In local dev this is just '/' (a no-op). A static deploy built with a
+  // non-root --base (e.g. GitHub Pages serving from /academic-advisor/)
+  // needs the router to know it isn't living at the domain root, or every
+  // internal link/redirect resolves one level too high and 404s.
+  basename: import.meta.env.BASE_URL,
+});

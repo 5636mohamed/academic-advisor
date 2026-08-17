@@ -336,14 +336,24 @@ function CandidateDetail({
         // so a naively-nested fullscreen overlay was rendering sized to
         // THIS card, not the viewport, and getting flex-shrunk down to a
         // few hundred px. Portalling to body sidesteps that entirely.
-        <div className="su-modal-overlay" role="dialog" aria-label={`${candidate.studentName}'s CV`} onMouseDown={e => e.target === e.currentTarget && setViewingCv(false)}>
-          <div className="su-modal su-modal-fullscreen su-pop">
-            <div className="su-card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <div className="su-flex su-justify-between su-items-center" style={{ marginBottom: 10 }}>
-                <div className="su-title" style={{ fontSize: 15 }}>{candidate.studentName}'s CV{candidate.cvFileName ? ` — ${candidate.cvFileName}` : ''}</div>
-                <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => setViewingCv(false)}>Close</button>
+        //
+        // The outer `.su` wrapper below matters just as much as the portal
+        // itself: every `--su-*` color token is scoped to `.su` (and its
+        // dark-mode overrides target `:root[data-theme] .su`), so anything
+        // portalled to <body> — outside the layout's own `.su` tree — sees
+        // NONE of them. Without this wrapper the buttons here silently fall
+        // back to the unrelated legacy `styles.css` theme instead of this
+        // one, which is exactly why the Close button looked off-theme.
+        <div className="su">
+          <div className="su-modal-overlay" role="dialog" aria-label={`${candidate.studentName}'s CV`} onMouseDown={e => e.target === e.currentTarget && setViewingCv(false)}>
+            <div className="su-modal su-modal-fullscreen su-pop">
+              <div className="su-card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div className="su-flex su-justify-between su-items-center" style={{ marginBottom: 10 }}>
+                  <div className="su-title" style={{ fontSize: 15 }}>{candidate.studentName}'s CV{candidate.cvFileName ? ` — ${candidate.cvFileName}` : ''}</div>
+                  <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => setViewingCv(false)}>Close</button>
+                </div>
+                <iframe title={`${candidate.studentName}'s CV`} src={candidate.cvDataUrl} style={{ flex: 1, width: '100%', border: '1px solid var(--su-border)', borderRadius: 8 }} />
               </div>
-              <iframe title={`${candidate.studentName}'s CV`} src={candidate.cvDataUrl} style={{ flex: 1, width: '100%', border: '1px solid var(--su-border)', borderRadius: 8 }} />
             </div>
           </div>
         </div>,

@@ -1,0 +1,97 @@
+name: Deploy web app to GitHub Pages
+
+# Builds the actual Vite/React frontend (packages/web) and deploys it —
+# replaces the two generic Jekyll/static templates GitHub's own "quick
+# setup" wizard added, which just published raw repo files (README.md
+# etc.) since neither knows this is a Vite app.
+#
+# Important limitation: GitHub Pages only serves static files — it can't
+# run the Express API (packages/api). So after this deploys, the login
+# screen and branding work fully (login is a client-side credential check,
+# see auth/credentials.ts — no API call), but every page that needs real
+# data (dashboards, course plans, rosters, venture board, ...) will show
+# failed requests, because there's nowhere for `/api/*` to go.
+#
+# To point this deploy at a real, separately-hosted copy of packages/api
+# once one exists: set an Actions variable named VITE_API_BASE_URL (repo
+# Settings → Secrets and variables → Actions → Variables) to that API's
+# base URL, and make sure that API sends CORS headers allowing this Pages
+# origin. Until then it's left unset, which preserves today's relative
+# `/api/...` behavior (see api/client.ts).
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --workspaces
+
+      - name: Build web app
+        working-directory: packages/web
+        # /academic-advisor/ matches this repo's name — GitHub Pages for a
+        # project repo (as opposed to a <user>.github.io repo) is always
+        # served from https://<user>.github.io/<repo>/, so every asset URL
+        # needs that prefix or they 404 once deployed.
+        run: npx vite build --base=/academic-advisor/
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: SPA fallback for direct/deep links
+        # GitHub Pages is plain static file serving with no server-side
+        # rewrites, but this is a client-side-routed (history API) SPA — a
+        # direct visit or refresh on e.g. /academic-advisor/students/ahmed-1
+        # has no matching file and 404s before React Router ever gets a
+        # chance to resolve it. Serving this same index.html as the 404
+        # page is the standard fix: GH Pages returns it for any unmatched
+        # path, then the router reads the real URL from the address bar
+        # once it mounts (createBrowserRouter's basename already matches
+        # this build's --base, so no rewrite script is needed on top).
+        run: cp packages/web/dist/index.html packages/web/dist/404.html
+
+      - name: Disable Jekyll processing
+        # Belt-and-suspenders: the actions/deploy-pages workflow path
+        # doesn't run Jekyll anyway, but an empty .nojekyll guarantees
+        # nothing here (e.g. the assets/ folder) is ever filtered as if it
+        # were a Jekyll site.
+        run: touch packages/web/dist/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload build artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/web/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
