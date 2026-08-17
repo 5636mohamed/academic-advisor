@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install --workspaces && npm run build --workspace=@advisor/api"
+  },
+  "deploy": {
+    "startCommand": "npm run start --workspace=@advisor/api",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}
