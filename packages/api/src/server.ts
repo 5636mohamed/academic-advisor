@@ -494,7 +494,7 @@ app.post('/api/advisor/students/:id/proposals/:slotKey/alternate/preview', async
   if (typeof courseCode !== 'string') return res.status(400).json({ error: 'expected { courseCode: string }' });
   try {
     const scored = await scoreAlternateCandidate(req.params.id, courseCode);
-    res.json(db.previewAdvisorAlternate(req.params.id, courseCode, scored));
+    res.json(db.previewAdvisorAlternate(req.params.id, req.params.slotKey, courseCode, scored));
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });

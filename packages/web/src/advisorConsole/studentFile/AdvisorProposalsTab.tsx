@@ -160,9 +160,13 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
               <div className="su-flex su-gap-10 su-items-center" style={{ flexWrap: 'wrap' }}>
                 <div className="su-field" style={{ flex: 1, minWidth: 220 }}>
                   <label>Propose alternate</label>
+                  {/* The system's own recommendation for this slot is deliberately
+                      excluded here — proposing it back as an "alternate" isn't a
+                      real alternative, and Approve above already covers that case.
+                      (Backend still rejects it too, in case of a stale course list.) */}
                   <select className="su-input" value={altPicker[slot.slotKey] ?? ''} onChange={e => pickAlternate(slot.slotKey, e.target.value)}>
                     <option value="">Choose a course…</option>
-                    {eligible.map(e => <option key={e.course.code} value={e.course.code}>{e.course.code} — {e.course.name}</option>)}
+                    {eligible.filter(e => e.course.code !== slot.system?.courseCode).map(e => <option key={e.course.code} value={e.course.code}>{e.course.code} — {e.course.name}</option>)}
                   </select>
                 </div>
                 <button className="su-btn su-btn-sm" style={{ alignSelf: 'flex-end' }} disabled={busySlot === slot.slotKey || !altPicker[slot.slotKey]} onClick={() => proposeAlternate(slot.slotKey)}>Propose</button>

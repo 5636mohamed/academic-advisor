@@ -1220,6 +1220,17 @@ function scoreCandidateFields(
   };
 }
 
+/** A slot's still-live system proposal (if any) — used to stop an advisor
+ *  from "proposing an alternate" that is actually just the course the
+ *  system already recommended for that exact slot. Looked up from the
+ *  student's own proposal list rather than assumed from slotKey===courseCode
+ *  (true today per buildProposalsFromPlan, but this stays correct even if
+ *  that ever changes). */
+function liveSystemProposalForSlot(studentId: string, slotKey: string): CourseProposal | undefined {
+  const student = students.get(studentId);
+  return student?.proposals.find(p => p.slotKey === slotKey && p.origin === 'system' && p.status !== 'declined');
+}
+
 /** Dry run — lets the advisor see a candidate alternate's expected AND
  *  best-case grade (and, on the frontend, its grade-point consequence
  *  versus the system's originally recommended course) before committing to
@@ -1227,16 +1238,23 @@ function scoreCandidateFields(
  *  as `previewExternalTransfer` above. */
 export function previewAdvisorAlternate(
   studentId: string,
+  slotKey: string,
   courseCode: string,
   scored: { expectedPct: number; expectedLetter: string; expectedPoints: number }
 ): CandidateScoreFields {
   if (!students.get(studentId)) throw new Error(`no such student ${studentId}`);
+  const systemProposal = liveSystemProposalForSlot(studentId, slotKey);
+  if (systemProposal && systemProposal.courseCode === courseCode) {
+    throw Object.assign(new Error(`${courseCode} is already the system's recommended course for this slot — pick a different course, or approve the system's suggestion instead.`), { httpStatus: 400 });
+  }
   return scoreCandidateFields(studentId, courseCode, scored);
 }
 
 /** §15.3.2 step 2(b) — the caller (server.ts) has already scored
  *  `courseCode` for real via the same §3.1 engine used everywhere else;
- *  this just persists the resulting advisor-authored proposal. */
+ *  this just persists the resulting advisor-authored proposal. An advisor
+ *  may not "propose" the exact course the system already recommended for
+ *  this slot — that isn't an alternate, and Approve already covers it. */
 export function addAdvisorAlternateProposal(
   studentId: string,
   slotKey: string,
@@ -1245,6 +1263,10 @@ export function addAdvisorAlternateProposal(
 ): CourseProposal {
   const student = students.get(studentId);
   if (!student) throw new Error(`no such student ${studentId}`);
+  const systemProposal = liveSystemProposalForSlot(studentId, slotKey);
+  if (systemProposal && systemProposal.courseCode === courseCode) {
+    throw Object.assign(new Error(`${courseCode} is already the system's recommended course for this slot — pick a different course, or approve the system's suggestion instead.`), { httpStatus: 400 });
+  }
   const fields = scoreCandidateFields(studentId, courseCode, scored);
 
   const proposal = buildAdvisorAlternate({

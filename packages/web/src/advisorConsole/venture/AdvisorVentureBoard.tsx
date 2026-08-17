@@ -7,6 +7,7 @@
 // Accept/Reject). "View all ventures" expands full project management
 // (create/edit/archive) below.
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, AdvisorVentureProjectRowDTO, StudentDetail, VentureCandidateDTO, VentureProjectType, VentureQuizQuestionDTO } from '../../api/client';
 import { Loading, ScoreRow, SearchBox } from '../../portal/ui/Primitives';
 import { IconLayers, IconPeople, IconPlus } from '../../portal/ui/Icons';
@@ -326,18 +327,27 @@ function CandidateDetail({
 
       <button className="su-btn su-btn-ghost su-btn-sm su-mt-16" onClick={onClose}>Close</button>
 
-      {viewingCv && candidate.cvDataUrl && (
-        <div className="su-modal-overlay" role="dialog" onMouseDown={e => e.target === e.currentTarget && setViewingCv(false)}>
-          <div className="su-modal su-pop" style={{ maxWidth: 900, width: '90vw' }}>
-            <div className="su-card" style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
+      {viewingCv && candidate.cvDataUrl && createPortal(
+        // Portalled straight to <body> rather than left in place: this
+        // component's own root is a `.su-pop`-animated card, and any
+        // ancestor with a non-none `transform` (which `.su-pop`'s
+        // fill-mode:both animation leaves behind even after it finishes)
+        // becomes the containing block for `position: fixed` descendants —
+        // so a naively-nested fullscreen overlay was rendering sized to
+        // THIS card, not the viewport, and getting flex-shrunk down to a
+        // few hundred px. Portalling to body sidesteps that entirely.
+        <div className="su-modal-overlay" role="dialog" aria-label={`${candidate.studentName}'s CV`} onMouseDown={e => e.target === e.currentTarget && setViewingCv(false)}>
+          <div className="su-modal su-modal-fullscreen su-pop">
+            <div className="su-card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <div className="su-flex su-justify-between su-items-center" style={{ marginBottom: 10 }}>
-                <div className="su-title" style={{ fontSize: 15 }}>{candidate.studentName}'s CV</div>
+                <div className="su-title" style={{ fontSize: 15 }}>{candidate.studentName}'s CV{candidate.cvFileName ? ` — ${candidate.cvFileName}` : ''}</div>
                 <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => setViewingCv(false)}>Close</button>
               </div>
               <iframe title={`${candidate.studentName}'s CV`} src={candidate.cvDataUrl} style={{ flex: 1, width: '100%', border: '1px solid var(--su-border)', borderRadius: 8 }} />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

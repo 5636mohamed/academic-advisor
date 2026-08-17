@@ -683,6 +683,12 @@
   display: flex; align-items: center; justify-content: center; z-index: 100; animation: su-fade-in 200ms var(--su-ease) both;
 }
 .su-modal { animation: su-pop-in 260ms var(--su-ease) both; max-width: 420px; width: calc(100% - 40px); }
+/* A document viewer (a CV, a PDF) reads far better filling almost the whole
+   viewport than boxed into a 900px dialog — this modifier is for exactly
+   that: a near-fullscreen surface with just enough margin to still read as
+   a dialog (click-outside-to-close, Esc-friendly framing) rather than a
+   full page navigation. */
+.su-modal-fullscreen { max-width: 96vw; width: 96vw; height: 94vh; }
 
 .su-toast {
   position: fixed; bottom: 22px; right: 22px; z-index: 200;

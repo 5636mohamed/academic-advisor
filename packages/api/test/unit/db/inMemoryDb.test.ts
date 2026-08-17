@@ -129,3 +129,45 @@ describe('in-memory store — write / modify', () => {
     db.updateStudentStatus('karim-1', 'active'); // restore for other tests in this file
   });
 });
+
+// §15.3.2 step 2(b) — an advisor "proposing an alternate" that is actually
+// the exact course the system already recommended for that slot isn't a
+// real alternative (Approve already covers that case); the store rejects
+// it rather than silently accepting a no-op alternate proposal.
+describe('advisor alternate proposals — cannot re-propose the system\'s own recommendation', () => {
+  function candidate(courseCode: string) {
+    return {
+      courseCode, isRetake: false, oldPoints: null,
+      expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0,
+      deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
+    };
+  }
+  const scored = { expectedPct: 84, expectedLetter: 'B', expectedPoints: 3.0 };
+
+  it('addAdvisorAlternateProposal throws when courseCode matches the slot\'s live system proposal', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    expect(() => db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE314', scored)).toThrow(/already the system's recommended course/);
+  });
+
+  it('addAdvisorAlternateProposal allows a genuinely different course for the same slot', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', scored);
+    expect(alt.courseCode).toBe('ECE322');
+    expect(alt.origin).toBe('advisor');
+  });
+
+  it('previewAdvisorAlternate throws the same guard before persisting anything', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const before = db.getProposals('ahmed-1').length; // ahmed-1 seeds with one unrelated registered proposal already
+    expect(() => db.previewAdvisorAlternate('ahmed-1', 'ECE314', 'ECE314', scored)).toThrow(/already the system's recommended course/);
+    expect(db.getProposals('ahmed-1')).toHaveLength(before); // nothing persisted by the throwing preview
+  });
+
+  it('the guard only fires while the system proposal is still live (declined slots are free to reuse)', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const sysProposal = db.getProposals('ahmed-1').find(p => p.slotKey === 'ECE314' && p.origin === 'system')!;
+    db.declineProposalById(sysProposal.id);
+    const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE314', scored);
+    expect(alt.courseCode).toBe('ECE314'); // now allowed — the system's recommendation is no longer live
+  });
+});
