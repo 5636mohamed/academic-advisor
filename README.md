@@ -3,6 +3,12 @@
 **Author:** Mohamed Elhariry — Department of Electronics and Communication
 Engineering, Egypt-Japan University of Science and Technology (E-JUST)
 
+[![Tests](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/ci.yml?branch=master&label=tests&logo=vitest&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/ci.yml)
+[![Pages Deploy](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/pages.yml?branch=master&label=pages%20deploy&logo=githubpages&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/pages.yml)
+[![Release](https://img.shields.io/github/v/release/5636mohamed/academic-advisor?label=release)](https://github.com/5636mohamed/academic-advisor/releases/latest)
+[![License](https://img.shields.io/github/license/5636mohamed/academic-advisor?color=blue)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/live%20demo-online-success?logo=googlechrome&logoColor=white)](https://5636mohamed.github.io/academic-advisor/)
+
 ### 🔗 Live demo — try it now
 
 **https://5636mohamed.github.io/academic-advisor/**
@@ -136,6 +142,49 @@ docs/
   HANDBOOK_RULES.md  → every business rule restated in plain language, cross-referenced to code
   DECISION_TREE.md   → the advising-cycle branch logic as a diagram
 ```
+
+## Tech Stack
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![React Router](https://img.shields.io/badge/React_Router-6.26-CA4245?logo=reactrouter&logoColor=white)](https://reactrouter.com/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.19-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![Vitest](https://img.shields.io/badge/Vitest-2.0-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.62-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
+[![Prisma](https://img.shields.io/badge/Prisma-5.18-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![npm workspaces](https://img.shields.io/badge/npm-workspaces-CB3837?logo=npm&logoColor=white)](https://docs.npmjs.com/cli/v10/using-npm/workspaces)
+
+Every dependency actually used, and what it's for:
+
+| Package | Version | Used for |
+|---|---|---|
+| TypeScript | 5.5 | The language across all 3 workspace packages — `strict` mode throughout |
+| React | 18.3 | Frontend UI |
+| React Router | 6.26 | Client-side routing — three separate route trees (advisor, student, faculty), each behind its own `RequireRole` guard |
+| Vite | 5.4 | Frontend dev server and production build |
+| Express | 4.19 | Backend HTTP API (`packages/api/src/server.ts`) |
+| Vitest | 2.0 | Backend unit tests — 187 passing, run in CI on every push |
+| jsPDF + jspdf-autotable | 4.2 / 5.0 | Client-side advisor roster PDF export (§15.4) |
+| Prisma / `@prisma/client` | 5.18 | A real schema is scaffolded (`packages/api/src/db/prisma/schema.prisma`) for the eventual database layer — the live app currently runs on an in-memory store (`db/memory/inMemoryDb.ts`), documented as a deliberate simplification, not a hidden gap |
+| Playwright | 1.62 | Dev-only — screenshot/E2E verification during development, not shipped in the app itself |
+| ffmpeg-static | 5.3 | Dev-only — generates this README's demo GIFs from Playwright recordings |
+| npm workspaces | — | Monorepo package management (`shared`/`api`/`web`), no extra tooling (Lerna/Nx/Turborepo) needed at this size |
+
+### Hosting & CI
+
+[![GitHub Pages](https://img.shields.io/badge/frontend-GitHub%20Pages-222?logo=githubpages&logoColor=white)](https://pages.github.com/)
+[![Railway](https://img.shields.io/badge/API-Railway-0B0D0E?logo=railway&logoColor=white)](https://railway.com/)
+[![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions)
+
+| Piece | Platform | How |
+|---|---|---|
+| Frontend (`packages/web`) | GitHub Pages | Auto-built and deployed on every push to `master` by `.github/workflows/pages.yml` |
+| Backend (`packages/api`) | Railway | Free tier; `railway.json` at the repo root configures the build/start commands. `render.yaml` is also included as a ready-to-go alternative |
+| Tests & type-checking | GitHub Actions | `.github/workflows/ci.yml` runs the backend suite plus `shared`/`web` type-checks on every push and pull request — the "tests" badge at the top of this README reflects this workflow's real, current status |
+
+See [Deployment](#deployment) below for how the two live pieces are wired together.
 
 ## Getting started
 ```bash

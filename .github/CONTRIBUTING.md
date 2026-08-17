@@ -41,6 +41,11 @@ every advising/grading/registration rule is expected to satisfy — **when a
 rule looks wrong or a bug looks like a business-logic question, check these
 first** before assuming intended behavior one way or the other.
 
+For the full dependency list (what's used, what version, and why) and how
+the live deployment (GitHub Pages + Railway) fits together, see the
+[README's Tech Stack section](../README.md#tech-stack) rather than this
+file duplicating it.
+
 ## Getting started
 
 Prerequisites: Node.js 18+ and npm.

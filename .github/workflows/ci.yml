@@ -1,0 +1,39 @@
+name: CI
+
+# Runs the backend test suite and frontend/shared type-checking on every
+# push and pull request against master — separate from pages.yml, which
+# only builds/deploys the frontend. This is what the README's "Tests"
+# badge actually reflects, rather than a static, easy-to-go-stale claim.
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --workspaces
+
+      - name: Backend unit tests
+        working-directory: packages/api
+        run: npm run test
+
+      - name: Shared package type-check
+        working-directory: packages/shared
+        run: npm run typecheck
+
+      - name: Web type-check
+        working-directory: packages/web
+        run: npm run typecheck
