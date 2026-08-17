@@ -2,9 +2,9 @@
 
 # Academic Advising & Early-Warning System
 
-**Author:** Mohamed Elsayed Elhariry — Department of Electronics and Communication
-Engineering @ Egypt-Japan University of Science and Technology (E-JUST)
-Yamen Hany Ezzat - Faculty of Art and Design , Department Digital media @ Egypt-Japan University of Science and Technology
+**Mohamed Elsayed Elhariry** — Department of Electronics and Communication Engineering<br>
+**Yamen Hany Ezzat** — Department of Digital Media, Faculty of Art and Design<br>
+*Egypt-Japan University of Science and Technology (E-JUST)*
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/ci.yml?branch=master&label=tests&logo=vitest&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/ci.yml)
 [![Pages Deploy](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/pages.yml?branch=master&label=pages%20deploy&logo=githubpages&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/pages.yml)
@@ -296,10 +296,14 @@ that variable and re-run the Pages workflow. `render.yaml` is also in the
 repo as a ready-to-go alternative if you'd rather deploy the API to Render
 instead of Railway.
 
-## Author
+## Authors
 
-**Mohamed Elhariry**
-Department of Electronics and Communication Engineering
+**Mohamed Elsayed Elhariry**<br>
+Department of Electronics and Communication Engineering<br>
+Egypt-Japan University of Science and Technology (E-JUST)
+
+**Yamen Hany Ezzat**<br>
+Department of Digital Media, Faculty of Art and Design<br>
 Egypt-Japan University of Science and Technology (E-JUST)
 
 ## Contributing
