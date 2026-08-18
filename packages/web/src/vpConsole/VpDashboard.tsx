@@ -30,6 +30,7 @@ export function VpDashboard() {
   if (!summary || !pending || !transferCounters) return <Loading label="Loading the Vice President dashboard…" />;
 
   const countersFor = (advisorId: string) => transferCounters.find(c => c.advisorId === advisorId);
+  const pendingCountFor = (advisorId: string) => pending.filter(p => p.advisorId === advisorId).length;
 
   const totalStudents = summary.reduce((sum, s) => sum + s.studentCount, 0);
   const overallAvgCgpa = summary.length > 0
@@ -75,16 +76,22 @@ export function VpDashboard() {
       >
         <div className="su-table-wrap su-mt-16">
           <table className="su-table">
-            <thead><tr><th>Advisor</th><th>Department</th><th>Students</th><th>Average CGPA</th><th>Transfers in flight</th><th></th></tr></thead>
+            <thead><tr><th>Advisor</th><th>Department</th><th>Students</th><th>Average CGPA</th><th>Registration status</th><th>Transfers in flight</th><th></th></tr></thead>
             <tbody>
               {summary.map(s => {
                 const c = countersFor(s.advisor.id);
+                const pendingCount = pendingCountFor(s.advisor.id);
                 return (
                   <tr key={s.advisor.id}>
                     <td><b>{s.advisor.name}</b></td>
                     <td className="su-muted">{s.advisor.facultyId}/{s.advisor.departmentId}</td>
                     <td>{s.studentCount}</td>
                     <td style={{ color: `var(--su-${s.averageCgpa >= 3.0 ? 'good' : s.averageCgpa < 2.0 ? 'danger' : 'warn'})`, fontWeight: 700 }}>{s.averageCgpa.toFixed(2)}</td>
+                    <td>
+                      {pendingCount === 0
+                        ? <span className="su-badge ok">All registered</span>
+                        : <span className="su-badge warn">{pendingCount} pending</span>}
+                    </td>
                     <td className="su-muted">
                       {c && (c.internalInFlight + c.externalInFlight) > 0
                         ? `${c.internalInFlight} internal, ${c.externalInFlight} external`
