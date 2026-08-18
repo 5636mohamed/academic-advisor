@@ -1,0 +1,27 @@
+{
+  "name": "AEGIS Academic Advisor — dev container",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
+
+  // Warms the npm workspace install as part of the (pre)build itself, so a
+  // prebuilt Codespace opens with dependencies already installed instead of
+  // running this on first connect.
+  "onCreateCommand": "npm install --workspaces",
+
+  "forwardPorts": [3001, 5173],
+  "portsAttributes": {
+    "3001": { "label": "API (Express)", "onAutoForward": "notify" },
+    "5173": { "label": "Web (Vite)", "onAutoForward": "openPreview" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "dsznajder.es7-react-js-snippets"
+      ]
+    }
+  },
+
+  "remoteUser": "node"
+}
