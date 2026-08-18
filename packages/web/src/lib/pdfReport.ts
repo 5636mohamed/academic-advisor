@@ -30,6 +30,35 @@ function drawVerificationFooter(doc: jsPDF, brand: Parameters<typeof drawSeal>[1
   drawSeal(doc, brand, pageWidth - 22, pageHeight - 20, 10);
 }
 
+/** The amber-highlight legend, once, in a fixed footer position — NOT
+ *  anymore via autoTable's `didDrawPage` at the table's own trailing
+ *  cursor position. That approach had two real bugs, both reported
+ *  against live output: (1) `didDrawPage` fires on every page a table
+ *  spans, so a multi-page table got the legend redrawn on each page, at a
+ *  Y position that was wherever THAT page's rows happened to stop — often
+ *  hard against the bottom margin; (2) in the VP report specifically, the
+ *  legend's own trailing Y and the *next* table's "Advisor Responsibility
+ *  Detail" heading were computed independently from roughly the same
+ *  point (the first table's end), so a legend long enough to wrap a
+ *  second line (enumerating every flagged student by name had no upper
+ *  bound) visibly overlapped that heading and the table under it.
+ *  Fixing both: call this once, after every table on the page is fully
+ *  drawn, at a fixed bottom-margin position (clear of the verification
+ *  seal's own footer slot) — and the text itself no longer enumerates
+ *  names (the highlighted rows already show exactly who, right there in
+ *  the table), so its height is now bounded to one line regardless of how
+ *  many rows are flagged. */
+function drawHighlightLegend(doc: jsPDF, text: string): void {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const y = pageHeight - 38;
+  doc.setFillColor(...RESPONSIBILITY_HIGHLIGHT_RGB);
+  doc.rect(14, y - 3.5, 4, 4, 'F');
+  doc.setFontSize(8.5);
+  doc.setTextColor(60);
+  doc.text(text, 20, y, { maxWidth: pageWidth - 55 }); // stops well clear of the seal
+}
+
 export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Promise<void> {
   const doc = new jsPDF();
   const brand = await getPdfBrandKit();
@@ -57,10 +86,11 @@ export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Pro
     styles: { fontSize: 9 },
     // Advisor-responsibility epic — a row's whole background turns amber
     // wherever that student has a live advisor-proposed course whose
-    // expected grade was no better than the system's own recommendation;
-    // the legend right below the table (added via didDrawPage, since
-    // that's the reliable place to know the table's actual final Y even
-    // if it spans multiple pages) explains what the color means.
+    // expected grade was no better than the system's own recommendation.
+    // What the color means is explained once, in the page footer (see
+    // drawHighlightLegend) — not here per-page against the table's own
+    // trailing cursor, which is what used to cause it to overlap other
+    // content on a multi-page report.
     didParseCell: data => {
       if (data.section === 'body' && flaggedNames.includes(String(rows[data.row.index]?.name))) {
         data.cell.styles.fillColor = RESPONSIBILITY_HIGHLIGHT_RGB;
@@ -71,21 +101,11 @@ export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Pro
     // not the other way around (jsPDF has no z-index; whatever's drawn
     // last simply covers whatever came before).
     willDrawPage: () => drawWatermark(doc, brand),
-    didDrawPage: data => {
-      if (flaggedNames.length === 0) return;
-      const finalY = (data.cursor?.y ?? 32) + 10;
-      doc.setFillColor(...RESPONSIBILITY_HIGHLIGHT_RGB);
-      doc.rect(14, finalY - 4, 4, 4, 'F');
-      doc.setFontSize(9);
-      doc.setTextColor(60);
-      doc.text(
-        `Highlighted rows: the advisor is responsible for this student's grade in a proposed course — ${flaggedNames.join(', ')}.`,
-        20, finalY,
-        { maxWidth: 175 }
-      );
-    },
   });
 
+  if (flaggedNames.length > 0) {
+    drawHighlightLegend(doc, "Highlighted rows: the advisor is responsible for this student's grade in a proposed course.");
+  }
   drawVerificationFooter(doc, brand);
   doc.save(`advisor-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
@@ -138,19 +158,6 @@ export async function downloadVpAdvisorsReportPdf(
       }
     },
     willDrawPage: () => drawWatermark(doc, brand),
-    didDrawPage: data => {
-      if (flaggedAdvisors.length === 0) return;
-      const y = (data.cursor?.y ?? 32) + 10;
-      doc.setFillColor(...RESPONSIBILITY_HIGHLIGHT_RGB);
-      doc.rect(14, y - 4, 4, 4, 'F');
-      doc.setFontSize(9);
-      doc.setTextColor(60);
-      doc.text(
-        'Highlighted rows: this advisor took responsibility for at least one student\'s grade in a proposed course (a course whose expected grade was not better than the system\'s own recommendation) — see the detail table below for exactly which students and courses.',
-        20, y,
-        { maxWidth: 175 }
-      );
-    },
   });
 
   if (responsibilityDetails.length > 0) {
@@ -168,6 +175,14 @@ export async function downloadVpAdvisorsReportPdf(
     });
   }
 
+  if (flaggedAdvisors.length > 0) {
+    drawHighlightLegend(
+      doc,
+      responsibilityDetails.length > 0
+        ? 'Highlighted rows: this advisor took responsibility for at least one student\'s grade in a proposed course — see the detail table above for exactly which students and courses.'
+        : "Highlighted rows: this advisor took responsibility for at least one student's grade in a proposed course."
+    );
+  }
   drawVerificationFooter(doc, brand);
   doc.save(`vp-advisor-oversight-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
