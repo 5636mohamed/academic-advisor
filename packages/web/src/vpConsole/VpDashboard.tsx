@@ -2,11 +2,12 @@
 // CGPA) plus a flat, cross-advisor pending-approvals queue the VP can act
 // on directly, without opening the advisor console at all (confirmed with
 // the user as the access model: per-advisor drill-down AND a flat queue,
-// not a flat "all 125 students" browser). Transfer-request counters are
-// wired in a later phase once that pending-chain exists.
+// not a flat "all 125 students" browser). Also shows per-advisor transfer
+// counters (internal vs. external, still in flight) — full review happens
+// on the Transfer requests tab.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, VpAdvisorSummaryDTO, VpPendingProposalDTO } from '../api/client';
+import { api, VpAdvisorSummaryDTO, VpPendingProposalDTO, VpTransferCounterDTO } from '../api/client';
 import { Loading, Section, StatCard } from '../portal/ui/Primitives';
 import { letterClass } from '../portal/lib/studentUiHelpers';
 
@@ -14,15 +15,19 @@ export function VpDashboard() {
   const navigate = useNavigate();
   const [summary, setSummary] = useState<VpAdvisorSummaryDTO[] | null>(null);
   const [pending, setPending] = useState<VpPendingProposalDTO[] | null>(null);
+  const [transferCounters, setTransferCounters] = useState<VpTransferCounterDTO[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = () => {
     api.vpAdvisorsSummary().then(setSummary);
     api.vpPendingProposals().then(setPending);
+    api.vpTransferCounters().then(setTransferCounters);
   };
   useEffect(load, []);
 
-  if (!summary || !pending) return <Loading label="Loading the Vice President dashboard…" />;
+  if (!summary || !pending || !transferCounters) return <Loading label="Loading the Vice President dashboard…" />;
+
+  const countersFor = (advisorId: string) => transferCounters.find(c => c.advisorId === advisorId);
 
   const totalStudents = summary.reduce((sum, s) => sum + s.studentCount, 0);
   const overallAvgCgpa = summary.length > 0
@@ -51,21 +56,29 @@ export function VpDashboard() {
       <Section title="Advisors" eyebrow="Roster overview">
         <div className="su-table-wrap su-mt-16">
           <table className="su-table">
-            <thead><tr><th>Advisor</th><th>Department</th><th>Students</th><th>Average CGPA</th><th></th></tr></thead>
+            <thead><tr><th>Advisor</th><th>Department</th><th>Students</th><th>Average CGPA</th><th>Transfers in flight</th><th></th></tr></thead>
             <tbody>
-              {summary.map(s => (
-                <tr key={s.advisor.id}>
-                  <td><b>{s.advisor.name}</b></td>
-                  <td className="su-muted">{s.advisor.facultyId}/{s.advisor.departmentId}</td>
-                  <td>{s.studentCount}</td>
-                  <td style={{ color: `var(--su-${s.averageCgpa >= 3.0 ? 'good' : s.averageCgpa < 2.0 ? 'danger' : 'warn'})`, fontWeight: 700 }}>{s.averageCgpa.toFixed(2)}</td>
-                  <td>
-                    <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => navigate(`/vp/advisors/${s.advisor.id}`)}>
-                      View roster
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {summary.map(s => {
+                const c = countersFor(s.advisor.id);
+                return (
+                  <tr key={s.advisor.id}>
+                    <td><b>{s.advisor.name}</b></td>
+                    <td className="su-muted">{s.advisor.facultyId}/{s.advisor.departmentId}</td>
+                    <td>{s.studentCount}</td>
+                    <td style={{ color: `var(--su-${s.averageCgpa >= 3.0 ? 'good' : s.averageCgpa < 2.0 ? 'danger' : 'warn'})`, fontWeight: 700 }}>{s.averageCgpa.toFixed(2)}</td>
+                    <td className="su-muted">
+                      {c && (c.internalInFlight + c.externalInFlight) > 0
+                        ? `${c.internalInFlight} internal, ${c.externalInFlight} external`
+                        : '—'}
+                    </td>
+                    <td>
+                      <button className="su-btn su-btn-sm su-btn-secondary" onClick={() => navigate(`/vp/advisors/${s.advisor.id}`)}>
+                        View roster
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

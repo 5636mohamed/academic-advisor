@@ -7,7 +7,7 @@
 // eventually wrap around actual SQL — swapping this module out for Prisma
 // calls later shouldn't require touching any caller (routes/ports), only
 // this file.
-import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor } from '@advisor/shared';
+import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor } from '@advisor/shared';
 import { CATALOG } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
 import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
@@ -34,6 +34,13 @@ import {
   buildAdvisorAlternate,
   chooseProposal,
 } from '../../modules/proposals/proposal.service';
+import {
+  createTransferRequest,
+  advisorApproveRequest,
+  advisorDeclineRequest,
+  vpApproveRequest,
+  vpDeclineRequest,
+} from '../../modules/transfer/transferRequest.service';
 
 export interface StoredStudent extends Student {
   /** Every enrollment attempt ever made, superseded ones included — the
@@ -833,6 +840,7 @@ export function __resetForTests(): void {
   seedInitialVentureMatches();
   seedInitialVentureOptIns();
   seedInitialRegisteredCourses();
+  transferRequests.length = 0;
 }
 
 // ---------------------------------------------------------------------
@@ -1232,6 +1240,125 @@ export function executeExternalTransferForStudent(studentId: string, toFacultyId
   student.probationLog.push(result.probationLog);
   student.transferRecords.push(result.transferRecord);
   return result;
+}
+
+// ---------------------------------------------------------------------
+// VP epic — the transfer pending chain: student requests -> advisor
+// approves/declines -> VP approves (executes the transfer, via the
+// existing execute*ForStudent functions above, unchanged) or declines.
+// A flat module-level array, not per-student, since both the advisor's
+// and the VP's queues need cross-student/cross-advisor scans — the same
+// shape ventureProjects already uses below.
+// ---------------------------------------------------------------------
+const transferRequests: TransferRequest[] = [];
+
+function findTransferRequest(requestId: string): TransferRequest {
+  const found = transferRequests.find(r => r.id === requestId);
+  if (!found) throw new Error(`no such transfer request ${requestId}`);
+  return found;
+}
+
+/** Student clicks "Request transfer" (internal or external) — always
+ *  starts pending_advisor. `toDepartmentId` is required for both types
+ *  (internal transfers directly into it; external transfers pick it from
+ *  the target faculty's department list before confirming), matching what
+ *  TransferConfirm.tsx already collects today before it used to execute
+ *  immediately. */
+export function createTransferRequestForStudent(
+  studentId: string,
+  type: TransferType,
+  toDepartmentId: string,
+  toFacultyId?: string
+): TransferRequest {
+  const student = students.get(studentId);
+  if (!student) throw new Error(`no such student ${studentId}`);
+  const request = createTransferRequest({
+    studentId,
+    studentName: student.name,
+    advisorId: student.advisorId,
+    type,
+    toFacultyId,
+    toDepartmentId,
+  });
+  transferRequests.push(request);
+  return request;
+}
+
+export function listTransferRequestsForStudent(studentId: string): TransferRequest[] {
+  return transferRequests.filter(r => r.studentId === studentId);
+}
+
+export function listTransferRequestsForAdvisor(advisorId: string): TransferRequest[] {
+  return transferRequests.filter(r => r.advisorId === advisorId);
+}
+
+/** VP's flat cross-advisor view — every request that's ever reached (or
+ *  passed through) VP review, so VP-side history/decline stays visible
+ *  too, not just the still-actionable pending_vp queue. */
+export function listAllTransferRequests(): TransferRequest[] {
+  return transferRequests;
+}
+
+/** Per-advisor in-flight counters for the VP dashboard — "in flight" means
+ *  still moving through the chain (pending_advisor or pending_vp), split
+ *  internal vs. external, per §"VP's dashboard should show counters per
+ *  advisor for how many transfers... are in flight". */
+export interface VpTransferCounterRow {
+  advisorId: string;
+  internalInFlight: number;
+  externalInFlight: number;
+}
+export function getTransferCountersByAdvisor(): VpTransferCounterRow[] {
+  return listAdvisors().map(a => {
+    const inFlight = transferRequests.filter(
+      r => r.advisorId === a.id && (r.status === 'pending_advisor' || r.status === 'pending_vp')
+    );
+    return {
+      advisorId: a.id,
+      internalInFlight: inFlight.filter(r => r.type === 'internal_department').length,
+      externalInFlight: inFlight.filter(r => r.type === 'external_faculty').length,
+    };
+  });
+}
+
+export function advisorDecideTransferRequest(requestId: string, decision: 'approve' | 'decline', reason?: string): TransferRequest {
+  const request = findTransferRequest(requestId);
+  if (request.status !== 'pending_advisor') {
+    throw new Error(`transfer request ${requestId} is '${request.status}', not awaiting advisor review`);
+  }
+  const updated = decision === 'approve' ? advisorApproveRequest(request) : advisorDeclineRequest(request, reason);
+  const idx = transferRequests.findIndex(r => r.id === requestId);
+  transferRequests[idx] = updated;
+  return updated;
+}
+
+/** VP approve is the only path that actually commits the transfer — reuses
+ *  execute{Internal,External}TransferForStudent unchanged, exactly as they
+ *  behaved under the old immediate-execute flow, just triggered one stage
+ *  later. A failed execution (e.g. a stale/now-invalid target) leaves the
+ *  request at pending_vp rather than silently marking it approved. */
+export function vpDecideTransferRequest(requestId: string, decision: 'approve' | 'decline', reason?: string): TransferRequest {
+  const request = findTransferRequest(requestId);
+  if (request.status !== 'pending_vp') {
+    throw new Error(`transfer request ${requestId} is '${request.status}', not awaiting VP review`);
+  }
+  if (decision === 'decline') {
+    const updated = vpDeclineRequest(request, reason);
+    const idx = transferRequests.findIndex(r => r.id === requestId);
+    transferRequests[idx] = updated;
+    return updated;
+  }
+  if (request.type === 'internal_department') {
+    if (!request.toDepartmentId) throw new Error(`transfer request ${requestId} is missing toDepartmentId`);
+    executeInternalTransferForStudent(request.studentId, request.toDepartmentId, `sem-transfer-${Date.now()}`);
+  } else {
+    if (!request.toFacultyId || !request.toDepartmentId) throw new Error(`transfer request ${requestId} is missing toFacultyId/toDepartmentId`);
+    executeExternalTransferForStudent(request.studentId, request.toFacultyId, request.toDepartmentId);
+  }
+  const updated = vpApproveRequest(request);
+  const idx = transferRequests.findIndex(r => r.id === requestId);
+  transferRequests[idx] = updated;
+  return updated;
 }
 
 // ---------------------------------------------------------------------

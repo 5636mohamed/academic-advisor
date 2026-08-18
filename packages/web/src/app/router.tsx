@@ -18,9 +18,11 @@ import { AdvisorCoursePlanPage } from '../advisorConsole/studentFile/AdvisorCour
 import { AdvisorCurriculumPage } from '../advisorConsole/studentFile/AdvisorCurriculumPage';
 import { AdvisorProbationHistoryPage } from '../advisorConsole/studentFile/AdvisorProbationHistoryPage';
 import { AdvisorVentureBoard } from '../advisorConsole/venture/AdvisorVentureBoard';
+import { AdvisorTransferRequests } from '../advisorConsole/AdvisorTransferRequests';
 import { VpLayout } from '../vpConsole/VpLayout';
 import { VpDashboard } from '../vpConsole/VpDashboard';
 import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
+import { VpTransferRequests } from '../vpConsole/VpTransferRequests';
 import { RequireAdvisor, RequireStudent, RequireProfessor, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -64,6 +66,7 @@ export const router = createBrowserRouter([
           // dashboard (My ventures / Pending approvals / candidate detail),
           // no per-professor sub-routes needed.
           { path: 'venture-board', element: <AdvisorVentureBoard /> },
+          { path: 'transfer-requests', element: <AdvisorTransferRequests /> },
           { path: 'advisor-console', element: <Navigate to="/students" replace /> },
         ],
       },
@@ -124,6 +127,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <VpDashboard /> },
           { path: 'advisors/:advisorId', element: <VpAdvisorDetail /> },
+          { path: 'transfer-requests', element: <VpTransferRequests /> },
         ],
       },
     ],

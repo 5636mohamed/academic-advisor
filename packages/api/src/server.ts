@@ -368,6 +368,81 @@ app.get('/api/students/:id/transfer/preview', (req, res) => {
 });
 
 // ---------------------------------------------------------------------
+// VP epic — transfer pending chain: student requests -> advisor
+// approves/declines -> VP approves (executes, via the same execute*
+// functions the two routes above still call directly) or declines. The
+// old immediate-execute routes above are left completely unchanged — they
+// stay reachable directly (existing tests hit them), just no longer what
+// the student-facing "Confirm transfer" button calls.
+// ---------------------------------------------------------------------
+app.post('/api/students/:id/transfer-requests', blockIfDismissed, (req, res) => {
+  const { type, toDepartmentId, toFacultyId } = req.body ?? {};
+  if (type !== 'internal_department' && type !== 'external_faculty') {
+    return res.status(400).json({ error: "expected { type: 'internal_department' | 'external_faculty', toDepartmentId: string, toFacultyId?: string }" });
+  }
+  if (typeof toDepartmentId !== 'string' || !toDepartmentId) {
+    return res.status(400).json({ error: 'expected a non-empty toDepartmentId' });
+  }
+  if (type === 'external_faculty' && (typeof toFacultyId !== 'string' || !toFacultyId)) {
+    return res.status(400).json({ error: 'external_faculty requests also need toFacultyId' });
+  }
+  try {
+    res.json(db.createTransferRequestForStudent(req.params.id, type, toDepartmentId, toFacultyId));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/students/:id/transfer-requests', (req, res) => {
+  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+  res.json(db.listTransferRequestsForStudent(req.params.id));
+});
+
+app.get('/api/advisors/:advisorId/transfer-requests', (req, res) => {
+  res.json(db.listTransferRequestsForAdvisor(req.params.advisorId));
+});
+
+app.post('/api/advisor/transfer-requests/:requestId/approve', (req, res) => {
+  try {
+    res.json(db.advisorDecideTransferRequest(req.params.requestId, 'approve'));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post('/api/advisor/transfer-requests/:requestId/decline', (req, res) => {
+  try {
+    res.json(db.advisorDecideTransferRequest(req.params.requestId, 'decline', req.body?.reason));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get('/api/vp/transfer-requests', (_req, res) => {
+  res.json(db.listAllTransferRequests());
+});
+
+app.get('/api/vp/transfer-requests-summary', (_req, res) => {
+  res.json(db.getTransferCountersByAdvisor());
+});
+
+app.post('/api/vp/transfer-requests/:requestId/approve', (req, res) => {
+  try {
+    res.json(db.vpDecideTransferRequest(req.params.requestId, 'approve'));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post('/api/vp/transfer-requests/:requestId/decline', (req, res) => {
+  try {
+    res.json(db.vpDecideTransferRequest(req.params.requestId, 'decline', req.body?.reason));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ---------------------------------------------------------------------
 // Faculties/departments catalog — small read-only lookups the frontend
 // needs to build a transfer confirmation UI (pick a department within a
 // recommended faculty).

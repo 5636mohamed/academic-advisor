@@ -43,6 +43,7 @@ export function AdvisorLayout() {
     { to: '/', label: 'Dashboard', end: true },
     { to: '/students', label: 'All Students' },
     { to: '/venture-board', label: 'Venture board' },
+    { to: '/transfer-requests', label: 'Transfer requests' },
   ];
 
   return (

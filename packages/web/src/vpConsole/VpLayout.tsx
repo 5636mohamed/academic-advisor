@@ -18,7 +18,10 @@ export function VpLayout() {
   const { logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const tabs = [{ to: '/vp', label: 'Dashboard', end: true }];
+  const tabs = [
+    { to: '/vp', label: 'Dashboard', end: true },
+    { to: '/vp/transfer-requests', label: 'Transfer requests' },
+  ];
 
   return (
     <div className="su">

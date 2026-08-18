@@ -279,6 +279,28 @@ export interface VpPendingProposalDTO {
   expectedPct: number;
 }
 
+// VP epic — the 3-stage transfer pending chain (student -> advisor -> VP).
+export type TransferRequestStatus = 'pending_advisor' | 'pending_vp' | 'advisor_declined' | 'vp_declined' | 'approved';
+export interface TransferRequestDTO {
+  id: string;
+  studentId: string;
+  studentName: string;
+  advisorId: string;
+  type: 'internal_department' | 'external_faculty';
+  toFacultyId?: string;
+  toDepartmentId?: string;
+  status: TransferRequestStatus;
+  createdAt: string;
+  advisorDecidedAt?: string;
+  vpDecidedAt?: string;
+  declineReason?: string;
+}
+export interface VpTransferCounterDTO {
+  advisorId: string;
+  internalInFlight: number;
+  externalInFlight: number;
+}
+
 export interface VentureCandidateDTO {
   studentId: string;
   studentName: string;
@@ -342,6 +364,25 @@ export const api = {
       gpa: number;
       totalCredits: number;
     }>(`/students/${id}/transfer/preview?toFacultyId=${toFacultyId}`),
+  // VP epic — the pending chain a "Confirm transfer" click now creates
+  // instead of executing immediately (transferInternal/transferExternal
+  // above stay defined for completeness but are no longer called from the
+  // student-facing confirm flow).
+  createTransferRequest: (id: string, type: 'internal_department' | 'external_faculty', toDepartmentId: string, toFacultyId?: string) =>
+    request<TransferRequestDTO>(`/students/${id}/transfer-requests`, {
+      method: 'POST',
+      body: JSON.stringify({ type, toDepartmentId, toFacultyId }),
+    }),
+  studentTransferRequests: (id: string) => request<TransferRequestDTO[]>(`/students/${id}/transfer-requests`),
+  advisorTransferRequests: (advisorId: string) => request<TransferRequestDTO[]>(`/advisors/${advisorId}/transfer-requests`),
+  advisorApproveTransferRequest: (requestId: string) => request<TransferRequestDTO>(`/advisor/transfer-requests/${requestId}/approve`, { method: 'POST' }),
+  advisorDeclineTransferRequest: (requestId: string, reason?: string) =>
+    request<TransferRequestDTO>(`/advisor/transfer-requests/${requestId}/decline`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  vpTransferRequests: () => request<TransferRequestDTO[]>('/vp/transfer-requests'),
+  vpTransferCounters: () => request<VpTransferCounterDTO[]>('/vp/transfer-requests-summary'),
+  vpApproveTransferRequest: (requestId: string) => request<TransferRequestDTO>(`/vp/transfer-requests/${requestId}/approve`, { method: 'POST' }),
+  vpDeclineTransferRequest: (requestId: string, reason?: string) =>
+    request<TransferRequestDTO>(`/vp/transfer-requests/${requestId}/decline`, { method: 'POST', body: JSON.stringify({ reason }) }),
   courseChain: (code: string) => request<{ courseCode: string; chainUnlockValue: number; directUnlocks: string[] }>(`/courses/${code}/chain`),
   quiz: () => request<QuizQuestionDTO[]>('/quiz'),
   faculties: () => request<Array<{ id: string; name: string }>>('/faculties'),
