@@ -12,4 +12,7 @@ export interface Student {
   activeBaseSnapshotId: string | null; // §7.2.3 anchor
   cumulativeEarnedCredits: number;
   level: number;
+  /** Which of the 5 named advisors owns this student's roster slot — see
+   *  types/advisor.ts. Every student has exactly one. */
+  advisorId: string;
 }

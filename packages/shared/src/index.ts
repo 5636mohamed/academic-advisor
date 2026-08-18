@@ -1,3 +1,4 @@
+export * from './types/advisor';
 export * from './types/course';
 export * from './types/transcript';
 export * from './types/probation';

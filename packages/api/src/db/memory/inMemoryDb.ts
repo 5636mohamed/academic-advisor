@@ -7,11 +7,12 @@
 // eventually wrap around actual SQL — swapping this module out for Prisma
 // calls later shouldn't require touching any caller (routes/ports), only
 // this file.
-import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown } from '@advisor/shared';
+import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor } from '@advisor/shared';
 import { CATALOG } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
 import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
 import { PROFESSORS, VENTURE_PROJECTS, COURSE_SKILL_TAGS, ELECTIVE_COURSE_CODES } from '../seed/seedVentureProjects';
+import { ADVISORS, NAMED_STUDENT_ADVISOR, fillerCountFor, STANDING_CYCLE, STANDING_TARGET_PCT, StandingBucket } from '../seed/seedAdvisors';
 import { computeCGPA, latestAttemptPerCourse } from '../../modules/grading/cgpa';
 import { levelFromCredits } from '../../modules/grading/level';
 import { gradeFromPct } from '@advisor/shared';
@@ -99,7 +100,11 @@ function attempt(courseCode: string, pct: number, semesterOrdinal: number, attem
  *  `deriveStudent` below, never hand-authored. */
 type SeedStudent = Omit<StoredStudent, 'probationLog' | 'transferRecords' | 'proposals' | 'registeredCourses' | 'ventureMatches'>;
 
-const seedStudents: SeedStudent[] = [
+/** The 13 hand-authored §11 worked-example personas — unchanged from
+ *  before the multi-advisor epic (still `Omit<..., 'advisorId'>` here;
+ *  `advisorId` is injected right after this array closes, via
+ *  NAMED_STUDENT_ADVISOR, rather than hand-editing all 13 literals). */
+const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   {
     id: 'ahmed-1',
     name: 'Ahmed',
@@ -492,6 +497,95 @@ function fillerHash(str: string): number {
   return Math.abs(h);
 }
 
+// ---------------------------------------------------------------------
+// Generated filler students — fills each advisor's roster out to 25 (the
+// multi-advisor epic's spec) on top of however many of the 13 named §11
+// personas they already own. Deliberately minimal by design: each gets
+// exactly ONE anchor attempt at a standing-appropriate percentage plus a
+// plausible cgpaSnapshots run — completeTranscript()'s existing gap-filler
+// (below) does the actual work of populating every other required course
+// around that one anchor, the same real mechanism the 13 hand-authored
+// students already rely on for their own "illustrative, not exhaustive"
+// transcripts. No separate/duplicate course-selection logic here.
+// ---------------------------------------------------------------------
+const GENERATED_FIRST_NAMES = [
+  'Amira', 'Bassem', 'Dina', 'Ehab', 'Farida', 'Gamal', 'Heba', 'Islam',
+  'Jana', 'Khaled', 'Lamia', 'Mahmoud', 'Nadia', 'Osama', 'Peter', 'Rania',
+  'Sherif', 'Tamer', 'Ula', 'Wael', 'Yasmin', 'Ziad', 'Aya', 'Bilal',
+  'Dalia', 'Emad', 'Farah', 'Ghada', 'Hany', 'Iman',
+];
+const GENERATED_LAST_NAMES = [
+  'Abdelrahman', 'Badawy', 'Fahmy', 'Gaber', 'Hegazy', 'Ismail', 'Kamal',
+  'Mansour', 'Nour', 'Rashad', 'Saad', 'Tawfik',
+];
+
+/** Approximates computeCGPA's credit-weighted-average shape closely enough
+ *  for a plausible history run — not a re-implementation, just enough to
+ *  keep the snapshot trajectory in the same ballpark as what the real
+ *  engine will later compute from the filled-in transcript, matching the
+ *  "illustrative, not exhaustive" precision the 13 hand-authored students'
+ *  own snapshots already use. */
+function buildCgpaSnapshots(targetPct: number, semestersClosed: number, studentId: string): CgpaSnapshot[] {
+  const points = gradeFromPct(targetPct, false).pts;
+  const snapshots: CgpaSnapshot[] = [];
+  let cumulativeCredits = 0;
+  for (let ord = 1; ord <= semestersClosed; ord++) {
+    // ~16-18 credits/semester, a small deterministic wobble so every
+    // student's credit curve isn't bit-identical.
+    cumulativeCredits += 16 + (fillerHash(`${studentId}:credits:${ord}`) % 3);
+    // Tiny deterministic jitter per semester so the trend line isn't a
+    // flat, obviously-synthetic straight line.
+    const jitter = ((fillerHash(`${studentId}:gpa:${ord}`) % 21) - 10) / 100; // -0.10..+0.10
+    const semesterGpa = Math.max(0, Math.min(4, Math.round((points + jitter) * 100) / 100));
+    snapshots.push({
+      semesterId: `sem-${ord}`,
+      semesterOrdinal: ord,
+      semesterGpa,
+      cgpa: semesterGpa, // single-anchor-attempt students have ~flat per-semester performance by construction
+      cumulativeCredits,
+      isBaseSnapshot: false,
+    });
+  }
+  return snapshots;
+}
+
+function generateFillerStudents(advisorId: string, count: number): SeedStudent[] {
+  const out: SeedStudent[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = `${advisorId}-gen-${i + 1}`;
+    const bucket: StandingBucket = STANDING_CYCLE[fillerHash(`${id}:bucket`) % STANDING_CYCLE.length];
+    const targetPct = STANDING_TARGET_PCT[bucket];
+    // 2-7 closed semesters (Level 1 through Level 4-ish), varied but
+    // deterministic — a real advisor's roster spans multiple class years.
+    const semestersClosed = 2 + (fillerHash(`${id}:semesters`) % 6);
+    const firstName = GENERATED_FIRST_NAMES[fillerHash(`${id}:first`) % GENERATED_FIRST_NAMES.length];
+    const lastName = GENERATED_LAST_NAMES[fillerHash(`${id}:last`) % GENERATED_LAST_NAMES.length];
+
+    // A single anchor attempt at the target percentage — completeTranscript
+    // (below) uses this to compute studentAvgPct and fills in every other
+    // required course up through semestersClosed around that average.
+    const anchorCourse = CATALOG.find(c => c.semesterOrdinal === 1 && !c.isUR);
+    const allAttempts: EnrollmentRecord[] = anchorCourse ? [attempt(anchorCourse.code, targetPct, 1)] : [];
+
+    out.push({
+      id,
+      name: `${firstName} ${lastName}`,
+      facultyId: 'ENG',
+      departmentId: 'ECE',
+      status: 'active',
+      activeBaseSnapshotId: null,
+      cumulativeEarnedCredits: 0, // recomputed by completeTranscript() from the filled-in transcript
+      level: 1, // same — recomputed once the transcript is complete
+      advisorId,
+      quizAnswers: {},
+      allAttempts,
+      cgpaSnapshots: buildCgpaSnapshots(targetPct, semestersClosed, id),
+      probationCounter: { studentId: id, count: 0, armed: true }, // replayProbationHistory (deriveStudent) overwrites this from the snapshots above
+    });
+  }
+  return out;
+}
+
 /** §14/handbook consistency fix: a hand-authored seed literal only ever
  *  listed a handful of "illustrative" courses per semester (see the
  *  original comment above `seedStudents`), which left real gaps — a
@@ -573,6 +667,14 @@ function deriveStudent(s: SeedStudent): StoredStudent {
     quizAnswers: { ...s.quizAnswers },
   };
 }
+
+// The full 125-student roster: the 13 hand-authored §11 personas (each
+// now tagged with its owning advisor via NAMED_STUDENT_ADVISOR) plus
+// generated filler students bringing every advisor up to 25.
+const seedStudents: SeedStudent[] = [
+  ...namedSeedStudentLiterals.map(s => ({ ...s, advisorId: NAMED_STUDENT_ADVISOR[s.id] })),
+  ...ADVISORS.flatMap(a => generateFillerStudents(a.id, fillerCountFor(a.id))),
+];
 
 const students = new Map<string, StoredStudent>(seedStudents.map(s => [s.id, deriveStudent(completeTranscript(s))]));
 
@@ -1483,6 +1585,16 @@ export function listProfessors(): ProfessorProfile[] {
 
 export function getProfessor(id: string): ProfessorProfile | undefined {
   return PROFESSORS.find(p => p.id === id);
+}
+
+// --- Multi-advisor epic: advisor-facing reads ---
+
+export function listAdvisors(): Advisor[] {
+  return ADVISORS;
+}
+
+export function getAdvisor(id: string): Advisor | undefined {
+  return ADVISORS.find(a => a.id === id);
 }
 
 export function listVentureProjects(): VentureProject[] {

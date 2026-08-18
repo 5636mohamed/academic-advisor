@@ -2,7 +2,7 @@
 
 # Academic Advising & Early-Warning System
 
-**Mohamed Elsayed Elhariry** — Department of Electronics and Communication Engineering<br>
+**Mohamed Elsayed Elhariry** — Department of Electronics and Communication, Faculty of Engineering<br>
 **Yamen Hany Ezzat** — Department of Digital Media, Faculty of Art and Design<br>
 *Egypt-Japan University of Science and Technology (E-JUST)*
 

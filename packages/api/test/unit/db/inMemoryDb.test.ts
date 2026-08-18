@@ -13,12 +13,14 @@ beforeEach(() => {
 });
 
 describe('in-memory store — seed / read', () => {
-  it('lists all seeded demo students', () => {
-    const list = db.listStudents();
-    expect(list.map(s => s.id).sort()).toEqual([
+  it('lists every seeded demo student, including all 13 named §11 personas (plus generated filler students — see advisorSeed.test.ts for the full 125-student roster coverage)', () => {
+    const ids = new Set(db.listStudents().map(s => s.id));
+    for (const namedId of [
       'ahmed-1', 'fatma-1', 'hassan-1', 'karim-1', 'laila-4', 'mohamed-1', 'mona-2',
       'nourhan-1', 'omar-1', 'salma-1', 'sara-1', 'yara-1', 'youssef-3',
-    ]);
+    ]) {
+      expect(ids.has(namedId)).toBe(true);
+    }
   });
 
   it('getStudent returns undefined for an unknown id (no crash)', () => {

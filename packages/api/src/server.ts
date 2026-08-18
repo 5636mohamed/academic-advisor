@@ -131,6 +131,7 @@ app.get('/api/students', (_req, res) => {
     status: s.status,
     cgpa: db.getCurrentCgpa(s.id),
     probationCounter: s.probationCounter,
+    advisorId: s.advisorId,
   }));
   res.json(list);
 });
@@ -684,6 +685,18 @@ app.get('/api/professors', (_req, res) => {
   // professor a student should see hosting a project list or a login this
   // route should ever surface as choosable.
   res.json(db.listProfessors().filter(p => p.id !== 'advisor-owned'));
+});
+
+// --- Multi-advisor epic: the 5 named advisors (each with their own
+// 25-student roster) — mirrors the professors routes above exactly. ---
+app.get('/api/advisors', (_req, res) => {
+  res.json(db.listAdvisors());
+});
+
+app.get('/api/advisors/:id', (req, res) => {
+  const advisor = db.getAdvisor(req.params.id);
+  if (!advisor) return res.status(404).json({ error: 'advisor not found' });
+  res.json(advisor);
 });
 
 // Advisor console's own Venture Board (advisorConsole/venture/*) — the

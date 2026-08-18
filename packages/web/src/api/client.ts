@@ -33,6 +33,7 @@ export interface StudentSummary {
   status: string;
   cgpa: number;
   probationCounter: ProbationCounterState;
+  advisorId: string;
 }
 
 export interface TransferRecordDTO {

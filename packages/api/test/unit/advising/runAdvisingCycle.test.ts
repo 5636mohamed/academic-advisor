@@ -67,6 +67,7 @@ function baseStudent(cgpa: number): StudentWithCgpa {
     activeBaseSnapshotId: null,
     cumulativeEarnedCredits: 72,
     level: 3,
+    advisorId: 'advisor-nabil',
     cgpa,
   };
 }
