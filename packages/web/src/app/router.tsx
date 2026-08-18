@@ -18,7 +18,10 @@ import { AdvisorCoursePlanPage } from '../advisorConsole/studentFile/AdvisorCour
 import { AdvisorCurriculumPage } from '../advisorConsole/studentFile/AdvisorCurriculumPage';
 import { AdvisorProbationHistoryPage } from '../advisorConsole/studentFile/AdvisorProbationHistoryPage';
 import { AdvisorVentureBoard } from '../advisorConsole/venture/AdvisorVentureBoard';
-import { RequireAdvisor, RequireStudent, RequireProfessor } from '../auth/RequireRole';
+import { VpLayout } from '../vpConsole/VpLayout';
+import { VpDashboard } from '../vpConsole/VpDashboard';
+import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
+import { RequireAdvisor, RequireStudent, RequireProfessor, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -105,6 +108,22 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <FacultyProjects /> },
           { path: ':projectId', element: <FacultyProjectCandidates /> },
+        ],
+      },
+    ],
+  },
+  {
+    // Vice President portal — a single global identity overseeing all 5
+    // advisors, so (like the advisor console above) no :id segment in the
+    // URL; RequireVicePresident is a pure role check.
+    path: '/vp',
+    element: <RequireVicePresident />,
+    children: [
+      {
+        element: <VpLayout />,
+        children: [
+          { index: true, element: <VpDashboard /> },
+          { path: 'advisors/:advisorId', element: <VpAdvisorDetail /> },
         ],
       },
     ],

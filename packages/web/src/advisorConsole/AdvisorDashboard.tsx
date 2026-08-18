@@ -10,17 +10,20 @@ import { api, AdvisorReportRowDTO, StudentSummary } from '../api/client';
 import { IconArrowRight, IconCheck, IconPaperPlane } from '../portal/ui/Icons';
 import { Loading, SearchBox, Section, StatCard } from '../portal/ui/Primitives';
 import { RISK_TONE, riskLevelFor } from './lib/riskLevel';
+import { useAuth } from '../auth/AuthContext';
 
 export function AdvisorDashboard() {
   const navigate = useNavigate();
+  const { auth } = useAuth();
+  const advisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
   const [students, setStudents] = useState<StudentSummary[] | null>(null);
   const [report, setReport] = useState<AdvisorReportRowDTO[] | null>(null);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    api.listStudents().then(setStudents);
-    api.advisorReport().then(setReport);
-  }, []);
+    api.listStudents(advisorId).then(setStudents);
+    api.advisorReport(advisorId).then(setReport);
+  }, [advisorId]);
 
   const reportById = useMemo(() => new Map((report ?? []).map(r => [r.studentId, r])), [report]);
 

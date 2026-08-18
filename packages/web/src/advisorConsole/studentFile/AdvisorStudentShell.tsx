@@ -7,14 +7,16 @@
 // Product-owner decision: the Best-Fit Department Quiz is a student-only
 // feature — removed from the advisor's per-student tabs entirely (it still
 // lives on the student's own portal, unchanged).
-import { NavLink, Outlet, useParams } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api, StudentSummary } from '../../api/client';
 import { Loading } from '../../portal/ui/Primitives';
 import { RISK_TONE, riskLevelFor } from '../lib/riskLevel';
+import { useAuth } from '../../auth/AuthContext';
 
 export function AdvisorStudentShell() {
   const { id } = useParams<{ id: string }>();
+  const { auth } = useAuth();
   const [student, setStudent] = useState<StudentSummary | null>(null);
 
   useEffect(() => {
@@ -23,6 +25,16 @@ export function AdvisorStudentShell() {
 
   if (!id) return null;
   if (!student) return <Loading label="Loading student…" />;
+
+  // Defense in depth: the advisor console's own URLs don't carry an
+  // :advisorId segment (identity comes from AuthContext, not the URL — see
+  // RequireRole.tsx's comment), so this is the one place a typed-in
+  // student id from another advisor's roster could otherwise be reached.
+  // The list/report endpoints are already ?advisorId=-scoped server-side;
+  // this closes the same gap for a student navigated to directly by id.
+  if (auth?.role === 'advisor' && student.advisorId !== auth.advisorId) {
+    return <Navigate to="/students" replace />;
+  }
 
   const risk = riskLevelFor(student.cgpa, student.probationCounter.count);
   const tabs = [

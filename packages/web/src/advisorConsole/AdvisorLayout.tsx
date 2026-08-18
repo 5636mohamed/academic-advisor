@@ -8,23 +8,36 @@
 // product decision that every professor at E-JUST is also an academic
 // advisor), reachable without a separate professor login.
 //
-// The advisor role itself is still the single shared session
-// auth/AuthContext.tsx has always modeled (no per-advisor identity/login,
-// unlike student/professor) — so unlike the mockup's "Dr. Mohamed", the
-// topbar shows a generic "Academic Advisor" label rather than inventing a
-// fake name/ID that isn't backed by any real login data.
+// Multi-advisor epic: advisor is now a real per-id identity (5 named
+// advisors, see db/seed/seedAdvisors.ts), so the topbar shows the actual
+// logged-in advisor's real name/department — same pattern FacultyLayout.tsx
+// already uses for professors — instead of the old generic "Academic
+// Advisor" placeholder from back when advisor was one shared account.
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { api, AdvisorDTO } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from '../portal/ui/Icons';
 import ejustLogo from '../assets/ejust-logo.png';
 import '../portal/student-theme.css';
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'A';
+}
+
 export function AdvisorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { auth, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const advisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
+  const [advisor, setAdvisor] = useState<AdvisorDTO | null>(null);
+
+  useEffect(() => {
+    if (advisorId) api.advisor(advisorId).then(setAdvisor);
+  }, [advisorId]);
 
   const tabs = [
     { to: '/', label: 'Dashboard', end: true },
@@ -70,11 +83,13 @@ export function AdvisorLayout() {
             >
               <IconLogout width={17} height={17} />
             </button>
-            <div className="su-user-meta">
-              <div className="su-user-name">Academic Advisor</div>
-              <div className="su-user-id">All students &amp; ventures</div>
-            </div>
-            <div className="su-avatar">AA</div>
+            {advisor && (
+              <div className="su-user-meta">
+                <div className="su-user-name">{advisor.name}</div>
+                <div className="su-user-id">{advisor.facultyId}/{advisor.departmentId} · 25 students</div>
+              </div>
+            )}
+            <div className="su-avatar">{advisor ? initials(advisor.name) : 'A'}</div>
           </div>
         </header>
 

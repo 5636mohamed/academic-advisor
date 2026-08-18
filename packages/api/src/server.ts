@@ -121,8 +121,16 @@ function blockIfDismissed(req: express.Request, res: express.Response, next: exp
 // ---------------------------------------------------------------------
 // Students — read
 // ---------------------------------------------------------------------
-app.get('/api/students', (_req, res) => {
-  const list = db.listStudents().map(s => ({
+// Multi-advisor epic: an optional ?advisorId= scopes the roster down to
+// one advisor's own 25 students — query-param-based, same demo-grade
+// rigor as the rest of this app's auth (client-checked route guards, no
+// real session), not a stronger guarantee. Unscoped (no param) still
+// returns everyone, used by the Vice President's cross-advisor views.
+app.get('/api/students', (req, res) => {
+  const { advisorId } = req.query;
+  let students = db.listStudents();
+  if (typeof advisorId === 'string') students = students.filter(s => s.advisorId === advisorId);
+  const list = students.map(s => ({
     id: s.id,
     name: s.name,
     facultyId: s.facultyId,
@@ -573,8 +581,10 @@ app.get('/api/students/:id/registered-courses', (req, res) => {
 });
 
 // §15.4 — the advisor's PDF report is built client-side from this aggregate.
-app.get('/api/advisor/report', (_req, res) => {
-  res.json(db.getAdvisorReport());
+// Same ?advisorId= scoping as GET /api/students above.
+app.get('/api/advisor/report', (req, res) => {
+  const { advisorId } = req.query;
+  res.json(db.getAdvisorReport(typeof advisorId === 'string' ? advisorId : undefined));
 });
 
 // ---------------------------------------------------------------------
@@ -697,6 +707,27 @@ app.get('/api/advisors/:id', (req, res) => {
   const advisor = db.getAdvisor(req.params.id);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
   res.json(advisor);
+});
+
+// --- Vice President portal ---
+
+// Per-advisor summary for the VP dashboard: roster size + average CGPA.
+// Not roster-scoped by design — the VP's whole point is a cross-advisor view.
+app.get('/api/vp/advisors-summary', (_req, res) => {
+  const summary = db.listAdvisors().map(a => {
+    const roster = db.listStudents().filter(s => s.advisorId === a.id);
+    const avgCgpa = roster.length > 0
+      ? roster.reduce((sum, s) => sum + db.getCurrentCgpa(s.id), 0) / roster.length
+      : 0;
+    return { advisor: a, studentCount: roster.length, averageCgpa: Math.round(avgCgpa * 100) / 100 };
+  });
+  res.json(summary);
+});
+
+// The flat, cross-advisor pending-approvals queue (see
+// listPendingProposalsAcrossAllAdvisors's doc comment).
+app.get('/api/vp/pending-proposals', (_req, res) => {
+  res.json(db.listPendingProposalsAcrossAllAdvisors());
 });
 
 // Advisor console's own Venture Board (advisorConsole/venture/*) — the

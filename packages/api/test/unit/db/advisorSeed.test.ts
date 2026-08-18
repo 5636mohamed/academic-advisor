@@ -85,3 +85,56 @@ describe('advisor seed — 5 advisors, 125 students total', () => {
     expect(after).toEqual(before);
   });
 });
+
+describe('getAdvisorReport — per-advisor roster scoping (real server-side filtering, not just client-side hiding)', () => {
+  it('unscoped (no advisorId) still returns every student, same as before this epic', () => {
+    expect(db.getAdvisorReport()).toHaveLength(5 * STUDENTS_PER_ADVISOR);
+  });
+
+  it('scoped to one advisor returns exactly that advisor\'s 25 students', () => {
+    for (const a of ADVISORS) {
+      const rows = db.getAdvisorReport(a.id);
+      expect(rows).toHaveLength(STUDENTS_PER_ADVISOR);
+    }
+  });
+
+  it('two different advisors\' scoped reports are fully disjoint sets of studentIds', () => {
+    const [a, b] = ADVISORS;
+    const idsA = new Set(db.getAdvisorReport(a.id).map(r => r.studentId));
+    const idsB = new Set(db.getAdvisorReport(b.id).map(r => r.studentId));
+    for (const id of idsA) expect(idsB.has(id)).toBe(false);
+  });
+
+  it('an unknown advisorId returns an empty report rather than silently falling back to everyone', () => {
+    expect(db.getAdvisorReport('nobody')).toHaveLength(0);
+  });
+});
+
+describe('listPendingProposalsAcrossAllAdvisors — the VP dashboard\'s flat cross-advisor queue', () => {
+  it('every row carries the real owning advisorId, and approving one via the normal advisor route removes it from the queue', () => {
+    const proposals = db.addProposalsFromPlan('ahmed-1', [{
+      courseCode: 'ECE314', isRetake: false, oldPoints: null,
+      expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0,
+      deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
+    }]);
+    const before = db.listPendingProposalsAcrossAllAdvisors();
+    const row = before.find(p => p.studentId === 'ahmed-1' && p.slotKey === 'ECE314');
+    expect(row).toBeDefined();
+    expect(row!.advisorId).toBe(db.getStudent('ahmed-1')!.advisorId);
+
+    db.approveProposalById(proposals.find(p => p.slotKey === 'ECE314')!.id);
+    const after = db.listPendingProposalsAcrossAllAdvisors();
+    expect(after.some(p => p.studentId === 'ahmed-1' && p.slotKey === 'ECE314')).toBe(false);
+  });
+
+  it('never includes advisor-authored alternates (those are self-approved on creation, never pending)', () => {
+    const rows = db.listPendingProposalsAcrossAllAdvisors();
+    // every row in the queue must be a genuinely still-pending SYSTEM proposal
+    for (const r of rows) {
+      const student = db.getStudent(r.studentId)!;
+      const proposal = student.proposals.find(p => p.id === r.proposalId)!;
+      expect(proposal.origin).toBe('system');
+      expect(proposal.status).toBe('pending');
+    }
+  });
+});

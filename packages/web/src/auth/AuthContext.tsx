@@ -8,16 +8,20 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
 export type AuthState =
-  | { role: 'advisor' }
+  | { role: 'advisor'; advisorId: string }
   | { role: 'student'; studentId: string }
   | { role: 'professor'; professorId: string }
+  /** A single global identity, same as advisor used to be before the
+   *  multi-advisor epic — one Vice President oversees all 5 advisors. */
+  | { role: 'vice_president' }
   | null;
 
 interface AuthContextValue {
   auth: AuthState;
-  loginAsAdvisor: () => void;
+  loginAsAdvisor: (advisorId: string) => void;
   loginAsStudent: (studentId: string) => void;
   loginAsProfessor: (professorId: string) => void;
+  loginAsVicePresident: () => void;
   logout: () => void;
 }
 
@@ -41,9 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextValue = {
     auth,
-    loginAsAdvisor: () => setAuth({ role: 'advisor' }),
+    loginAsAdvisor: advisorId => setAuth({ role: 'advisor', advisorId }),
     loginAsStudent: studentId => setAuth({ role: 'student', studentId }),
     loginAsProfessor: professorId => setAuth({ role: 'professor', professorId }),
+    loginAsVicePresident: () => setAuth({ role: 'vice_president' }),
     logout: () => setAuth(null),
   };
 
@@ -61,7 +66,8 @@ export function useAuth(): AuthContextValue {
  *  than just to a generic "not allowed" screen. */
 export function homeRouteFor(auth: AuthState): string {
   if (!auth) return '/login';
-  if (auth.role === 'advisor') return '/';
+  if (auth.role === 'advisor') return '/'; // unchanged — the advisor console's own URLs never gained an :advisorId segment (see plan notes); identity comes from context, not the URL
   if (auth.role === 'student') return `/portal/${auth.studentId}`;
+  if (auth.role === 'vice_president') return '/vp';
   return `/faculty/${auth.professorId}`;
 }

@@ -252,6 +252,30 @@ export interface ProfessorDetailDTO extends ProfessorSummaryDTO {
   projects: VentureProjectDTO[];
 }
 
+export interface AdvisorDTO {
+  id: string;
+  name: string;
+  facultyId: string;
+  departmentId: string;
+}
+
+export interface VpAdvisorSummaryDTO {
+  advisor: AdvisorDTO;
+  studentCount: number;
+  averageCgpa: number;
+}
+
+export interface VpPendingProposalDTO {
+  proposalId: string;
+  studentId: string;
+  studentName: string;
+  advisorId: string;
+  slotKey: string;
+  courseCode: string;
+  expectedLetter: string;
+  expectedPct: number;
+}
+
 export interface VentureCandidateDTO {
   studentId: string;
   studentName: string;
@@ -274,7 +298,7 @@ export interface AdvisorVentureProjectRowDTO {
 }
 
 export const api = {
-  listStudents: () => request<StudentSummary[]>('/students'),
+  listStudents: (advisorId?: string) => request<StudentSummary[]>(`/students${advisorId ? `?advisorId=${encodeURIComponent(advisorId)}` : ''}`),
   getStudent: (id: string) => request<StudentDetail>(`/students/${id}`),
   getEligibleCourses: (id: string) => request<EligibleCourseDTO[]>(`/students/${id}/eligible-courses`),
   getCurriculum: (id: string) => request<CurriculumCourseDTO[]>(`/students/${id}/curriculum`),
@@ -338,7 +362,7 @@ export const api = {
   chooseProposal: (studentId: string, proposalId: string) =>
     request<ChooseProposalResultDTO>(`/students/${studentId}/proposals/${proposalId}/choose`, { method: 'POST' }),
   registeredCourses: (id: string) => request<RegisteredCourseDTO[]>(`/students/${id}/registered-courses`),
-  advisorReport: () => request<AdvisorReportRowDTO[]>('/advisor/report'),
+  advisorReport: (advisorId?: string) => request<AdvisorReportRowDTO[]>(`/advisor/report${advisorId ? `?advisorId=${encodeURIComponent(advisorId)}` : ''}`),
 
   // §16 — Innovation & Venture Catalyst
   ventureQuiz: () => request<VentureQuizQuestionDTO[]>('/venture-quiz'),
@@ -365,6 +389,10 @@ export const api = {
       body: JSON.stringify(cv ? { cvFileName: cv.fileName, cvDataUrl: cv.dataUrl } : {}),
     }),
   professors: () => request<ProfessorSummaryDTO[]>('/professors'),
+  advisors: () => request<AdvisorDTO[]>('/advisors'),
+  advisor: (advisorId: string) => request<AdvisorDTO>(`/advisors/${advisorId}`),
+  vpAdvisorsSummary: () => request<VpAdvisorSummaryDTO[]>('/vp/advisors-summary'),
+  vpPendingProposals: () => request<VpPendingProposalDTO[]>('/vp/pending-proposals'),
   professor: (professorId: string) => request<ProfessorDetailDTO>(`/professors/${professorId}`),
   createVentureProject: (professorId: string, input: Omit<VentureProjectDTO, 'id' | 'professorId' | 'createdAt'>) =>
     request<VentureProjectDTO>(`/professors/${professorId}/venture-projects`, { method: 'POST', body: JSON.stringify(input) }),

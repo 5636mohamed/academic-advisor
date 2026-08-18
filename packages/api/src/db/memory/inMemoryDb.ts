@@ -1249,6 +1249,43 @@ export function getProposals(studentId: string): CourseProposal[] {
   return students.get(studentId)?.proposals ?? [];
 }
 
+/** Vice President epic — a flat, cross-advisor queue of every still-
+ *  pending SYSTEM proposal in the whole system, so the VP can act on any
+ *  student's plan directly (§ "accept the students plan even if the
+ *  advisor didn't accept for the student") without opening the advisor
+ *  console at all. Deliberately just the pending ones, not the whole
+ *  proposal history — this is an action queue, not a report. */
+export interface VpPendingProposal {
+  proposalId: string;
+  studentId: string;
+  studentName: string;
+  advisorId: string;
+  slotKey: string;
+  courseCode: string;
+  expectedLetter: string;
+  expectedPct: number;
+}
+export function listPendingProposalsAcrossAllAdvisors(): VpPendingProposal[] {
+  const out: VpPendingProposal[] = [];
+  for (const s of students.values()) {
+    for (const p of s.proposals) {
+      if (p.origin === 'system' && p.status === 'pending') {
+        out.push({
+          proposalId: p.id,
+          studentId: s.id,
+          studentName: s.name,
+          advisorId: s.advisorId,
+          slotKey: p.slotKey,
+          courseCode: p.courseCode,
+          expectedLetter: p.expectedLetter,
+          expectedPct: p.expectedPct,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /** §15.3.2 step 1 — adds one pending system proposal per NEW slot in
  *  `plan` (skips slots that already have any proposal on record, so
  *  repeat /advise runs never clobber an advisor's prior review). */
@@ -1437,8 +1474,9 @@ export function getRegisteredCourses(studentId: string): RegisteredCourse[] {
 }
 
 /** §15.4 — the roster aggregate the advisor's PDF report is built from. */
-export function getAdvisorReport(): AdvisorReportRow[] {
-  return listStudents().map(s => ({
+export function getAdvisorReport(advisorId?: string): AdvisorReportRow[] {
+  const scoped = advisorId ? listStudents().filter(s => s.advisorId === advisorId) : listStudents();
+  return scoped.map(s => ({
     studentId: s.id,
     name: s.name,
     cgpa: getCurrentCgpa(s.id),

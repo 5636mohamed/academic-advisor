@@ -35,3 +35,13 @@ export function RequireProfessor() {
   if (auth.professorId !== id) return <Navigate to={`/faculty/${auth.professorId}`} replace />;
   return <Outlet />;
 }
+
+/** The Vice President portal — a single global identity (like advisor used
+ *  to be pre-multi-advisor), so this is a pure role check, same shape as
+ *  RequireAdvisor. */
+export function RequireVicePresident() {
+  const { auth } = useAuth();
+  if (!auth) return <Navigate to="/login" replace />;
+  if (auth.role !== 'vice_president') return <Navigate to={homeRouteFor(auth)} replace />;
+  return <Outlet />;
+}

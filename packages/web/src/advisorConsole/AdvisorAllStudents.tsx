@@ -10,12 +10,18 @@ import { api, StudentSummary, TransferRecordDTO, AdvisorReportRowDTO } from '../
 import { downloadAdvisorReportPdf } from '../lib/pdfReport';
 import { Loading, SearchBox } from '../portal/ui/Primitives';
 import { RISK_TONE, riskLevelFor } from './lib/riskLevel';
+import { useAuth } from '../auth/AuthContext';
 
 type QuickFilter = 'probation' | 'atRisk' | 'lowCgpa' | 'highCgpa' | 'pending' | null;
 
 export function AdvisorAllStudents() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { auth } = useAuth();
+  // This component is only ever rendered inside RequireAdvisor's tree, so
+  // auth is always the advisor arm here — narrowed defensively rather than
+  // asserted, in case that ever changes.
+  const advisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
   const [students, setStudents] = useState<StudentSummary[] | null>(null);
   const [report, setReport] = useState<AdvisorReportRowDTO[] | null>(null);
   const [query, setQuery] = useState('');
@@ -25,9 +31,9 @@ export function AdvisorAllStudents() {
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    api.listStudents().then(setStudents);
-    api.advisorReport().then(setReport);
-  }, []);
+    api.listStudents(advisorId).then(setStudents);
+    api.advisorReport(advisorId).then(setReport);
+  }, [advisorId]);
 
   const reportById = useMemo(() => new Map((report ?? []).map(r => [r.studentId, r])), [report]);
 
@@ -64,7 +70,7 @@ export function AdvisorAllStudents() {
   const downloadReport = async () => {
     setDownloading(true);
     try {
-      downloadAdvisorReportPdf(await api.advisorReport());
+      downloadAdvisorReportPdf(await api.advisorReport(advisorId));
     } finally {
       setDownloading(false);
     }
