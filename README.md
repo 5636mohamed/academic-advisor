@@ -56,16 +56,19 @@ portal/student-theme.css`), dark mode throughout, smooth transitions on
 every interactive surface, and verified responsive from mobile (375px)
 through desktop across every portal.
 
-### 🎬 Full tour (all 4 roles)
+### 🎬 Full tour (all 4 roles) — plays automatically, no click needed
 
-**[▶ Watch `docs/media/full-tour-demo.mp4`](docs/media/full-tour-demo.mp4)** —
-recorded straight off the running app (Playwright, headless Chromium),
+![Full tour: login, student portal, advisor console, Vice President portal, and Faculty Console](docs/media/full-tour-demo.gif)
+
+Recorded straight off the running app (Playwright, headless Chromium),
 ~45 seconds: the redesigned login → student portal (dashboard, course
 plan, recommendations, transcript, venture board) → advisor console
 (students, venture board, transfer requests, a student file) → Vice
 President portal (advisor drill-down, transfer requests, venture board) →
-Faculty Console. Real navigation, real seeded data throughout, not a mockup
-— GitHub's file viewer plays it inline when you click through.
+Faculty Console. Real navigation, real seeded data throughout, not a
+mockup. (A higher-quality MP4 of the same recording is also available at
+`docs/media/full-tour-demo.mp4` if you'd rather watch it at full
+resolution.)
 
 ### Live demo GIFs
 
@@ -349,9 +352,8 @@ good-standing student, a mid-probation warning-ladder student, a
 mandatory-retake-overflow case, a dismissed student, a faculty-transfer
 candidate, **Mohamed for the §16 venture-match scenario**, etc.) so every
 branch of the system is reachable through the UI, not just through unit
-tests. See the [🎬 full tour video](docs/media/full-tour-demo.mp4) above
-for a guided walkthrough of all 4 roles before you start clicking around
-yourself.
+tests. See the 🎬 full tour GIF near the top of this README for a guided
+walkthrough of all 4 roles before you start clicking around yourself.
 
 No `node_modules` are committed. `npm install --workspaces` installs
 everything (Express, Vitest, React, Vite, jsPDF, Prisma client, etc.)
