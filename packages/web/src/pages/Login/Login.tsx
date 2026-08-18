@@ -2,8 +2,9 @@
 // no server session) email + password gate instead of the old "pick your
 // identity from a list of buttons" picker. See auth/credentials.ts for how
 // email/password map to a role, and docs/LOGIN_CREDENTIALS.md for the full
-// human-readable roster (every student's email is derived straight from
-// their real seeded id, never a second hardcoded list).
+// human-readable roster (every student/advisor's email is derived straight
+// from their real seeded NAME — firstname.lastname@aegis.edu.eg — never a
+// second hardcoded list).
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -47,14 +48,14 @@ export function Login() {
         navigate('/vp');
         return;
       }
-      const advisor = advisors?.find(a => advisorEmailFor(a.id) === typedEmail);
+      const advisor = advisors?.find(a => advisorEmailFor(a.name) === typedEmail);
       if (advisor) {
         if (password !== ADVISOR_PASSWORD) return setError('Incorrect password.');
         loginAsAdvisor(advisor.id);
         navigate('/');
         return;
       }
-      const student = students?.find(s => studentEmailFor(s.id) === typedEmail);
+      const student = students?.find(s => studentEmailFor(s.name) === typedEmail);
       if (student) {
         if (password !== STUDENT_PASSWORD) return setError('Incorrect password.');
         loginAsStudent(student.id);
@@ -95,7 +96,7 @@ export function Login() {
                     className="su-input"
                     type="text"
                     autoComplete="username"
-                    placeholder="e.g., ahmed-1@aegis.edu.eg or advisor-nabil@aegis.edu.eg"
+                    placeholder="e.g., ahmed.mostafa@aegis.edu.eg or nabil.fathy@aegis.edu.eg"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                   />

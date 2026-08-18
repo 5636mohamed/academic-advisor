@@ -54,7 +54,7 @@ describe('advisor seed — 5 advisors, 125 students total', () => {
 
   it('named personas keep their real hand-authored fields untouched (spot check Ahmed)', () => {
     const ahmed = db.getStudent('ahmed-1');
-    expect(ahmed?.name).toBe('Ahmed');
+    expect(ahmed?.name).toBe('Ahmed Mostafa');
     expect(ahmed?.facultyId).toBe('ENG');
     expect(ahmed?.departmentId).toBe('ECE');
   });

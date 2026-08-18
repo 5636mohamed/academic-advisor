@@ -28,12 +28,23 @@
   --su-accent-soft-strong: #f8d4d1;
   --su-accent-contrast: #ffffff;
 
-  --su-good: #1f9254;
-  --su-good-soft: #e4f6ea;
-  --su-warn: #a9760b;
-  --su-warn-soft: #fbf1d4;
-  --su-danger: #c62828;
-  --su-danger-soft: #fbe3e2;
+  /* Brand palette (light mode) — Main/Background pairs as specified:
+   * Yellow F4D30F / FEF6C7, Red EB2028 / FEF2F2, Green 10B981 / C9FFED.
+   * Dark mode keeps its own already-tuned tones below, unchanged — these
+   * three exact pairs weren't given a dark-mode counterpart, and reusing
+   * pale backgrounds like FEF6C7 on a dark surface would read as broken,
+   * not on-brand. NOTE: --su-warn's brand yellow (F4D30F) is a genuinely
+   * low-contrast pairing against its own brand background (FEF6C7) for
+   * small TEXT specifically (both are high-luminance yellows) — it still
+   * reads fine everywhere it's used as a fill/dot/border/icon color, which
+   * is most places; flagging this rather than silently picking a different
+   * shade than the one specified. */
+  --su-good: #10b981;
+  --su-good-soft: #c9ffed;
+  --su-warn: #f4d30f;
+  --su-warn-soft: #fef6c7;
+  --su-danger: #eb2028;
+  --su-danger-soft: #fef2f2;
   --su-info: #2f6fed;
   --su-info-soft: #e6edfe;
   --su-neutral-soft: #eef0f3;

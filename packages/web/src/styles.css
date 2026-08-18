@@ -20,12 +20,18 @@
   --rule: #e4ddc9;
   --accent: #8a3b2b;
   --accent-soft: #f4e6df;
-  --good: #2f6b3f;
-  --good-soft: #e6f0e3;
-  --warn: #8a5a12;
-  --warn-soft: #faf0d8;
-  --danger: #a3312a;
-  --danger-soft: #f8e2df;
+  /* Brand palette (light mode) — same Main/Background pairs applied in
+   * student-theme.css's `.su-*` tokens; see that file's header comment for
+   * the --warn contrast caveat (Main Yellow on its own Background reads
+   * poorly as small text specifically — it's used here exactly as given
+   * regardless, and still reads fine as a fill/border/icon color). Dark
+   * mode keeps its own tones, unchanged, same reasoning as that file. */
+  --good: #10b981;
+  --good-soft: #c9ffed;
+  --warn: #f4d30f;
+  --warn-soft: #fef6c7;
+  --danger: #eb2028;
+  --danger-soft: #fef2f2;
   --masthead-bg: #232017;
   --masthead-fg: #faf7f0;
   --neutral-soft: #eee;

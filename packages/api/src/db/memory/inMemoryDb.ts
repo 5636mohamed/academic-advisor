@@ -114,7 +114,7 @@ type SeedStudent = Omit<StoredStudent, 'probationLog' | 'transferRecords' | 'pro
 const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   {
     id: 'ahmed-1',
-    name: 'Ahmed',
+    name: 'Ahmed Mostafa',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -145,7 +145,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   },
   {
     id: 'sara-1',
-    name: 'Sara',
+    name: 'Sara Salem',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -175,7 +175,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   },
   {
     id: 'karim-1',
-    name: 'Karim',
+    name: 'Karim Zaki',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -207,7 +207,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   // ---------------------------------------------------------------------
   {
     id: 'omar-1',
-    name: 'Omar (warning 1/6)',
+    name: 'Omar Fahmy (warning 1/6)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -230,7 +230,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   },
   {
     id: 'mona-2',
-    name: 'Mona (warning 2/6)',
+    name: 'Mona Adel (warning 2/6)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -253,7 +253,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   },
   {
     id: 'youssef-3',
-    name: 'Youssef (warning 3/6)',
+    name: 'Youssef Naguib (warning 3/6)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -284,7 +284,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   },
   {
     id: 'laila-4',
-    name: 'Laila (warning 4/6)',
+    name: 'Laila Anwar (warning 4/6)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -320,7 +320,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   {
     // §11 Example B — retake gate = YES, chain-unlock-prioritized retake.
     id: 'salma-1',
-    name: 'Salma (retake gate — Example B)',
+    name: 'Salma Ibrahim (retake gate — Example B)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -344,7 +344,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   {
     // §11 Example G — Level-1 first-semester half-load (GPA==CGPA < 2.00).
     id: 'yara-1',
-    name: 'Yara (Level-1 half-load — Example G)',
+    name: 'Yara Mahmoud (Level-1 half-load — Example G)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -365,7 +365,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
     // armed-low semester; semester 1 is unarmed per §4.5, matching the
     // example's exact "starts at semester 2" note).
     id: 'nourhan-1',
-    name: 'Nourhan (dismissed — Example F)',
+    name: 'Nourhan Adly (dismissed — Example F)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'dismissed',
@@ -396,7 +396,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
     // external faculty transfer is the live demo for buildTransferSemester
     // + executeExternalTransfer against real seeded equivalency rows.
     id: 'hassan-1',
-    name: 'Hassan (faculty transfer — Examples I/K)',
+    name: 'Hassan Reda (faculty transfer — Examples I/K)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -427,7 +427,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
   {
     // §11 Example M — mandatory F-retake credits exceed the probation cap.
     id: 'fatma-1',
-    name: 'Fatma (mandatory-overflow — Example M)',
+    name: 'Fatma Zaher (mandatory-overflow — Example M)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
@@ -464,7 +464,7 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
     // can be demoed end-to-end through the UI, not just replayed from seed
     // state — matching how the retake gate/other preferences work.
     id: 'mohamed-1',
-    name: 'Mohamed (venture match — Scenario N)',
+    name: 'Mohamed Farag (venture match — Scenario N)',
     facultyId: 'ENG',
     departmentId: 'ECE',
     status: 'active',
