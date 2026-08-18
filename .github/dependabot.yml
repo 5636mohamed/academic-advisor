@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # Root plus all three workspace packages share one npm lockfile
+  # (packages/* use npm workspaces), so a single "/" entry with
+  # directory-based grouping covers the whole monorepo — Dependabot
+  # resolves the workspace graph from the root package.json/package-lock.json.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # Bundles routine minor/patch bumps into one PR instead of one per
+      # package — a major bump (more likely to need real review) still
+      # gets its own PR, not silently folded into a group.
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Keeps the GitHub Actions workflow files themselves (actions/checkout,
+  # actions/setup-node, etc.) up to date the same way.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
