@@ -71,6 +71,14 @@ export interface AlternateScoreInput {
   expectedLetter: string;
   expectedPoints: number;
   bestCase: BestCaseFields;
+  /** Advisor-responsibility epic — set by the caller (inMemoryDb.ts) by
+   *  comparing against the slot's live system proposal; true means this
+   *  alternate's expected grade is worse-or-equal, which is what the
+   *  frontend's confirmation modal gates on. */
+  belowOrEqualSystemGrade?: boolean;
+  /** Only meaningful (and only ever provided) when belowOrEqualSystemGrade
+   *  is true — the advisor's typed name from that confirmation modal. */
+  acknowledgedByAdvisorName?: string;
 }
 
 /** §15.3.2 step 2(b) — an advisor-authored alternate for a slot. Always
@@ -93,6 +101,8 @@ export function buildAdvisorAlternate(input: AlternateScoreInput): CourseProposa
     advisorApproved: true,
     status: 'advisor_approved',
     createdAt: new Date().toISOString(),
+    belowOrEqualSystemGrade: input.belowOrEqualSystemGrade,
+    acknowledgedByAdvisorName: input.acknowledgedByAdvisorName,
   };
 }
 

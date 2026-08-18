@@ -144,7 +144,12 @@ describe('advisor alternate proposals — cannot re-propose the system\'s own re
       deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
     };
   }
-  const scored = { expectedPct: 84, expectedLetter: 'B', expectedPoints: 3.0 };
+  // expectedPoints deliberately higher than the system's own 3.0 (candidate()
+  // above) — a genuine improvement, not a tie, so these tests stay focused on
+  // the re-propose-same-course guard rather than tripping the separate
+  // advisor-responsibility rule (a tie or worse needs a typed-name
+  // acknowledgement — see the dedicated describe block for that).
+  const scored = { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 };
 
   it('addAdvisorAlternateProposal throws when courseCode matches the slot\'s live system proposal', () => {
     db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
@@ -174,6 +179,73 @@ describe('advisor alternate proposals — cannot re-propose the system\'s own re
   });
 });
 
+// Advisor-responsibility epic — proposing a course whose expected grade is
+// worse-or-equal to the system's own recommendation needs the advisor's
+// typed-name acknowledgement, both because the frontend gates on it and
+// because the server independently re-derives and enforces it (never
+// trusts the client's own comparison).
+describe('advisor alternate proposals — responsibility acknowledgement for a worse-or-equal grade', () => {
+  function candidate(courseCode: string) {
+    return {
+      courseCode, isRetake: false, oldPoints: null,
+      expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0,
+      deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
+    };
+  }
+
+  it('throws without a typed name when the alternate is strictly worse than the system\'s recommendation', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    expect(() =>
+      db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 70, expectedLetter: 'C-', expectedPoints: 2.3 })
+    ).toThrow(/type your name to confirm/);
+  });
+
+  it('throws without a typed name on an exact tie (no change) — a tie counts as "not better"', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    expect(() =>
+      db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0 })
+    ).toThrow(/type your name to confirm/);
+  });
+
+  it('a blank/whitespace-only name is rejected the same as no name at all', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    expect(() =>
+      db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 70, expectedLetter: 'C-', expectedPoints: 2.3 }, '   ')
+    ).toThrow(/type your name to confirm/);
+  });
+
+  it('succeeds and persists belowOrEqualSystemGrade + the trimmed typed name once a name is provided', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const alt = db.addAdvisorAlternateProposal(
+      'ahmed-1', 'ECE314', 'ECE322',
+      { expectedPct: 70, expectedLetter: 'C-', expectedPoints: 2.3 },
+      '  Dr. Nabil Fathy  '
+    );
+    expect(alt.belowOrEqualSystemGrade).toBe(true);
+    expect(alt.acknowledgedByAdvisorName).toBe('Dr. Nabil Fathy');
+  });
+
+  it('a strictly better alternate never requires a name, and never sets belowOrEqualSystemGrade', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
+    expect(alt.belowOrEqualSystemGrade).toBeFalsy();
+    expect(alt.acknowledgedByAdvisorName).toBeUndefined();
+  });
+
+  it('getAdvisorReport flags a student with a live worse-or-equal advisor proposal, and un-flags them if it\'s declined', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const alt = db.addAdvisorAlternateProposal(
+      'ahmed-1', 'ECE314', 'ECE322',
+      { expectedPct: 70, expectedLetter: 'C-', expectedPoints: 2.3 },
+      'Dr. Nabil Fathy'
+    );
+    expect(db.getAdvisorReport().find(r => r.studentId === 'ahmed-1')!.hasBelowOrEqualAdvisorProposal).toBe(true);
+
+    db.declineProposalById(alt.id);
+    expect(db.getAdvisorReport().find(r => r.studentId === 'ahmed-1')!.hasBelowOrEqualAdvisorProposal).toBe(false);
+  });
+});
+
 // "Approve all" — the advisor accepting the system's whole plan in one
 // click instead of clicking Approve on every slot.
 describe('approveAllPendingSystemProposals', () => {
@@ -194,7 +266,7 @@ describe('approveAllPendingSystemProposals', () => {
 
   it('leaves a slot alone once the advisor has already replaced it with their own alternate', () => {
     db.addProposalsFromPlan('ahmed-1', [candidate('ECE314'), candidate('ECE316')]);
-    db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 84, expectedLetter: 'B', expectedPoints: 3.0 });
+    db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
     db.approveAllPendingSystemProposals('ahmed-1');
     const all = db.getProposals('ahmed-1');
     // the system's original ECE314 proposal stays pending, untouched, underneath the advisor's alternate

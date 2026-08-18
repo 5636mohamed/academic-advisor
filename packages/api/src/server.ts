@@ -552,11 +552,14 @@ app.post('/api/advisor/students/:id/proposals/:slotKey/alternate/preview', async
 // SAME §3.1 scoring pipeline the system used is run here, on demand, so the
 // advisor sees the real projected impact before confirming — never a guess.
 app.post('/api/advisor/students/:id/proposals/:slotKey/alternate', async (req, res) => {
-  const { courseCode } = req.body ?? {};
+  const { courseCode, acknowledgedByAdvisorName } = req.body ?? {};
   if (typeof courseCode !== 'string') return res.status(400).json({ error: 'expected { courseCode: string }' });
+  if (acknowledgedByAdvisorName !== undefined && typeof acknowledgedByAdvisorName !== 'string') {
+    return res.status(400).json({ error: 'acknowledgedByAdvisorName must be a string if provided' });
+  }
   try {
     const scored = await scoreAlternateCandidate(req.params.id, courseCode);
-    const proposal = db.addAdvisorAlternateProposal(req.params.id, req.params.slotKey, courseCode, scored);
+    const proposal = db.addAdvisorAlternateProposal(req.params.id, req.params.slotKey, courseCode, scored, acknowledgedByAdvisorName);
     res.json(proposal);
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;

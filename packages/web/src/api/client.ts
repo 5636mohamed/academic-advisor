@@ -158,6 +158,8 @@ export interface CourseProposalDTO {
   advisorApproved: boolean;
   status: ProposalStatus;
   createdAt: string;
+  belowOrEqualSystemGrade?: boolean;
+  acknowledgedByAdvisorName?: string;
 }
 
 export interface RegisteredCourseDTO {
@@ -176,6 +178,7 @@ export interface AdvisorReportRowDTO {
   pendingCount: number;
   advisorApprovedCount: number;
   registeredCount: number;
+  hasBelowOrEqualAdvisorProposal: boolean;
 }
 
 export interface ChooseProposalResultDTO {
@@ -349,10 +352,10 @@ export const api = {
   approveProposal: (proposalId: string) => request<CourseProposalDTO>(`/advisor/proposals/${proposalId}/approve`, { method: 'POST' }),
   declineProposal: (proposalId: string) => request<CourseProposalDTO>(`/advisor/proposals/${proposalId}/decline`, { method: 'POST' }),
   approveAllProposals: (studentId: string) => request<ProposalsWithImpactDTO>(`/advisor/students/${studentId}/proposals/approve-all`, { method: 'POST' }),
-  proposeAlternate: (studentId: string, slotKey: string, courseCode: string) =>
+  proposeAlternate: (studentId: string, slotKey: string, courseCode: string, acknowledgedByAdvisorName?: string) =>
     request<CourseProposalDTO>(`/advisor/students/${studentId}/proposals/${slotKey}/alternate`, {
       method: 'POST',
-      body: JSON.stringify({ courseCode }),
+      body: JSON.stringify({ courseCode, acknowledgedByAdvisorName }),
     }),
   previewAlternate: (studentId: string, slotKey: string, courseCode: string) =>
     request<AlternateScorePreviewDTO>(`/advisor/students/${studentId}/proposals/${slotKey}/alternate/preview`, {

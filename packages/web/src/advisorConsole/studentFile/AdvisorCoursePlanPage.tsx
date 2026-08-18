@@ -70,7 +70,7 @@ export function AdvisorCoursePlanPage() {
           onGoDashboard={() => { reload(); setMode('fast'); }}
         />
       )}
-      {mode === 'proposals' && <AdvisorProposalsTab studentId={id} />}
+      {mode === 'proposals' && <AdvisorProposalsTab studentId={id} studentName={student.name} />}
     </div>
   );
 }

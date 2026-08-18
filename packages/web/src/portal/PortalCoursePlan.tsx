@@ -58,7 +58,7 @@ export function PortalCoursePlan() {
       {mode === 'probation' && (
         <ProbationRepairTab studentId={id} student={student} catalog={catalog} completedCredits={completedCredits} onGoDashboard={() => navigate(`/portal/${id}`)} />
       )}
-      {mode === 'recommendations' && <MyRecommendationsTab studentId={id} />}
+      {mode === 'recommendations' && <MyRecommendationsTab studentId={id} studentName={student.name} />}
     </div>
   );
 }

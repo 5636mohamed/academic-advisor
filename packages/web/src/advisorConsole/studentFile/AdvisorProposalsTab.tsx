@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { api, AlternateScorePreviewDTO, CourseProposalDTO, EligibleCourseDTO } from '../../api/client';
 import { letterClass } from '../../portal/lib/studentUiHelpers';
 import { Loading } from '../../portal/ui/Primitives';
+import { downloadResponsibilityLetterPdf } from '../../lib/pdfReport';
 
 interface Slot { slotKey: string; system?: CourseProposalDTO; advisor?: CourseProposalDTO }
 
@@ -24,7 +25,7 @@ function groupBySlot(proposals: CourseProposalDTO[]): Slot[] {
   return [...bySlot.values()];
 }
 
-export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
+export function AdvisorProposalsTab({ studentId, studentName }: { studentId: string; studentName: string }) {
   const [proposals, setProposals] = useState<CourseProposalDTO[] | null>(null);
   const [impact, setImpact] = useState<{ expectedProjectedCGPA: number; bestCaseProjectedCGPA: number } | null>(null);
   const [eligible, setEligible] = useState<EligibleCourseDTO[]>([]);
@@ -34,6 +35,12 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
   const [previewSlot, setPreviewSlot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showFinalPlan, setShowFinalPlan] = useState(false);
+  // Advisor-responsibility epic — a same-or-worse alternate needs the
+  // advisor to type their name and explicitly confirm before it's
+  // proposed; this holds which slot/course that confirmation is pending
+  // for (null = no modal open).
+  const [confirmModal, setConfirmModal] = useState<{ slotKey: string; courseCode: string } | null>(null);
+  const [advisorNameInput, setAdvisorNameInput] = useState('');
 
   const load = () => {
     api.getProposals(studentId).then(r => {
@@ -82,14 +89,40 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
     setBusySlot(proposalId);
     try { await api.declineProposal(proposalId); load(); } finally { setBusySlot(null); }
   };
-  const proposeAlternate = async (slotKey: string) => {
-    const courseCode = altPicker[slotKey];
-    if (!courseCode) return;
+  // The single real commit path — reused by both the direct case (a
+  // strictly better alternate) and the confirmation modal's OK button (a
+  // same-or-worse one). acknowledgedByAdvisorName is only ever passed in
+  // the latter case; the server independently re-derives whether it was
+  // actually required, so this never has to be trusted blindly either way.
+  const proposeAlternate = async (slotKey: string, courseCode: string, acknowledgedByAdvisorName?: string) => {
     setBusySlot(slotKey);
     setError(null);
-    try { await api.proposeAlternate(studentId, slotKey, courseCode); setPreview({ ...preview, [slotKey]: null }); load(); }
+    try {
+      await api.proposeAlternate(studentId, slotKey, courseCode, acknowledgedByAdvisorName);
+      setPreview({ ...preview, [slotKey]: null });
+      setConfirmModal(null);
+      setAdvisorNameInput('');
+      load();
+    }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusySlot(null); }
+  };
+
+  // Click-dispatcher for the "Propose" button — decides whether a
+  // confirmation is needed at all, using the exact same delta the preview
+  // box below already renders (recommended.expectedPoints vs. the
+  // preview's own expectedPoints).
+  const handleProposeClick = (slot: Slot) => {
+    const courseCode = altPicker[slot.slotKey];
+    const p = preview[slot.slotKey];
+    if (!courseCode || !p) return; // Propose is disabled until both exist anyway
+    const delta = slot.system ? p.expectedPoints - slot.system.expectedPoints : null;
+    if (delta !== null && delta <= 0) {
+      setConfirmModal({ slotKey: slot.slotKey, courseCode });
+      setAdvisorNameInput('');
+    } else {
+      proposeAlternate(slot.slotKey, courseCode);
+    }
   };
   const pickAlternate = async (slotKey: string, courseCode: string) => {
     setAltPicker({ ...altPicker, [slotKey]: courseCode });
@@ -179,8 +212,26 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
                     <td><b>{slot.advisor.courseCode}</b></td>
                     <td className={letterClass(slot.advisor.expectedLetter)}>{slot.advisor.expectedLetter} ({slot.advisor.expectedPct.toFixed(1)}%)</td>
                     <td className={letterClass(slot.advisor.bestCaseLetter)}>{slot.advisor.bestCaseLetter} ({slot.advisor.bestCasePct.toFixed(1)}%)</td>
-                    <td><span className="su-badge ok">advisor_approved</span></td>
-                    <td></td>
+                    <td><span className="su-badge ok">{slot.advisor.status}</span></td>
+                    <td>
+                      {slot.advisor.status === 'registered' && slot.advisor.belowOrEqualSystemGrade && slot.advisor.acknowledgedByAdvisorName && (
+                        <button
+                          className="su-btn su-btn-sm su-btn-secondary"
+                          onClick={() => downloadResponsibilityLetterPdf({
+                            studentName,
+                            advisorName: slot.advisor!.acknowledgedByAdvisorName!,
+                            oldCourseCode: slot.slotKey,
+                            newCourseCode: slot.advisor!.courseCode,
+                            // slot.system may no longer be present if it was later declined — belowOrEqualSystemGrade
+                            // is a permanent snapshot either way, so default to the more conservative wording ("decrease")
+                            // rather than incorrectly claim "no change" once the original comparison point is gone.
+                            gradeEffect: slot.system && slot.advisor!.expectedPoints === slot.system.expectedPoints ? 'no change' : 'decrease',
+                          })}
+                        >
+                          Download responsibility letter
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -206,7 +257,14 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
                     {eligible.filter(e => e.course.code !== slot.system?.courseCode).map(e => <option key={e.course.code} value={e.course.code}>{e.course.code} — {e.course.name}</option>)}
                   </select>
                 </div>
-                <button className="su-btn su-btn-sm" style={{ alignSelf: 'flex-end' }} disabled={busySlot === slot.slotKey || !altPicker[slot.slotKey]} onClick={() => proposeAlternate(slot.slotKey)}>Propose</button>
+                <button
+                  className="su-btn su-btn-sm"
+                  style={{ alignSelf: 'flex-end' }}
+                  disabled={busySlot === slot.slotKey || !altPicker[slot.slotKey] || previewSlot === slot.slotKey || !preview[slot.slotKey]}
+                  onClick={() => handleProposeClick(slot)}
+                >
+                  Propose
+                </button>
               </div>
 
               {previewSlot === slot.slotKey && <div className="su-muted su-mt-16">Scoring {altPicker[slot.slotKey]} live…</div>}
@@ -293,6 +351,51 @@ export function AdvisorProposalsTab({ studentId }: { studentId: string }) {
           )}
         </div>
       )}
+
+      {confirmModal && (() => {
+        const modalSlot = slots.find(s => s.slotKey === confirmModal.slotKey);
+        const p = preview[confirmModal.slotKey];
+        return (
+          <div className="su-modal-overlay" role="dialog" aria-label="Confirm responsibility" onMouseDown={e => e.target === e.currentTarget && setConfirmModal(null)}>
+            <div className="su-modal su-pop">
+              <div className="su-card">
+                <div className="su-title" style={{ fontSize: 16 }}>Confirm you're taking responsibility</div>
+                <div className="su-subtitle su-mt-16" style={{ marginTop: 8 }}>
+                  <b>{confirmModal.courseCode}</b>'s expected grade{p ? <> (<span className={letterClass(p.expectedLetter)}>{p.expectedLetter}, {p.expectedPct.toFixed(1)}%</span>)</> : null} is not
+                  better than the system's own recommendation, <b>{modalSlot?.system?.courseCode}</b>
+                  {modalSlot?.system ? <> (<span className={letterClass(modalSlot.system.expectedLetter)}>{modalSlot.system.expectedLetter}, {modalSlot.system.expectedPct.toFixed(1)}%</span>)</> : null}, for this slot.
+                </div>
+                <div className="su-note warn su-mt-16">
+                  By proposing this course anyway, you are taking full responsibility for the student's grade in it —
+                  including the retake process if they end up failing it. Type your name to confirm, or cancel to
+                  choose a different course instead.
+                </div>
+                <div className="su-field su-mt-16">
+                  <label>Your name</label>
+                  <input
+                    className="su-input"
+                    placeholder="e.g., Dr. Nabil Fathy"
+                    value={advisorNameInput}
+                    onChange={e => setAdvisorNameInput(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                {error && <div className="su-note danger su-mt-16">{error}</div>}
+                <div className="su-flex su-gap-8 su-mt-16">
+                  <button
+                    className="su-btn"
+                    disabled={!advisorNameInput.trim() || busySlot === confirmModal.slotKey}
+                    onClick={() => proposeAlternate(confirmModal.slotKey, confirmModal.courseCode, advisorNameInput)}
+                  >
+                    OK, I take responsibility
+                  </button>
+                  <button className="su-btn su-btn-ghost" onClick={() => { setConfirmModal(null); setError(null); }}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

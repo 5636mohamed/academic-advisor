@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { api, CourseProposalDTO, RegisteredCourseDTO } from '../../api/client';
 import { letterClass } from '../lib/studentUiHelpers';
 import { Empty, Loading } from '../ui/Primitives';
+import { downloadResponsibilityLetterPdf } from '../../lib/pdfReport';
 
 interface Slot { slotKey: string; system?: CourseProposalDTO; advisor?: CourseProposalDTO }
 
@@ -22,8 +23,14 @@ function groupBySlot(proposals: CourseProposalDTO[]): Slot[] {
   return [...bySlot.values()];
 }
 
-function OptionCard({ proposal, label, onChoose, busy }: { proposal: CourseProposalDTO; label: string; onChoose: () => void; busy: boolean }) {
+function OptionCard({
+  proposal, label, onChoose, busy, studentName, systemProposal,
+}: {
+  proposal: CourseProposalDTO; label: string; onChoose: () => void; busy: boolean;
+  studentName: string; systemProposal?: CourseProposalDTO;
+}) {
   const isFinal = proposal.status === 'registered';
+  const showResponsibilityLetter = isFinal && proposal.origin === 'advisor' && proposal.belowOrEqualSystemGrade && proposal.acknowledgedByAdvisorName;
   return (
     <div className="su-card" style={{ flex: 1, minWidth: 220 }}>
       <div className="su-eyebrow">{label}</div>
@@ -43,11 +50,26 @@ function OptionCard({ proposal, label, onChoose, busy }: { proposal: CoursePropo
         {isFinal && <span className="su-badge ok" style={{ marginLeft: 6 }}>registered</span>}
       </div>
       {!isFinal && <button className="su-btn su-btn-sm" disabled={busy} onClick={onChoose}>Choose this course</button>}
+      {showResponsibilityLetter && (
+        <button
+          className="su-btn su-btn-sm su-btn-secondary"
+          style={{ marginTop: 8 }}
+          onClick={() => downloadResponsibilityLetterPdf({
+            studentName,
+            advisorName: proposal.acknowledgedByAdvisorName!,
+            oldCourseCode: systemProposal?.courseCode ?? proposal.courseCode,
+            newCourseCode: proposal.courseCode,
+            gradeEffect: systemProposal && proposal.expectedPoints === systemProposal.expectedPoints ? 'no change' : 'decrease',
+          })}
+        >
+          Download your advisor's responsibility letter
+        </button>
+      )}
     </div>
   );
 }
 
-export function MyRecommendationsTab({ studentId }: { studentId: string }) {
+export function MyRecommendationsTab({ studentId, studentName }: { studentId: string; studentName: string }) {
   const [proposals, setProposals] = useState<CourseProposalDTO[] | null>(null);
   const [impact, setImpact] = useState<{ expectedProjectedCGPA: number; bestCaseProjectedCGPA: number } | null>(null);
   const [registered, setRegistered] = useState<RegisteredCourseDTO[]>([]);
@@ -97,8 +119,25 @@ export function MyRecommendationsTab({ studentId }: { studentId: string }) {
       <div className="su-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {slots.map(slot => (
           <div key={slot.slotKey} className="su-flex su-gap-14" style={{ flexWrap: 'wrap' }}>
-            {slot.system && <OptionCard proposal={slot.system} label="System suggestion" onChoose={() => choose(slot.system!)} busy={busySlot === slot.slotKey} />}
-            {slot.advisor && <OptionCard proposal={slot.advisor} label="Advisor suggestion" onChoose={() => choose(slot.advisor!)} busy={busySlot === slot.slotKey} />}
+            {slot.system && (
+              <OptionCard
+                proposal={slot.system}
+                label="System suggestion"
+                onChoose={() => choose(slot.system!)}
+                busy={busySlot === slot.slotKey}
+                studentName={studentName}
+              />
+            )}
+            {slot.advisor && (
+              <OptionCard
+                proposal={slot.advisor}
+                label="Advisor suggestion"
+                onChoose={() => choose(slot.advisor!)}
+                busy={busySlot === slot.slotKey}
+                studentName={studentName}
+                systemProposal={slot.system}
+              />
+            )}
           </div>
         ))}
       </div>

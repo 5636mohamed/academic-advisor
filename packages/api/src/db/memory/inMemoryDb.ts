@@ -1420,7 +1420,8 @@ export function addAdvisorAlternateProposal(
   studentId: string,
   slotKey: string,
   courseCode: string,
-  scored: { expectedPct: number; expectedLetter: string; expectedPoints: number }
+  scored: { expectedPct: number; expectedLetter: string; expectedPoints: number },
+  acknowledgedByAdvisorName?: string
 ): CourseProposal {
   const student = students.get(studentId);
   if (!student) throw new Error(`no such student ${studentId}`);
@@ -1430,6 +1431,16 @@ export function addAdvisorAlternateProposal(
   }
   const fields = scoreCandidateFields(studentId, courseCode, scored);
 
+  // Advisor-responsibility epic: a worse-or-equal pick versus the system's
+  // own live recommendation for this slot needs the advisor's typed-name
+  // acknowledgement — computed here (not trusted from the client) since
+  // this is exactly the same "never trust the client's own math" rule the
+  // scoring pipeline already follows one line up.
+  const belowOrEqualSystemGrade = !!systemProposal && fields.expectedPoints <= systemProposal.expectedPoints;
+  if (belowOrEqualSystemGrade && !acknowledgedByAdvisorName?.trim()) {
+    throw Object.assign(new Error('This course\'s expected grade is not better than the system\'s own recommendation — type your name to confirm you\'re taking responsibility before proposing it.'), { httpStatus: 400 });
+  }
+
   const proposal = buildAdvisorAlternate({
     studentId,
     slotKey,
@@ -1438,6 +1449,8 @@ export function addAdvisorAlternateProposal(
     expectedLetter: fields.expectedLetter,
     expectedPoints: fields.expectedPoints,
     bestCase: { bestCasePct: fields.bestCasePct, bestCaseLetter: fields.bestCaseLetter, bestCasePoints: fields.bestCasePoints },
+    belowOrEqualSystemGrade,
+    acknowledgedByAdvisorName: belowOrEqualSystemGrade ? acknowledgedByAdvisorName!.trim() : undefined,
   });
   student.proposals.push(proposal);
   return proposal;
@@ -1484,6 +1497,9 @@ export function getAdvisorReport(advisorId?: string): AdvisorReportRow[] {
     pendingCount: s.proposals.filter(p => p.status === 'pending').length,
     advisorApprovedCount: s.proposals.filter(p => p.status === 'advisor_approved').length,
     registeredCount: s.proposals.filter(p => p.status === 'registered').length,
+    hasBelowOrEqualAdvisorProposal: s.proposals.some(
+      p => p.origin === 'advisor' && p.belowOrEqualSystemGrade && p.status !== 'declined'
+    ),
   }));
 }
 
