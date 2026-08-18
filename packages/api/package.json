@@ -19,7 +19,7 @@
     "@prisma/client": "^5.18.0"
   },
   "devDependencies": {
-    "prisma": "^5.18.0",
+    "prisma": "^7.9.1",
     "typescript": "^5.5.0",
     "tsx": "^4.16.0",
     "vitest": "^2.0.0",
