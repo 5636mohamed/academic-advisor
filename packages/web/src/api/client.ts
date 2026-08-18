@@ -210,6 +210,11 @@ export interface AlternateScorePreviewDTO {
 export type VentureProjectType = 'academic_research' | 'commercial_spinoff';
 export type VentureMatchStatus = 'suggested' | 'applied' | 'accepted' | 'declined' | 'unscored';
 
+export interface VentureAuthorDTO {
+  name: string;
+  link?: string;
+}
+
 export interface VentureProjectDTO {
   id: string;
   professorId: string;
@@ -224,6 +229,12 @@ export interface VentureProjectDTO {
   capacity: number;
   isActive: boolean;
   createdAt: string;
+  // VP epic — "research portal": optional published-research fields.
+  authors?: VentureAuthorDTO[];
+  publishedPaperUrl?: string;
+  conferenceName?: string;
+  impactFactor?: number;
+  labName?: string;
 }
 
 export interface VentureMatchResultDTO {

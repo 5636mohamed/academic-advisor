@@ -4,9 +4,41 @@
 // cleared the display threshold (a below-threshold row has matchId: null
 // until this fires); a CV attachment is optional.
 import { useState } from 'react';
-import { VentureMatchResultDTO } from '../../api/client';
+import { VentureMatchResultDTO, VentureProjectDTO } from '../../api/client';
 import { readFileAsDataUrl } from '../../lib/readFileAsDataUrl';
 import { ScoreRow } from '../ui/Primitives';
+
+/** VP epic — "research portal": renders whichever of the optional
+ *  published-research fields a project actually has (all optional, so a
+ *  plain open-position project renders nothing extra, same as before this
+ *  epic). Shared between the student-facing card below and the advisor/VP
+ *  console's own project list. */
+export function ResearchDetails({ project }: { project: Pick<VentureProjectDTO, 'authors' | 'publishedPaperUrl' | 'conferenceName' | 'impactFactor' | 'labName'> }) {
+  const hasAny = (project.authors && project.authors.length > 0) || project.publishedPaperUrl || project.conferenceName || project.impactFactor !== undefined || project.labName;
+  if (!hasAny) return null;
+  return (
+    <div className="su-note" style={{ margin: '10px 0', fontSize: 12.5 }}>
+      <div className="su-eyebrow" style={{ marginBottom: 6 }}>Published research</div>
+      {project.authors && project.authors.length > 0 && (
+        <div>
+          <b>Authors:</b>{' '}
+          {project.authors.map((a, i) => (
+            <span key={a.name + i}>
+              {i > 0 && ', '}
+              {a.link ? <a href={a.link} target="_blank" rel="noreferrer">{a.name}</a> : a.name}
+            </span>
+          ))}
+        </div>
+      )}
+      {project.publishedPaperUrl && (
+        <div><b>Paper:</b> <a href={project.publishedPaperUrl} target="_blank" rel="noreferrer">{project.publishedPaperUrl}</a></div>
+      )}
+      {project.conferenceName && <div><b>Conference:</b> {project.conferenceName}</div>}
+      {project.impactFactor !== undefined && <div><b>Impact factor:</b> {project.impactFactor}</div>}
+      {project.labName && <div><b>Lab:</b> {project.labName}</div>}
+    </div>
+  );
+}
 
 export function VentureProjectCard({ match, onExpressInterest }: { match: VentureMatchResultDTO; onExpressInterest: (projectId: string, cv?: { fileName: string; dataUrl: string }) => Promise<void> }) {
   const [file, setFile] = useState<File | null>(null);
@@ -33,6 +65,8 @@ export function VentureProjectCard({ match, onExpressInterest }: { match: Ventur
         <span className="su-badge neutral">{match.project.type === 'commercial_spinoff' ? 'Commercial spin-off' : 'Academic research'}</span>
       </div>
       <div className="su-subtitle" style={{ margin: '10px 0' }}>{match.project.description}</div>
+
+      <ResearchDetails project={match.project} />
 
       <ScoreRow name="Course competency" pct={match.courseCompetencyScore} />
       <ScoreRow name="Skill / interest alignment" pct={match.skillAlignmentScore} />

@@ -768,11 +768,11 @@ function isPendingCandidate(c: { status: string; total: number }): boolean {
 
 // --- Faculty Console (role: professor) ---
 app.get('/api/professors', (_req, res) => {
-  // 'advisor-owned' (seedVentureProjects.ts) is an internal attribution
-  // anchor for ventures the advisor console posts directly — not a real
-  // professor a student should see hosting a project list or a login this
-  // route should ever surface as choosable.
-  res.json(db.listProfessors().filter(p => p.id !== 'advisor-owned'));
+  // 'advisor-owned' and 'vp-owned' (seedVentureProjects.ts) are internal
+  // attribution anchors for ventures the advisor console / VP console post
+  // directly — not real professors a student should see hosting a project
+  // list or a login this route should ever surface as choosable.
+  res.json(db.listProfessors().filter(p => p.id !== 'advisor-owned' && p.id !== 'vp-owned'));
 });
 
 // --- Multi-advisor epic: the 5 named advisors (each with their own
@@ -843,7 +843,13 @@ app.get('/api/professors/:id', (req, res) => {
 
 app.post('/api/professors/:id/venture-projects', (req, res) => {
   if (!db.getProfessor(req.params.id)) return res.status(404).json({ error: 'professor not found' });
-  const { title, description, type, requiredCourseCodes, preferredSkills, capacity, isActive } = req.body ?? {};
+  const {
+    title, description, type, requiredCourseCodes, preferredSkills, capacity, isActive,
+    // VP epic — "research portal": optional published-research fields any
+    // advisor (or the VP) can attach to a project alongside the plain
+    // open-position fields above.
+    authors, publishedPaperUrl, conferenceName, impactFactor, labName,
+  } = req.body ?? {};
   if (typeof title !== 'string' || typeof description !== 'string' || (type !== 'academic_research' && type !== 'commercial_spinoff')) {
     return res.status(400).json({ error: 'expected { title, description, type: "academic_research"|"commercial_spinoff", requiredCourseCodes[], preferredSkills[], capacity, isActive? }' });
   }
@@ -857,6 +863,13 @@ app.post('/api/professors/:id/venture-projects', (req, res) => {
       preferredSkills: Array.isArray(preferredSkills) ? preferredSkills : [],
       capacity: typeof capacity === 'number' && capacity > 0 ? capacity : 1,
       isActive: isActive !== false,
+      authors: Array.isArray(authors)
+        ? authors.filter((a: unknown): a is { name: string; link?: string } => !!a && typeof (a as { name?: unknown }).name === 'string' && (a as { name: string }).name.trim() !== '')
+        : undefined,
+      publishedPaperUrl: typeof publishedPaperUrl === 'string' && publishedPaperUrl.trim() ? publishedPaperUrl.trim() : undefined,
+      conferenceName: typeof conferenceName === 'string' && conferenceName.trim() ? conferenceName.trim() : undefined,
+      impactFactor: typeof impactFactor === 'number' && impactFactor >= 0 ? impactFactor : undefined,
+      labName: typeof labName === 'string' && labName.trim() ? labName.trim() : undefined,
     });
     res.json(project);
   } catch (err) {

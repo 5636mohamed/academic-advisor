@@ -11,6 +11,14 @@ export interface ProfessorProfile {
   acceptingUndergrads: boolean;
 }
 
+/** VP epic — the "research portal" fields an advisor (or the VP, posting
+ *  the same way) can optionally attach to a project, letting the Venture
+ *  Board also surface real published research, not just open positions. */
+export interface VentureAuthor {
+  name: string;
+  link?: string;
+}
+
 export interface VentureProject {
   id: string;
   professorId: string;
@@ -22,6 +30,13 @@ export interface VentureProject {
   capacity: number;
   isActive: boolean;
   createdAt: string;
+  /** All optional — a project can be posted as a plain open position with
+   *  none of these, exactly as before this epic. */
+  authors?: VentureAuthor[];
+  publishedPaperUrl?: string;
+  conferenceName?: string;
+  impactFactor?: number;
+  labName?: string;
 }
 
 export interface StudentVentureMatch {

@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { api, AdvisorVentureProjectRowDTO, StudentDetail, VentureCandidateDTO, VentureProjectType, VentureQuizQuestionDTO } from '../../api/client';
 import { Loading, ScoreRow, SearchBox } from '../../portal/ui/Primitives';
 import { IconLayers, IconPeople, IconPlus } from '../../portal/ui/Icons';
+import { ResearchDetails } from '../../portal/venture/VentureProjectCard';
 
 const ADVISOR_PROFESSOR_ID = 'advisor-owned';
 
@@ -32,7 +33,14 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
 }
 
-export function AdvisorVentureBoard() {
+/** `professorId` defaults to the shared advisor attribution anchor —
+ *  VpVentureBoard.tsx reuses this whole component unmodified, just passing
+ *  `professorId="vp-owned"` so new projects it creates are attributed to
+ *  the Vice President instead. Every OTHER part of the board (the pending-
+ *  approvals queue, candidate review, "manage all ventures") is already
+ *  global across every professor — see /api/advisor/venture-projects — so
+ *  nothing else needs to change for the VP to get full parity. */
+export function AdvisorVentureBoard({ professorId = ADVISOR_PROFESSOR_ID }: { professorId?: string } = {}) {
   const [rows, setRows] = useState<AdvisorVentureProjectRowDTO[] | null>(null);
   const [ventureQuiz, setVentureQuiz] = useState<VentureQuizQuestionDTO[] | null>(null);
   const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
@@ -80,7 +88,7 @@ export function AdvisorVentureBoard() {
       <div className="su-venture-3col">
         {/* --- Left: My venture --- */}
         <div>
-          <CreateVentureCard onCreated={load} />
+          <CreateVentureCard professorId={professorId} onCreated={load} />
           <div className="su-card su-mt-16">
             <div className="su-title" style={{ fontSize: 15 }}>My venture</div>
             <div className="su-subtitle" style={{ marginTop: 2, marginBottom: 12 }}>Manage and track my ventures</div>
@@ -162,18 +170,36 @@ export function AdvisorVentureBoard() {
   );
 }
 
-function CreateVentureCard({ onCreated }: { onCreated: () => void }) {
+const BLANK_FORM = {
+  title: '', description: '', type: 'academic_research' as VentureProjectType, requiredCourseCodes: '', preferredSkills: '', capacity: 2,
+  // VP epic — "research portal": optional, all blank by default so a plain
+  // open-position project posts exactly as it always has.
+  authorsText: '', publishedPaperUrl: '', conferenceName: '', impactFactor: '', labName: '',
+};
+
+/** "Name <link>" or bare "Name" per line — kept as free text rather than a
+ *  repeating-row form widget, matching how requiredCourseCodes/preferredSkills
+ *  are already just comma-separated text above. */
+function parseAuthors(text: string): { name: string; link?: string }[] {
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    const m = line.match(/^(.*?)\s*<(https?:\/\/[^>]+)>$/);
+    return m ? { name: m[1].trim(), link: m[2].trim() } : { name: line };
+  });
+}
+
+function CreateVentureCard({ professorId, onCreated }: { professorId: string; onCreated: () => void }) {
   const [open, setOpen] = useState(false);
+  const [showResearch, setShowResearch] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', type: 'academic_research' as VentureProjectType, requiredCourseCodes: '', preferredSkills: '', capacity: 2 });
+  const [form, setForm] = useState(BLANK_FORM);
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await api.createVentureProject(ADVISOR_PROFESSOR_ID, {
+      await api.createVentureProject(professorId, {
         title: form.title,
         description: form.description,
         type: form.type,
@@ -181,8 +207,14 @@ function CreateVentureCard({ onCreated }: { onCreated: () => void }) {
         preferredSkills: form.preferredSkills.split(',').map(s => s.trim()).filter(Boolean),
         capacity: Number(form.capacity) || 1,
         isActive: true,
+        authors: parseAuthors(form.authorsText),
+        publishedPaperUrl: form.publishedPaperUrl.trim() || undefined,
+        conferenceName: form.conferenceName.trim() || undefined,
+        impactFactor: form.impactFactor.trim() ? Number(form.impactFactor) : undefined,
+        labName: form.labName.trim() || undefined,
       });
-      setForm({ title: '', description: '', type: 'academic_research', requiredCourseCodes: '', preferredSkills: '', capacity: 2 });
+      setForm(BLANK_FORM);
+      setShowResearch(false);
       setOpen(false);
       onCreated();
     } catch (e) {
@@ -215,6 +247,27 @@ function CreateVentureCard({ onCreated }: { onCreated: () => void }) {
         </div>
         <input className="su-input" placeholder="Required course codes (comma-separated)" value={form.requiredCourseCodes} onChange={e => setForm({ ...form, requiredCourseCodes: e.target.value })} />
         <input className="su-input" placeholder="Preferred skills (comma-separated)" value={form.preferredSkills} onChange={e => setForm({ ...form, preferredSkills: e.target.value })} />
+
+        <button type="button" className="su-btn su-btn-ghost su-btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowResearch(s => !s)}>
+          {showResearch ? 'Hide' : 'Add'} published-research details (optional)
+        </button>
+        {showResearch && (
+          <div className="su-note" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <textarea
+              className="su-input"
+              placeholder={'Authors, one per line — "Name" or "Name <https://link>"'}
+              rows={3}
+              value={form.authorsText}
+              onChange={e => setForm({ ...form, authorsText: e.target.value })}
+            />
+            <input className="su-input" placeholder="Published paper URL" value={form.publishedPaperUrl} onChange={e => setForm({ ...form, publishedPaperUrl: e.target.value })} />
+            <div className="su-flex su-gap-10">
+              <input className="su-input" placeholder="Conference" value={form.conferenceName} onChange={e => setForm({ ...form, conferenceName: e.target.value })} />
+              <input className="su-input" type="number" step="0.001" min="0" placeholder="Impact factor" value={form.impactFactor} onChange={e => setForm({ ...form, impactFactor: e.target.value })} style={{ width: 130 }} />
+            </div>
+            <input className="su-input" placeholder="Lab" value={form.labName} onChange={e => setForm({ ...form, labName: e.target.value })} />
+          </div>
+        )}
       </div>
       {error && <div className="su-note danger su-mt-16">{error}</div>}
       <div className="su-flex su-gap-10 su-mt-16">
@@ -389,6 +442,7 @@ function ManageVentures({ rows, onChanged }: { rows: AdvisorVentureProjectRowDTO
             <div className="su-muted" style={{ fontSize: 12, marginBottom: 12 }}>
               {r.project.type === 'commercial_spinoff' ? 'Commercial spin-off' : 'Academic research'} · capacity {r.project.capacity} · {r.acceptedCount} member{r.acceptedCount !== 1 ? 's' : ''} · required: {r.project.requiredCourseCodes.join(', ') || '—'}
             </div>
+            <ResearchDetails project={r.project} />
             <button className="su-btn su-btn-sm su-btn-ghost" onClick={() => toggleActive(r)}>{r.project.isActive ? 'Archive' : 'Reactivate'}</button>
           </div>
         ))}

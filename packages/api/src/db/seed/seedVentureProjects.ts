@@ -62,6 +62,19 @@ export const PROFESSORS: ProfessorProfile[] = [
     researchTags: [],
     acceptingUndergrads: true,
   },
+  // VP epic — the same attribution-anchor pattern as 'advisor-owned' above,
+  // for projects the Vice President posts directly (their own Venture
+  // Board tab reuses the advisor console's create-project UI). Also
+  // deliberately no login credential and filtered from student-facing
+  // "who hosts this" professor pickers.
+  {
+    id: 'vp-owned',
+    facultyId: 'ENG',
+    departmentId: 'ECE',
+    name: 'Office of the Vice President',
+    researchTags: [],
+    acceptingUndergrads: true,
+  },
 ];
 
 export const VENTURE_PROJECTS: VentureProject[] = [

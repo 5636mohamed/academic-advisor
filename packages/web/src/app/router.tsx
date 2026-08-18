@@ -23,6 +23,7 @@ import { VpLayout } from '../vpConsole/VpLayout';
 import { VpDashboard } from '../vpConsole/VpDashboard';
 import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
 import { VpTransferRequests } from '../vpConsole/VpTransferRequests';
+import { VpVentureBoard } from '../vpConsole/VpVentureBoard';
 import { RequireAdvisor, RequireStudent, RequireProfessor, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -128,6 +129,7 @@ export const router = createBrowserRouter([
           { index: true, element: <VpDashboard /> },
           { path: 'advisors/:advisorId', element: <VpAdvisorDetail /> },
           { path: 'transfer-requests', element: <VpTransferRequests /> },
+          { path: 'venture-board', element: <VpVentureBoard /> },
         ],
       },
     ],
