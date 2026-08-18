@@ -13,6 +13,9 @@ import { CgpaBarChart, Loading, ProbationTrack, SearchBox, Section, StatCard } f
 import { IconArrowRight, IconFileText, IconLayers, IconTarget } from '../../portal/ui/Icons';
 
 const TOTAL_DEGREE_CREDITS = 160;
+// Same "newest few by default, View more for the rest" collapse the
+// student's own dashboard (PortalHome.tsx) and Transcript page use.
+const COLLAPSED_ROW_COUNT = 5;
 
 export function Overview() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +24,7 @@ export function Overview() {
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumCourseDTO[] | null>(null);
   const [query, setQuery] = useState('');
+  const [showAllGrades, setShowAllGrades] = useState(false);
   const [form, setForm] = useState({ courseCode: '', pct: '', semesterOrdinal: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +80,9 @@ export function Overview() {
       const name = nameByCode.get(r.courseCode)?.course.name ?? '';
       return r.courseCode.toLowerCase().includes(q) || name.toLowerCase().includes(q);
     });
+  const isFiltering = query.trim().length > 0;
+  const displayedGradedRows = isFiltering || showAllGrades ? gradedRows : gradedRows.slice(0, COLLAPSED_ROW_COUNT);
+  const hiddenGradeCount = gradedRows.length - displayedGradedRows.length;
 
   return (
     <div>
@@ -149,7 +156,7 @@ export function Overview() {
                 <tr><th>Course code</th><th>Course name</th><th>Category</th><th>Credits</th><th>Grade</th><th>%</th><th>Advisor system recommendation</th></tr>
               </thead>
               <tbody>
-                {gradedRows.map(r => {
+                {displayedGradedRows.map(r => {
                   const meta = nameByCode.get(r.courseCode);
                   const rec = gradeRecommendation(r.letter!);
                   return (
@@ -167,6 +174,16 @@ export function Overview() {
               </tbody>
             </table>
           </div>
+        )}
+        {!isFiltering && hiddenGradeCount > 0 && (
+          <button className="su-btn su-btn-secondary su-btn-sm su-mt-16" onClick={() => setShowAllGrades(true)}>
+            View more ({hiddenGradeCount} older attempt{hiddenGradeCount === 1 ? '' : 's'})
+          </button>
+        )}
+        {!isFiltering && showAllGrades && gradedRows.length > COLLAPSED_ROW_COUNT && (
+          <button className="su-btn su-btn-ghost su-btn-sm su-mt-16" onClick={() => setShowAllGrades(false)}>
+            Show fewer
+          </button>
         )}
       </Section>
 

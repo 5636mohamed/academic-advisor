@@ -14,12 +14,20 @@ import { categoryTag, creditCapDisplay, gradeRecommendation, letterClass, levelL
 
 const TOTAL_DEGREE_CREDITS = 160; // §2.3 LEVEL_THRESHOLDS ceiling
 
+// Same "newest few by default, View more for the rest" collapse
+// PortalTranscript.tsx's own Grade History already uses — kept as its own
+// constant here rather than importing theirs since these are two
+// independently-scrollable "my grades" tables (dashboard summary vs. full
+// transcript), not one shared component.
+const COLLAPSED_ROW_COUNT = 5;
+
 export function PortalHome() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumCourseDTO[] | null>(null);
   const [query, setQuery] = useState('');
+  const [showAllGrades, setShowAllGrades] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -53,6 +61,12 @@ export function PortalHome() {
       const name = nameByCode.get(r.courseCode)?.course.name ?? '';
       return r.courseCode.toLowerCase().includes(q) || name.toLowerCase().includes(q);
     });
+  // Collapsed to the newest few by default, same reasoning as
+  // PortalTranscript.tsx's Grade History — searching always shows every
+  // match regardless of the cap.
+  const isFiltering = query.trim().length > 0;
+  const displayedGradedRows = isFiltering || showAllGrades ? gradedRows : gradedRows.slice(0, COLLAPSED_ROW_COUNT);
+  const hiddenGradeCount = gradedRows.length - displayedGradedRows.length;
 
   return (
     <div>
@@ -148,7 +162,7 @@ export function PortalHome() {
                 </tr>
               </thead>
               <tbody>
-                {gradedRows.map(r => {
+                {displayedGradedRows.map(r => {
                   const meta = nameByCode.get(r.courseCode);
                   const rec = gradeRecommendation(r.letter!);
                   return (
@@ -165,6 +179,16 @@ export function PortalHome() {
               </tbody>
             </table>
           </div>
+        )}
+        {!isFiltering && hiddenGradeCount > 0 && (
+          <button className="su-btn su-btn-secondary su-btn-sm su-mt-16" onClick={() => setShowAllGrades(true)}>
+            View more ({hiddenGradeCount} older attempt{hiddenGradeCount === 1 ? '' : 's'})
+          </button>
+        )}
+        {!isFiltering && showAllGrades && gradedRows.length > COLLAPSED_ROW_COUNT && (
+          <button className="su-btn su-btn-ghost su-btn-sm su-mt-16" onClick={() => setShowAllGrades(false)}>
+            Show fewer
+          </button>
         )}
         <div className="su-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
           Only letter grades are shown here — percentages are visible to your advisor only.
