@@ -2,7 +2,7 @@
 
 <img src="docs/media/aegis-logo-readme.png" alt="AEGIS — Academic Advisor System" width="320">
 
-# AEGIS — Academic Advising & Early-Warning System
+# AEGIS — Academic Advising & Early-Warning System 
 
 **Mohamed Elsayed Elhariry** — Department of Electronics and Communication, Faculty of Engineering, Egypt-Japan University of Science and Technology (E-JUST)<br>
 **Yamen Hany Ezzat** — Department of Digital Media, Faculty of Art and Design, Egypt-Japan University of Science and Technology (E-JUST)<br>
