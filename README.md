@@ -56,7 +56,7 @@ portal/student-theme.css`), dark mode throughout, smooth transitions on
 every interactive surface, and verified responsive from mobile (375px)
 through desktop across every portal.
 
-### 🎬 Full tour (all 4 roles) — plays automatically, no click needed
+### 🎬 Full tour (all 3 roles)
 
 ![Full tour: login, student portal, advisor console, Vice President portal, and Faculty Console](docs/media/full-tour-demo.gif)
 
