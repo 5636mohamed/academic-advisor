@@ -28,6 +28,24 @@ vulnerability to fix:
   password hashing, no session tokens, no rate limiting), and the project
   should not be deployed with real user data without a proper auth layer
   first.
+- **Role isolation mechanism (applies equally to every role)**: every
+  role — student, professor, the 5 individual advisors, and the Vice
+  President alike — is enforced the same two ways, and no role gets a
+  stronger guarantee than any other: (1) client-side route guards
+  (`packages/web/src/auth/RequireRole.tsx`) redirect a session that
+  doesn't match a route's required role, verified to correctly bounce
+  every other role away from every route (including a student typing
+  another student's portal URL, and an advisor typing another advisor's
+  student id directly into a URL); and (2) basic query-param-based
+  server-side scoping (e.g. `GET /api/students?advisorId=...`) that is
+  real filtering, not just what the UI happens to show — confirmed live
+  by calling the API directly, bypassing the UI entirely. Neither of
+  these is a session/token system: any raw API call can still ask for
+  any id's data, exactly as documented in the Authentication point
+  above. The advisor/Vice-President roles added later in the project's
+  life were deliberately held to this *same* rigor, not a stronger one
+  — so this isn't a silent, undocumented gap between older and newer
+  roles.
 
 Reports about either of the above being "insecure" are welcome as
 discussion but are known, not novel — please focus reports on things like
