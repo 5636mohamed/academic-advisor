@@ -13,13 +13,14 @@
 // logged-in advisor's real name/department instead of the old generic
 // "Academic Advisor" placeholder from back when advisor was one shared
 // account.
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api, AdvisorDTO } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from '../portal/ui/Icons';
 import { BrandMark } from '../portal/ui/BrandMark';
+import { TopbarNav } from '../portal/ui/TopbarNav';
 import '../portal/student-theme.css';
 
 function initials(name: string) {
@@ -60,13 +61,7 @@ export function AdvisorLayout() {
           <div className="su-brand-divider" />
           <div className="su-role-tag">Advisor</div>
 
-          <nav className="su-topbar-nav">
-            {tabs.map(t => (
-              <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-                {t.label}
-              </NavLink>
-            ))}
-          </nav>
+          <TopbarNav tabs={tabs} />
 
           <div className="su-topbar-user">
             <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>

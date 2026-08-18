@@ -216,7 +216,24 @@
   100% { box-shadow: 0 0 0 8px rgba(0,0,0,0); }
 }
 
-.su-page { animation: su-fade-up 420ms var(--su-ease) both; }
+/* Deliberately `su-fade-in` (opacity only), not `su-fade-up` — `.su-page`
+ * wraps EVERY page's entire content in all three shells (PortalLayout,
+ * AdvisorLayout, VpLayout), so it's an ancestor of every `position: fixed`
+ * modal rendered inline in a page (i.e., every one that isn't explicitly
+ * portalled to <body>, like the CV viewer already is). `su-fade-up`'s
+ * `transform: translateY(...)`, combined with `animation-fill-mode: both`,
+ * permanently leaves a live `transform` on this element even after the
+ * animation finishes — and a `transform` anywhere in a fixed-position
+ * element's ancestor chain makes THAT ancestor the containing block
+ * instead of the true viewport (the same containing-block gotcha the CV
+ * viewer's own header comment already documents). The visible symptom: a
+ * modal meant to be dead-center on screen instead centers itself relative
+ * to the whole scrollable page, landing anywhere from off the top of the
+ * viewport to requiring a scroll to find — confirmed live via a "contact
+ * your advisor" modal opening ~400px above the actual viewport. Losing the
+ * subtle rise-in on page transitions is a fair trade for every modal in
+ * the app actually landing where it's supposed to. */
+.su-page { animation: su-fade-in 320ms var(--su-ease) both; }
 .su-stagger > * { animation: su-fade-up 460ms var(--su-ease) both; }
 .su-stagger > *:nth-child(1) { animation-delay: 20ms; }
 .su-stagger > *:nth-child(2) { animation-delay: 70ms; }
@@ -318,22 +335,59 @@
 .su-body { flex: 1; padding: 26px 30px 60px; min-width: 0; }
 .su-inner { max-width: 1180px; margin: 0 auto; }
 
+/* TopbarNav.tsx's hamburger button — hidden on desktop, where the plain
+   pill-row nav (.su-topbar-nav-desktop) is already visible and has room. */
+.su-topbar-menu-btn { display: none; }
+
+/* TopbarNav.tsx's mobile menu — a genuine full-screen takeover (not just
+   "below the topbar"), since a phone's viewport is cramped enough that a
+   partial-height dropdown would still have to compete with page content
+   for space. One tab per full-width row, stacked, easy to hit with a
+   thumb — the "3 bars -> options stacked under each other, taking the
+   whole screen" pattern instead of the cramped horizontally-scrolling
+   strip this replaces. */
+.su-mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--su-surface);
+  display: flex;
+  flex-direction: column;
+}
+.su-mobile-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--su-border);
+  flex-shrink: 0;
+}
+.su-mobile-menu-nav { display: flex; flex-direction: column; overflow-y: auto; }
+.su-mobile-menu-nav a {
+  padding: 18px 22px;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--su-text);
+  border-bottom: 1px solid var(--su-border);
+}
+.su-mobile-menu-nav a.active { color: var(--su-accent); background: var(--su-accent-soft); }
+
 /* ---------------------------------------------------------------------- *
  * Responsiveness — every portal in the system shares this shell
  * (PortalLayout, AdvisorLayout, VpLayout), so these rules cover all
  * three, no exception. The topbar was the one genuinely fixed-width
  * assumption: brand + role tag + nav + user block all fighting for one
  * row works fine at desktop widths but has nowhere to go on a phone. Below
- * 860px the nav drops to its own full-width row (horizontally scrollable
- * if it still doesn't fit, rather than wrapping into a multi-row tangle)
- * and the name/ID text next to the avatar hides — the avatar and icon
- * buttons alone are enough to orient a signed-in session on a small
- * screen. Below 520px, tightened further for phones specifically.
+ * 860px the pill-row nav gives way to TopbarNav's hamburger button/full-
+ * screen menu above, and the name/ID text next to the avatar hides — the
+ * avatar and icon buttons alone are enough to orient a signed-in session
+ * on a small screen. Below 520px, tightened further for phones
+ * specifically.
  * ---------------------------------------------------------------------- */
 @media (max-width: 860px) {
-  .su-topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 16px; }
-  .su-topbar-nav { order: 3; flex-basis: 100%; justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
-  .su-topbar-nav a { flex-shrink: 0; }
+  .su-topbar { padding: 10px 16px; }
+  .su-topbar-nav-desktop { display: none; }
+  .su-topbar-menu-btn { display: flex; order: 2; }
   .su-topbar-user .su-user-meta { display: none; }
   .su-body { padding: 18px 16px 40px; }
   .su-stat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
@@ -586,7 +640,20 @@
  * Wizard shell (Department Quiz / Discover Venture)
  * ---------------------------------------------------------------------- */
 .su-wizard { display: grid; grid-template-columns: 250px 1fr; gap: 20px; align-items: flex-start; }
-@media (max-width: 760px) { .su-wizard { grid-template-columns: 1fr; } }
+.su-wizard-steps-card { position: sticky; top: 74px; }
+/* A "sticky sidebar" only makes sense next to a much-taller scrolling
+ * column — once the grid collapses to one column below, this card is just
+ * the FIRST stacked block, not a side panel, so `position: sticky` on it
+ * stops meaning anything useful. Left enabled, it was actually causing a
+ * visible overlap glitch when this shell is embedded somewhere narrower
+ * than a full page (e.g. DiscoverVentureWizard's modal) — the step list
+ * card and the "Step X of N" progress row beneath it rendering on top of
+ * each other. `position: static` here removes the sticky/stacking
+ * behavior entirely, matching how a plain stacked block should act. */
+@media (max-width: 760px) {
+  .su-wizard { grid-template-columns: 1fr; }
+  .su-wizard-steps-card { position: static; }
+}
 
 .su-wizard-steps { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .su-wizard-step { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-radius: var(--su-radius-sm); font-size: 13px; font-weight: 600; color: var(--su-text-faint); }
@@ -689,6 +756,20 @@
   display: flex; align-items: center; justify-content: center; z-index: 100; animation: su-fade-in 200ms var(--su-ease) both;
 }
 .su-modal { animation: su-pop-in 260ms var(--su-ease) both; max-width: 420px; width: calc(100% - 40px); }
+/* Below the shell's own mobile breakpoint, a boxed dialog with margin on
+ * every side reads small and fiddly to dismiss with a thumb — every
+ * ordinary (non-fullscreen-variant) modal takes the entire screen instead,
+ * matching how a native mobile app's own dialogs/sheets behave. The
+ * fullscreen CV/document-viewer variant just above is already this size
+ * at every width, so it's untouched by this rule. */
+@media (max-width: 640px) {
+  .su-modal-overlay { padding: 0; }
+  .su-modal:not(.su-modal-fullscreen) {
+    max-width: 100vw; width: 100vw; height: 100dvh; max-height: 100dvh;
+    border-radius: 0; display: flex; flex-direction: column; justify-content: center;
+    overflow-y: auto;
+  }
+}
 /* A document viewer (a CV, a PDF) reads far better filling almost the whole
    viewport than boxed into a 900px dialog — this modifier is for exactly
    that: a near-fullscreen surface with just enough margin to still read as

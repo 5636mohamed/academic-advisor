@@ -235,6 +235,10 @@ export interface VentureProjectDTO {
   conferenceName?: string;
   impactFactor?: number;
   labName?: string;
+  /** Graduation Project epic — orthogonal to `type`: a graduation project
+   *  can be posted on either the academic-research or commercial-spinoff
+   *  track (see the shared VentureProject type's own doc comment). */
+  isGraduationProject?: boolean;
 }
 
 export interface VentureMatchResultDTO {
@@ -280,6 +284,11 @@ export interface VpPendingProposalDTO {
   courseCode: string;
   expectedLetter: string;
   expectedPct: number;
+  /** True once the student's advisor already proposed their own alternate
+   *  for this slot — "Approve all" skips these (see the DB layer's own
+   *  doc comment); the row still shows so the VP knows it exists, just
+   *  without an "Approve" action that would silently overrule the advisor. */
+  overriddenByAdvisor: boolean;
 }
 
 // VP epic — the 3-stage transfer pending chain (student -> advisor -> VP).
@@ -298,6 +307,15 @@ export interface TransferRequestDTO {
   vpDecidedAt?: string;
   declineReason?: string;
 }
+export interface AdvisorResponsibilityDetailDTO {
+  studentId: string;
+  studentName: string;
+  advisorId: string;
+  advisorName: string;
+  courseCode: string;
+  courseName: string;
+}
+
 export interface VpTransferCounterDTO {
   advisorId: string;
   internalInFlight: number;
@@ -408,6 +426,8 @@ export const api = {
     }),
   chooseProposal: (studentId: string, proposalId: string) =>
     request<ChooseProposalResultDTO>(`/students/${studentId}/proposals/${proposalId}/choose`, { method: 'POST' }),
+  chooseAllProposals: (studentId: string) =>
+    request<ProposalsWithImpactDTO & { stillPendingSlots: string[] }>(`/students/${studentId}/proposals/choose-all`, { method: 'POST' }),
   registeredCourses: (id: string) => request<RegisteredCourseDTO[]>(`/students/${id}/registered-courses`),
   advisorReport: (advisorId?: string) => request<AdvisorReportRowDTO[]>(`/advisor/report${advisorId ? `?advisorId=${encodeURIComponent(advisorId)}` : ''}`),
 
@@ -439,6 +459,8 @@ export const api = {
   advisor: (advisorId: string) => request<AdvisorDTO>(`/advisors/${advisorId}`),
   vpAdvisorsSummary: () => request<VpAdvisorSummaryDTO[]>('/vp/advisors-summary'),
   vpPendingProposals: () => request<VpPendingProposalDTO[]>('/vp/pending-proposals'),
+  vpApproveAllPendingProposals: () => request<VpPendingProposalDTO[]>('/vp/pending-proposals/approve-all', { method: 'POST' }),
+  vpResponsibilityDetails: () => request<AdvisorResponsibilityDetailDTO[]>('/vp/responsibility-details'),
   /** `professorId` here is an attribution field, not a login — every real
    *  caller today passes 'advisor-owned' or 'vp-owned' (the two seeded
    *  attribution anchors); prof-kamel/prof-adel still own their existing

@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="packages/web/src/assets/aegis-full-light.png" alt="AEGIS — Academic Advisor System" width="320">
+<img src="docs/media/aegis-logo-readme.png" alt="AEGIS — Academic Advisor System" width="320">
 
 # AEGIS — Academic Advising & Early-Warning System
 
 **Mohamed Elsayed Elhariry** — Department of Electronics and Communication, Faculty of Engineering, Egypt-Japan University of Science and Technology (E-JUST)<br>
 **Yamen Hany Ezzat** — Department of Digital Media, Faculty of Art and Design, Egypt-Japan University of Science and Technology (E-JUST)<br>
-**Mohamed Ehab** — Department of Artificial Intelligence, Faculty of Computer Science and Information Technology, Egypt-Japan University of Science and Technology (E-JUST)<br>
+**Mohamed Ehab Nabil** — Department of Artificial Intelligence and Data Science, Faculty of Computer Science and Information Technology, Egypt-Japan University of Science and Technology (E-JUST)<br>
 
 
 
@@ -385,15 +385,16 @@ instead of Railway.
 ## Authors
 
 **Mohamed Elsayed Elhariry**<br>
-Department of Electronics and Communication Engineering<br>
+Department of Electronics and Communication Engineering, Faculty of Engineering<br>
 Egypt-Japan University of Science and Technology (E-JUST)
 
 **Yamen Hany Ezzat**<br>
 Department of Digital Media, Faculty of Art and Design<br>
 Egypt-Japan University of Science and Technology (E-JUST)
 
-**Mohamed Ehab**<br>
-Department of Artificial Intelligence, Faculty of Computer Science and Information Technology
+**Mohamed Ehab Nabil**<br>
+Department of Artificial Intelligence and Data Science, Faculty of Computer Science and Information Technology<br>
+Egypt-Japan University of Science and Technology (E-JUST)
 
 ## Contributing
 

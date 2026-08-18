@@ -133,4 +133,37 @@ export const VENTURE_PROJECTS: VentureProject[] = [
     isActive: false,
     createdAt: '2025-09-01T00:00:00.000Z',
   },
+  // Graduation Project epic — `isGraduationProject` is orthogonal to
+  // `type` (see the shared VentureProject type's own doc comment): a
+  // student capstone can pursue either an academic-research outcome or a
+  // commercial spin-off one. These two seed one of each track so the board
+  // demos both without needing a live-created example.
+  {
+    id: 'proj-grad-federated',
+    professorId: 'prof-adel',
+    title: 'Graduation Project: Federated Learning for Cross-Campus Course Recommendation',
+    description:
+      'Academic-research-track graduation project extending the department\'s recommendation models to a federated setting across multiple campuses without centralizing student data. Intended to conclude in a thesis and a submitted paper.',
+    type: 'academic_research',
+    requiredCourseCodes: ['CSE213', 'ECEEL1'],
+    preferredSkills: ['machine_learning', 'data_science'],
+    capacity: 2,
+    isActive: true,
+    createdAt: '2026-02-01T00:00:00.000Z',
+    isGraduationProject: true,
+  },
+  {
+    id: 'proj-grad-fieldkit',
+    professorId: 'prof-kamel',
+    title: 'Graduation Project: FieldKit — Deployable Agri-Sensor Starter Kits',
+    description:
+      'Commercial-spin-off-track graduation project turning the lab\'s LoRa sensor research into a sellable starter kit for smallholder farms. Looking for teammates who want to carry their capstone into an actual company after graduation.',
+    type: 'commercial_spinoff',
+    requiredCourseCodes: ['ECEEL2', 'ECE413'],
+    preferredSkills: ['embedded_systems', 'hardware', 'rf_communications'],
+    capacity: 3,
+    isActive: true,
+    createdAt: '2026-02-05T00:00:00.000Z',
+    isGraduationProject: true,
+  },
 ];

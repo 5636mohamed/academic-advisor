@@ -7,13 +7,14 @@
 // the only way out is "Log out." Theme toggle + logout are kept as compact
 // icon buttons next to the avatar since the mockups don't show them (they
 // weren't designing the auth chrome) but the feature has to stay reachable.
-import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api, StudentSummary } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from './ui/Icons';
 import { BrandMark } from './ui/BrandMark';
+import { TopbarNav } from './ui/TopbarNav';
 import './student-theme.css';
 
 function initials(name: string) {
@@ -57,13 +58,7 @@ export function PortalLayout() {
           <div className="su-brand-divider" />
           <div className="su-role-tag">Student</div>
 
-          <nav className="su-topbar-nav">
-            {tabs.map(t => (
-              <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-                {t.label}
-              </NavLink>
-            ))}
-          </nav>
+          <TopbarNav tabs={tabs} />
 
           <div className="su-topbar-user">
             <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>

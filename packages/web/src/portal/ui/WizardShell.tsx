@@ -21,7 +21,7 @@ export function WizardShell({
   const pct = steps.length > 1 ? Math.round((current / (steps.length - 1)) * 100) : 0;
   return (
     <div className="su-wizard su-page">
-      <div className="su-card" style={{ position: 'sticky', top: 74 }}>
+      <div className="su-card su-wizard-steps-card">
         <div className="su-title" style={{ fontSize: 16 }}>{title}</div>
         <ol className="su-wizard-steps">
           {steps.map((label, i) => {

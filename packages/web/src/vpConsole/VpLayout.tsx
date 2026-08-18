@@ -5,11 +5,12 @@
 // account" shape the pre-multi-advisor advisor login used to have, so
 // (like that old advisor topbar) this shows a generic "Vice President"
 // label rather than a per-id name.
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from '../portal/ui/Icons';
 import { BrandMark } from '../portal/ui/BrandMark';
+import { TopbarNav } from '../portal/ui/TopbarNav';
 import '../portal/student-theme.css';
 
 export function VpLayout() {
@@ -38,13 +39,7 @@ export function VpLayout() {
           <div className="su-brand-divider" />
           <div className="su-role-tag">Vice President</div>
 
-          <nav className="su-topbar-nav">
-            {tabs.map(t => (
-              <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-                {t.label}
-              </NavLink>
-            ))}
-          </nav>
+          <TopbarNav tabs={tabs} />
 
           <div className="su-topbar-user">
             <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>

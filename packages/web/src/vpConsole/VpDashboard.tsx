@@ -7,7 +7,7 @@
 // on the Transfer requests tab.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, VpAdvisorSummaryDTO, VpPendingProposalDTO, VpTransferCounterDTO } from '../api/client';
+import { api, AdvisorResponsibilityDetailDTO, VpAdvisorSummaryDTO, VpPendingProposalDTO, VpTransferCounterDTO } from '../api/client';
 import { Loading, Section, StatCard } from '../portal/ui/Primitives';
 import { letterClass } from '../portal/lib/studentUiHelpers';
 import { downloadVpAdvisorsReportPdf } from '../lib/pdfReport';
@@ -17,13 +17,16 @@ export function VpDashboard() {
   const [summary, setSummary] = useState<VpAdvisorSummaryDTO[] | null>(null);
   const [pending, setPending] = useState<VpPendingProposalDTO[] | null>(null);
   const [transferCounters, setTransferCounters] = useState<VpTransferCounterDTO[] | null>(null);
+  const [responsibilityDetails, setResponsibilityDetails] = useState<AdvisorResponsibilityDetailDTO[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   const load = () => {
     api.vpAdvisorsSummary().then(setSummary);
     api.vpPendingProposals().then(setPending);
     api.vpTransferCounters().then(setTransferCounters);
+    api.vpResponsibilityDetails().then(setResponsibilityDetails);
   };
   useEffect(load, []);
 
@@ -37,6 +40,7 @@ export function VpDashboard() {
     ? summary.reduce((sum, s) => sum + s.averageCgpa * s.studentCount, 0) / (totalStudents || 1)
     : 0;
   const advisorNameFor = (advisorId: string) => summary.find(s => s.advisor.id === advisorId)?.advisor.name ?? advisorId;
+  const bulkApprovableCount = pending.filter(p => !p.overriddenByAdvisor).length;
 
   const approve = async (proposalId: string) => {
     setBusyId(proposalId);
@@ -48,10 +52,25 @@ export function VpDashboard() {
     }
   };
 
+  // "Approve all" — every advisor's whole pending queue in one click, so
+  // the VP doesn't have to approve each student's course individually.
+  // Server-side, this skips any slot an advisor has already overridden
+  // with their own alternate (see approveAllPendingProposalsAcrossAllAdvisors) —
+  // bulkApprovableCount below mirrors that exact same rule so the button's
+  // own count is never a lie.
+  const approveAll = async () => {
+    setApprovingAll(true);
+    try {
+      setPending(await api.vpApproveAllPendingProposals());
+    } finally {
+      setApprovingAll(false);
+    }
+  };
+
   const downloadReport = async () => {
     setDownloading(true);
     try {
-      await downloadVpAdvisorsReportPdf(summary);
+      await downloadVpAdvisorsReportPdf(summary, responsibilityDetails);
     } finally {
       setDownloading(false);
     }
@@ -110,7 +129,17 @@ export function VpDashboard() {
         </div>
       </Section>
 
-      <Section title="Pending approvals" eyebrow={`${pending.length} across every advisor`}>
+      <Section
+        title="Pending approvals"
+        eyebrow={`${pending.length} across every advisor`}
+        right={
+          bulkApprovableCount > 0 ? (
+            <button className="su-btn su-btn-sm su-btn-secondary" disabled={approvingAll} onClick={approveAll}>
+              {approvingAll ? 'Approving…' : `Approve all (${bulkApprovableCount})`}
+            </button>
+          ) : undefined
+        }
+      >
         <div className="su-subtitle" style={{ marginBottom: 12 }}>
           Every student's still-pending system recommendation, across all 5 advisors — approve directly here even if
           the student's own advisor hasn't reviewed it yet.
@@ -130,9 +159,15 @@ export function VpDashboard() {
                     <td><b>{p.courseCode}</b></td>
                     <td className={letterClass(p.expectedLetter)}>{p.expectedLetter} ({p.expectedPct.toFixed(1)}%)</td>
                     <td>
-                      <button className="su-btn su-btn-sm" disabled={busyId === p.proposalId} onClick={() => approve(p.proposalId)}>
-                        Approve
-                      </button>
+                      {p.overriddenByAdvisor ? (
+                        <span className="su-badge neutral" title="This slot's advisor already proposed their own alternate — approve or decline it from the advisor console instead.">
+                          Advisor proposed alternate
+                        </span>
+                      ) : (
+                        <button className="su-btn su-btn-sm" disabled={busyId === p.proposalId} onClick={() => approve(p.proposalId)}>
+                          Approve
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

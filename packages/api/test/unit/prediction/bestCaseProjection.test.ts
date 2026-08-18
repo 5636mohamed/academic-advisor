@@ -37,4 +37,22 @@ describe('bestCasePct — §15.2', () => {
     expect(result.bestCaseLetter).toBe('A+');
     expect(result.bestCasePoints).toBe(4.0);
   });
+
+  it('clamps up to the live expected pct when the student\'s own historical best is worse — "best case" must never look worse than "expected"', () => {
+    // A student whose only comparable-category result ever was a 52 (F)
+    // being told their "best case" for a new course is also an F, even
+    // though that same course's realistic expected grade is a healthy 78,
+    // is exactly the confusing Expected > Best Case pairing reported
+    // against live data — clamp instead of ever showing that.
+    const history = [rec('ECE314', 52)];
+    const result = bestCasePct({ category: 'program', isUR: false }, history, courseByCode, 78);
+    expect(result.bestCasePct).toBe(78);
+    expect(result.bestCaseLetter).not.toBe('F');
+  });
+
+  it('leaves a genuinely higher historical best alone even when it clears the expected pct by a lot', () => {
+    const history = [rec('ECE314', 96)];
+    const result = bestCasePct({ category: 'program', isUR: false }, history, courseByCode, 78);
+    expect(result.bestCasePct).toBe(96);
+  });
 });

@@ -4,6 +4,7 @@
 // folded in as a Course Plan sub-tab instead of its own top-level nav item,
 // since the new topbar only has room for the five tabs the mockups show.
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, CourseProposalDTO, RegisteredCourseDTO } from '../../api/client';
 import { letterClass } from '../lib/studentUiHelpers';
 import { Empty, Loading } from '../ui/Primitives';
@@ -75,6 +76,7 @@ export function MyRecommendationsTab({ studentId, studentName }: { studentId: st
   const [registered, setRegistered] = useState<RegisteredCourseDTO[]>([]);
   const [busySlot, setBusySlot] = useState<string | null>(null);
   const [contactPopup, setContactPopup] = useState<string | null>(null);
+  const [stillPendingSlots, setStillPendingSlots] = useState<string[] | null>(null);
 
   const load = () => {
     api.getProposals(studentId).then(r => {
@@ -99,13 +101,42 @@ export function MyRecommendationsTab({ studentId, studentName }: { studentId: st
     }
   };
 
+  // "Choose all" — register every already advisor-approved slot in one
+  // click instead of clicking "Choose this course" per slot. Slots still
+  // awaiting advisor review are reported back in `stillPendingSlots` and
+  // shown as one consolidated note (see the modal below) instead of firing
+  // a "contact your advisor" popup per course.
+  const chooseAll = async () => {
+    setBusySlot('__choose_all__');
+    try {
+      const r = await api.chooseAllProposals(studentId);
+      setProposals(r.proposals);
+      setImpact({ expectedProjectedCGPA: r.expectedProjectedCGPA, bestCaseProjectedCGPA: r.bestCaseProjectedCGPA });
+      setStillPendingSlots(r.stillPendingSlots.length > 0 ? r.stillPendingSlots : null);
+      load();
+    } finally {
+      setBusySlot(null);
+    }
+  };
+
   const slots = groupBySlot(proposals);
+  const readyCount = slots.filter(s => {
+    const final = s.advisor ?? s.system;
+    return final && final.status !== 'registered' && final.advisorApproved;
+  }).length;
 
   return (
     <div className="su-fade">
-      <div className="su-subtitle" style={{ marginBottom: 16 }}>
-        Your advisor may approve the system's suggestion as-is, or propose a different course. Pick the option you
-        want — if it's already advisor-approved, it registers right away.
+      <div className="su-flex su-justify-between su-items-center" style={{ flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+        <div className="su-subtitle" style={{ margin: 0 }}>
+          Your advisor may approve the system's suggestion as-is, or propose a different course. Pick the option you
+          want — if it's already advisor-approved, it registers right away.
+        </div>
+        {readyCount > 0 && (
+          <button className="su-btn su-btn-sm su-btn-secondary" disabled={busySlot === '__choose_all__'} onClick={chooseAll}>
+            {busySlot === '__choose_all__' ? 'Registering…' : `Choose all (${readyCount})`}
+          </button>
+        )}
       </div>
       {impact && (
         <div className="su-stat-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(160px,1fr))', marginBottom: 18 }}>
@@ -151,17 +182,46 @@ export function MyRecommendationsTab({ studentId, studentName }: { studentId: st
         </div>
       )}
 
-      {contactPopup && (
-        <div className="su-modal-overlay" role="dialog">
-          <div className="su-card su-modal">
-            <div className="su-title">Advisor approval needed</div>
-            <div className="su-subtitle">
-              <b>{contactPopup}</b> hasn't been approved by your advisor yet. Please contact your advisor to review
-              and approve this course before it can be registered.
+      {contactPopup && createPortal(
+        // Portalled straight to <body>, same reasoning as the venture
+        // board's CV viewer (see its own header comment): `.su-page`'s own
+        // entrance animation leaves this component's ancestry with a live
+        // transform/opacity trail even after it finishes, which both
+        // resizes a naively-nested `position: fixed` overlay to the page's
+        // full scroll height instead of the viewport (confirmed live — the
+        // dialog was opening off-screen, needing a scroll to find) and can
+        // trap it under a lower z-index sibling. Escaping to <body> — with
+        // the `.su` wrapper for --su-* token scoping — sidesteps both.
+        <div className="su">
+          <div className="su-modal-overlay" role="dialog" onMouseDown={e => e.target === e.currentTarget && setContactPopup(null)}>
+            <div className="su-card su-modal su-pop">
+              <div className="su-title">Advisor approval needed</div>
+              <div className="su-subtitle">
+                <b>{contactPopup}</b> hasn't been approved by your advisor yet. Please contact your advisor to review
+                and approve this course before it can be registered.
+              </div>
+              <button className="su-btn su-mt-16" onClick={() => setContactPopup(null)}>OK</button>
             </div>
-            <button className="su-btn su-mt-16" onClick={() => setContactPopup(null)}>OK</button>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {stillPendingSlots && createPortal(
+        <div className="su">
+          <div className="su-modal-overlay" role="dialog" onMouseDown={e => e.target === e.currentTarget && setStillPendingSlots(null)}>
+            <div className="su-card su-modal su-pop">
+              <div className="su-title">Some courses still need advisor approval</div>
+              <div className="su-subtitle">
+                Everything already advisor-approved is now registered. <b>{stillPendingSlots.join(', ')}</b>{' '}
+                {stillPendingSlots.length === 1 ? "hasn't" : "haven't"} been approved by your advisor yet — please
+                contact your advisor to review {stillPendingSlots.length === 1 ? 'it' : 'them'} before it can register.
+              </div>
+              <button className="su-btn su-mt-16" onClick={() => setStillPendingSlots(null)}>OK</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

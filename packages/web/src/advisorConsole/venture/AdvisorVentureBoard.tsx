@@ -175,6 +175,9 @@ const BLANK_FORM = {
   // VP epic — "research portal": optional, all blank by default so a plain
   // open-position project posts exactly as it always has.
   authorsText: '', publishedPaperUrl: '', conferenceName: '', impactFactor: '', labName: '',
+  // Graduation Project epic — off by default, same "plain post unless
+  // opted in" philosophy as the research-portal fields above.
+  isGraduationProject: false,
 };
 
 /** "Name <link>" or bare "Name" per line — kept as free text rather than a
@@ -212,6 +215,7 @@ function CreateVentureCard({ professorId, onCreated }: { professorId: string; on
         conferenceName: form.conferenceName.trim() || undefined,
         impactFactor: form.impactFactor.trim() ? Number(form.impactFactor) : undefined,
         labName: form.labName.trim() || undefined,
+        isGraduationProject: form.isGraduationProject || undefined,
       });
       setForm(BLANK_FORM);
       setShowResearch(false);
@@ -245,6 +249,10 @@ function CreateVentureCard({ professorId, onCreated }: { professorId: string; on
           </select>
           <input className="su-input" type="number" min="1" value={form.capacity} onChange={e => setForm({ ...form, capacity: Number(e.target.value) })} style={{ width: 90 }} />
         </div>
+        <label className="su-flex su-gap-8 su-items-center" style={{ fontSize: 13, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.isGraduationProject} onChange={e => setForm({ ...form, isGraduationProject: e.target.checked })} />
+          This is a graduation project (student capstone, on the {form.type === 'commercial_spinoff' ? 'commercial spin-off' : 'academic research'} track above)
+        </label>
         <input className="su-input" placeholder="Required course codes (comma-separated)" value={form.requiredCourseCodes} onChange={e => setForm({ ...form, requiredCourseCodes: e.target.value })} />
         <input className="su-input" placeholder="Preferred skills (comma-separated)" value={form.preferredSkills} onChange={e => setForm({ ...form, preferredSkills: e.target.value })} />
 
@@ -439,6 +447,7 @@ function ManageVentures({ rows, onChanged }: { rows: AdvisorVentureProjectRowDTO
               <span className={`su-badge ${r.project.isActive ? 'ok' : 'neutral'}`}>{r.project.isActive ? 'active' : 'archived'}</span>
             </div>
             <div className="su-subtitle">{r.project.description}</div>
+            {r.project.isGraduationProject && <span className="su-badge info" style={{ marginBottom: 8 }}>Graduation project</span>}
             <div className="su-muted" style={{ fontSize: 12, marginBottom: 12 }}>
               {r.project.type === 'commercial_spinoff' ? 'Commercial spin-off' : 'Academic research'} · capacity {r.project.capacity} · {r.acceptedCount} member{r.acceptedCount !== 1 ? 's' : ''} · required: {r.project.requiredCourseCodes.join(', ') || '—'}
             </div>

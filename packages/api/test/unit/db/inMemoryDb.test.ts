@@ -288,3 +288,106 @@ describe('approveAllPendingSystemProposals', () => {
     expect(() => db.approveAllPendingSystemProposals('nobody')).toThrow();
   });
 });
+
+// VP epic — "Approve all" across every advisor at once, not one student at
+// a time. Reuses approveAllPendingSystemProposals per-student under the
+// hood, so this mainly proves the cross-advisor fan-out and the
+// overriddenByAdvisor flag the VP dashboard's button count depends on.
+describe('approveAllPendingProposalsAcrossAllAdvisors — VP bulk action', () => {
+  function candidate(courseCode: string) {
+    return {
+      courseCode, isRetake: false, oldPoints: null,
+      expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0,
+      deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
+    };
+  }
+
+  it('flags a slot the advisor already overrode, and excludes it from the count implied by the queue', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
+    const pending = db.listPendingProposalsAcrossAllAdvisors();
+    const row = pending.find(p => p.studentId === 'ahmed-1' && p.slotKey === 'ECE314');
+    expect(row?.overriddenByAdvisor).toBe(true);
+  });
+
+  it('a plain, un-overridden slot is flagged false', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE316')]);
+    const row = db.listPendingProposalsAcrossAllAdvisors().find(p => p.studentId === 'ahmed-1' && p.slotKey === 'ECE316');
+    expect(row?.overriddenByAdvisor).toBe(false);
+  });
+
+  it('approves pending system proposals across DIFFERENT advisors in one call', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]); // advisor-nabil
+    db.addProposalsFromPlan('omar-1', [candidate('ECE314')]); // advisor-mervat
+    db.approveAllPendingProposalsAcrossAllAdvisors();
+    expect(db.getProposals('ahmed-1').find(p => p.slotKey === 'ECE314')!.status).toBe('advisor_approved');
+    expect(db.getProposals('omar-1').find(p => p.slotKey === 'ECE314')!.status).toBe('advisor_approved');
+  });
+
+  it('never overrules a slot an advisor already replaced with their own alternate, even in the bulk path', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
+    db.approveAllPendingProposalsAcrossAllAdvisors();
+    const all = db.getProposals('ahmed-1');
+    expect(all.find(p => p.slotKey === 'ECE314' && p.origin === 'system')!.status).toBe('pending');
+    expect(all.find(p => p.slotKey === 'ECE314' && p.origin === 'advisor')!.status).toBe('advisor_approved');
+  });
+
+  it('returns the remaining pending queue after the bulk approve', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
+    const remaining = db.approveAllPendingProposalsAcrossAllAdvisors();
+    // the overridden system proposal is still "pending" underneath, so it
+    // still shows up in the queue — just permanently un-bulk-approvable.
+    expect(remaining.some(p => p.studentId === 'ahmed-1' && p.slotKey === 'ECE314' && p.overriddenByAdvisor)).toBe(true);
+  });
+});
+
+// Student epic — "Choose all" registers every already advisor-approved
+// slot in one click instead of one "Choose this course" click per slot.
+describe('chooseAllReadyProposals — student bulk action', () => {
+  function candidate(courseCode: string) {
+    return {
+      courseCode, isRetake: false, oldPoints: null,
+      expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0,
+      deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
+    };
+  }
+
+  it('registers every slot whose final option is already advisor-approved', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314'), candidate('ECE316')]);
+    db.approveAllPendingSystemProposals('ahmed-1');
+    const { stillPendingSlots } = db.chooseAllReadyProposals('ahmed-1');
+    expect(stillPendingSlots).toEqual([]);
+    const proposals = db.getProposals('ahmed-1').filter(p => ['ECE314', 'ECE316'].includes(p.slotKey));
+    expect(proposals.every(p => p.status === 'registered')).toBe(true);
+    expect(db.getRegisteredCourses('ahmed-1').map(r => r.courseCode)).toEqual(expect.arrayContaining(['ECE314', 'ECE316']));
+  });
+
+  it('leaves a not-yet-approved slot alone and reports it back, instead of throwing or silently registering it', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const { stillPendingSlots } = db.chooseAllReadyProposals('ahmed-1');
+    expect(stillPendingSlots).toEqual(['ECE314']);
+    expect(db.getProposals('ahmed-1').find(p => p.slotKey === 'ECE314')!.status).toBe('pending');
+  });
+
+  it('prefers the advisor alternate over the system suggestion when both exist', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
+    db.chooseAllReadyProposals('ahmed-1');
+    expect(db.getProposals('ahmed-1').find(p => p.id === alt.id)!.status).toBe('registered');
+  });
+
+  it('is idempotent — re-running after everything is already registered does nothing further', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    db.approveAllPendingSystemProposals('ahmed-1');
+    db.chooseAllReadyProposals('ahmed-1');
+    const before = db.getRegisteredCourses('ahmed-1').length;
+    db.chooseAllReadyProposals('ahmed-1');
+    expect(db.getRegisteredCourses('ahmed-1').length).toBe(before);
+  });
+
+  it('throws for an unknown student', () => {
+    expect(() => db.chooseAllReadyProposals('nobody')).toThrow();
+  });
+});

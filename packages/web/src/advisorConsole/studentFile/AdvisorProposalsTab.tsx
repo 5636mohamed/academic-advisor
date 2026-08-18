@@ -6,6 +6,7 @@
 // from the old ProposalReview.tsx with su-* styling; percentages are shown
 // throughout, same as every other advisor screen.
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, AlternateScorePreviewDTO, CourseProposalDTO, EligibleCourseDTO } from '../../api/client';
 import { letterClass } from '../../portal/lib/studentUiHelpers';
 import { Loading } from '../../portal/ui/Primitives';
@@ -355,8 +356,15 @@ export function AdvisorProposalsTab({ studentId, studentName }: { studentId: str
       {confirmModal && (() => {
         const modalSlot = slots.find(s => s.slotKey === confirmModal.slotKey);
         const p = preview[confirmModal.slotKey];
-        return (
-          <div className="su-modal-overlay" role="dialog" aria-label="Confirm responsibility" onMouseDown={e => e.target === e.currentTarget && setConfirmModal(null)}>
+        // Portalled to <body> — see MyRecommendationsTab.tsx's identical
+        // fix for why a modal rendered inline in page content can't rely
+        // on `position: fixed` alone (a live transform/opacity trail left
+        // behind by `.su-page`'s own entrance animation, even after it's
+        // finished, both mis-sizes the overlay and can trap it under a
+        // lower z-index sibling).
+        return createPortal(
+        <div className="su">
+        <div className="su-modal-overlay" role="dialog" aria-label="Confirm responsibility" onMouseDown={e => e.target === e.currentTarget && setConfirmModal(null)}>
             <div className="su-modal su-pop">
               <div className="su-card">
                 <div className="su-title" style={{ fontSize: 16 }}>Confirm you're taking responsibility</div>
@@ -394,6 +402,8 @@ export function AdvisorProposalsTab({ studentId, studentName }: { studentId: str
               </div>
             </div>
           </div>
+        </div>,
+        document.body
         );
       })()}
     </div>

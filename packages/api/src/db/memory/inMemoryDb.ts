@@ -1391,10 +1391,22 @@ export interface VpPendingProposal {
   courseCode: string;
   expectedLetter: string;
   expectedPct: number;
+  /** True when this slot's advisor has already proposed their own
+   *  alternate (any status but declined) — approving this row's plain
+   *  system proposal underneath that alternate would silently overrule the
+   *  advisor's real decision for the slot, exactly the case
+   *  approveAllPendingSystemProposals already guards against per-student.
+   *  Surfaced here so the VP's own bulk action can apply the identical
+   *  rule across every advisor at once, and the UI can explain why a row
+   *  isn't included in "Approve all". */
+  overriddenByAdvisor: boolean;
 }
 export function listPendingProposalsAcrossAllAdvisors(): VpPendingProposal[] {
   const out: VpPendingProposal[] = [];
   for (const s of students.values()) {
+    const advisorHandledSlots = new Set(
+      s.proposals.filter(p => p.origin === 'advisor' && p.status !== 'declined').map(p => p.slotKey)
+    );
     for (const p of s.proposals) {
       if (p.origin === 'system' && p.status === 'pending') {
         out.push({
@@ -1406,11 +1418,24 @@ export function listPendingProposalsAcrossAllAdvisors(): VpPendingProposal[] {
           courseCode: p.courseCode,
           expectedLetter: p.expectedLetter,
           expectedPct: p.expectedPct,
+          overriddenByAdvisor: advisorHandledSlots.has(p.slotKey),
         });
       }
     }
   }
   return out;
+}
+
+/** VP bulk action — mirrors approveAllPendingSystemProposals, just applied
+ *  across every student/advisor in one call instead of one student at a
+ *  time, so the VP never has to open each advisor's roster individually
+ *  either. Reuses that exact per-student function (rather than a second
+ *  copy of its "don't overrule an advisor's own alternate" logic) so the
+ *  two bulk paths can never drift apart. */
+export function approveAllPendingProposalsAcrossAllAdvisors(): VpPendingProposal[] {
+  const studentIds = new Set(listPendingProposalsAcrossAllAdvisors().map(p => p.studentId));
+  for (const studentId of studentIds) approveAllPendingSystemProposals(studentId);
+  return listPendingProposalsAcrossAllAdvisors();
 }
 
 /** §15.3.2 step 1 — adds one pending system proposal per NEW slot in
@@ -1613,6 +1638,44 @@ export function getRegisteredCourses(studentId: string): RegisteredCourse[] {
   return students.get(studentId)?.registeredCourses ?? [];
 }
 
+/** "Choose all" — the student's own bulk action, mirroring the advisor's
+ *  and VP's "Approve all": register every slot's final option (the
+ *  advisor's alternate if there is one, else the system's own suggestion)
+ *  in one click instead of clicking "Choose this course" per slot. Only
+ *  ever registers a slot whose final option is already advisor-approved —
+ *  exactly the same rule §15.3.2 step 3's single-choice `chooseProposal`
+ *  already enforces one slot at a time, just applied across every slot at
+ *  once. Slots whose final option isn't advisor-approved yet are left
+ *  alone and reported back in `stillPendingSlots`, so the caller can show
+ *  one consolidated "contact your advisor" note instead of a popup per
+ *  course. Reuses `chooseProposalById` per slot for the actual commit so
+ *  the RegisteredCourse side effect (and every other single-choice rule)
+ *  never has a second, potentially-drifting copy. */
+export function chooseAllReadyProposals(studentId: string): { proposals: CourseProposal[]; stillPendingSlots: string[] } {
+  const student = students.get(studentId);
+  if (!student) throw new Error(`no such student ${studentId}`);
+
+  const bySlot = new Map<string, { system?: CourseProposal; advisor?: CourseProposal }>();
+  for (const p of student.proposals) {
+    if (p.status === 'declined') continue;
+    const entry = bySlot.get(p.slotKey) ?? {};
+    if (p.origin === 'system') entry.system = p; else entry.advisor = p;
+    bySlot.set(p.slotKey, entry);
+  }
+
+  const stillPendingSlots: string[] = [];
+  for (const [slotKey, entry] of bySlot) {
+    const final = entry.advisor ?? entry.system;
+    if (!final || final.status === 'registered') continue;
+    if (final.advisorApproved) {
+      chooseProposalById(studentId, final.id);
+    } else {
+      stillPendingSlots.push(slotKey);
+    }
+  }
+  return { proposals: student.proposals, stillPendingSlots };
+}
+
 /** §15.4 — the roster aggregate the advisor's PDF report is built from. */
 export function getAdvisorReport(advisorId?: string): AdvisorReportRow[] {
   const scoped = advisorId ? listStudents().filter(s => s.advisorId === advisorId) : listStudents();
@@ -1628,6 +1691,41 @@ export function getAdvisorReport(advisorId?: string): AdvisorReportRow[] {
       p => p.origin === 'advisor' && p.belowOrEqualSystemGrade && p.status !== 'declined'
     ),
   }));
+}
+
+/** VP report follow-up — one row per (student, proposal) an advisor has
+ *  taken responsibility for, i.e. the exact same condition
+ *  `getAdvisorReport`'s `hasBelowOrEqualAdvisorProposal` flag already
+ *  checks (`origin === 'advisor' && belowOrEqualSystemGrade && status !==
+ *  'declined'`), just expanded from "which students" into the full detail
+ *  a VP-level report table needs: which course, and which advisor. Reuses
+ *  that identical condition so the two can never disagree about who's
+ *  flagged. */
+export interface AdvisorResponsibilityDetail {
+  studentId: string;
+  studentName: string;
+  advisorId: string;
+  advisorName: string;
+  courseCode: string;
+  courseName: string;
+}
+export function listAdvisorResponsibilityDetails(): AdvisorResponsibilityDetail[] {
+  const out: AdvisorResponsibilityDetail[] = [];
+  for (const s of students.values()) {
+    for (const p of s.proposals) {
+      if (p.origin !== 'advisor' || !p.belowOrEqualSystemGrade || p.status === 'declined') continue;
+      const advisor = ADVISORS.find(a => a.id === s.advisorId);
+      out.push({
+        studentId: s.id,
+        studentName: s.name,
+        advisorId: s.advisorId,
+        advisorName: advisor?.name ?? s.advisorId,
+        courseCode: p.courseCode,
+        courseName: courseByCode[p.courseCode]?.name ?? p.courseCode,
+      });
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------

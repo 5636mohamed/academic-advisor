@@ -37,6 +37,15 @@ export interface VentureProject {
   conferenceName?: string;
   impactFactor?: number;
   labName?: string;
+  /** Graduation Project epic — marks this venture as a student capstone
+   *  project rather than a faculty-initiated one. Deliberately orthogonal
+   *  to `type`, not a third value of it: a graduation project can pursue
+   *  either an `academic_research` outcome (feeds a paper/thesis) or a
+   *  `commercial_spinoff` one (feeds a startup) — `type` already captures
+   *  which track, this flag just says the project originates as someone's
+   *  graduation project either way. Optional/undefined = a regular
+   *  faculty-posted venture, same as every project before this epic. */
+  isGraduationProject?: boolean;
 }
 
 export interface StudentVentureMatch {

@@ -62,7 +62,10 @@ export function VentureProjectCard({ match, onExpressInterest }: { match: Ventur
           <div className="su-title" style={{ fontSize: 16 }}>{match.project.title}</div>
           <div className="su-muted" style={{ marginTop: 2 }}>Hosted by {match.project.professorName ?? 'a faculty member'}</div>
         </div>
-        <span className="su-badge neutral">{match.project.type === 'commercial_spinoff' ? 'Commercial spin-off' : 'Academic research'}</span>
+        <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {match.project.isGraduationProject && <span className="su-badge info">Graduation project</span>}
+          <span className="su-badge neutral">{match.project.type === 'commercial_spinoff' ? 'Commercial spin-off' : 'Academic research'}</span>
+        </div>
       </div>
       <div className="su-subtitle" style={{ margin: '10px 0' }}>{match.project.description}</div>
 

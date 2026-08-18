@@ -653,6 +653,19 @@ app.post('/api/students/:id/proposals/:proposalId/choose', (req, res) => {
   }
 });
 
+// "Choose all" — the student's own bulk action (see chooseAllReadyProposals's
+// doc comment). Returns the same shape GET/generate use, plus the slots that
+// still need advisor review, so the client can render one consolidated note.
+app.post('/api/students/:id/proposals/choose-all', (req, res) => {
+  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+  try {
+    const { stillPendingSlots } = db.chooseAllReadyProposals(req.params.id);
+    res.json({ ...proposalsWithImpact(req.params.id), stillPendingSlots });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.get('/api/students/:id/registered-courses', (req, res) => {
   if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
   res.json(db.getRegisteredCourses(req.params.id));
@@ -810,6 +823,24 @@ app.get('/api/vp/pending-proposals', (_req, res) => {
   res.json(db.listPendingProposalsAcrossAllAdvisors());
 });
 
+// VP report follow-up — the per-(student, course) detail rows for the
+// responsibility table the VP's own PDF now renders after the advisor
+// summary table (see downloadVpAdvisorsReportPdf). See
+// listAdvisorResponsibilityDetails's own doc comment for the exact rule.
+app.get('/api/vp/responsibility-details', (_req, res) => {
+  res.json(db.listAdvisorResponsibilityDetails());
+});
+
+// VP's own "Approve all" — every advisor's whole pending queue in one
+// click, same guarantee as the advisor's per-student version (see
+// approveAllPendingProposalsAcrossAllAdvisors's doc comment): never
+// silently overrules a slot the advisor already replaced with their own
+// alternate. Returns the queue as it stands afterward, so the client can
+// re-render without a second round trip.
+app.post('/api/vp/pending-proposals/approve-all', (_req, res) => {
+  res.json(db.approveAllPendingProposalsAcrossAllAdvisors());
+});
+
 // Advisor console's own Venture Board (advisorConsole/venture/*) — the
 // advisor "owns" every venture directly rather than browsing a directory of
 // separate professors, so this returns every project across every
@@ -845,6 +876,9 @@ app.post('/api/professors/:id/venture-projects', (req, res) => {
     // advisor (or the VP) can attach to a project alongside the plain
     // open-position fields above.
     authors, publishedPaperUrl, conferenceName, impactFactor, labName,
+    // Graduation Project epic — orthogonal to `type` (see VentureProject's
+    // own doc comment): a graduation project can be posted on either track.
+    isGraduationProject,
   } = req.body ?? {};
   if (typeof title !== 'string' || typeof description !== 'string' || (type !== 'academic_research' && type !== 'commercial_spinoff')) {
     return res.status(400).json({ error: 'expected { title, description, type: "academic_research"|"commercial_spinoff", requiredCourseCodes[], preferredSkills[], capacity, isActive? }' });
@@ -866,6 +900,7 @@ app.post('/api/professors/:id/venture-projects', (req, res) => {
       conferenceName: typeof conferenceName === 'string' && conferenceName.trim() ? conferenceName.trim() : undefined,
       impactFactor: typeof impactFactor === 'number' && impactFactor >= 0 ? impactFactor : undefined,
       labName: typeof labName === 'string' && labName.trim() ? labName.trim() : undefined,
+      isGraduationProject: isGraduationProject === true ? true : undefined,
     });
     res.json(project);
   } catch (err) {

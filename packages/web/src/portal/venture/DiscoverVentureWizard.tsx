@@ -4,6 +4,7 @@
 // exactly the same data/endpoints PortalVentureBoard's inline form always
 // used, just presented as a step wizard instead of one long page.
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, VentureMatchResultDTO, VentureQuizQuestionDTO } from '../../api/client';
 import { Loading } from '../ui/Primitives';
 import { OptionRow, WizardShell } from '../ui/WizardShell';
@@ -67,7 +68,14 @@ export function DiscoverVentureWizard({ studentId, onClose }: { studentId: strin
     setMatches(await api.ventureMatches(studentId));
   };
 
-  return (
+  // Portalled to <body> — same reasoning as MyRecommendationsTab.tsx's
+  // identical fix: rendered inline in page content, `position: fixed`
+  // alone isn't reliable here (a live transform/opacity trail `.su-page`'s
+  // own entrance animation leaves behind even after it finishes both
+  // mis-sizes the overlay to the page's scroll height and can trap it
+  // under a lower z-index sibling).
+  return createPortal(
+    <div className="su">
     <div className="su-modal-overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
       <div className="su-modal su-pop" style={{ maxWidth: 900 }}>
         <div className="su-card" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
@@ -135,5 +143,7 @@ export function DiscoverVentureWizard({ studentId, onClose }: { studentId: strin
         </div>
       </div>
     </div>
+    </div>,
+    document.body
   );
 }
