@@ -6,9 +6,6 @@
 
 **Mohamed Elsayed Elhariry** — Department of Electronics and Communication, Faculty of Engineering, Egypt-Japan University of Science and Technology (E-JUST)<br>
 **Yamen Hany Ezzat** — Department of Digital Media, Faculty of Art and Design, Egypt-Japan University of Science and Technology (E-JUST)<br>
-**Mohamed Ehab Nabil** — Department of Artificial Intelligence and Data Science, Faculty of Computer Science and Information Technology, Egypt-Japan University of Science and Technology (E-JUST)<br>
-
-
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/ci.yml?branch=master&label=tests&logo=vitest&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/ci.yml)
 [![Pages Deploy](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/pages.yml?branch=master&label=pages%20deploy&logo=githubpages&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/pages.yml)
@@ -390,10 +387,6 @@ Egypt-Japan University of Science and Technology (E-JUST)
 
 **Yamen Hany Ezzat**<br>
 Department of Digital Media, Faculty of Art and Design<br>
-Egypt-Japan University of Science and Technology (E-JUST)
-
-**Mohamed Ehab Nabil**<br>
-Department of Artificial Intelligence and Data Science, Faculty of Computer Science and Information Technology<br>
 Egypt-Japan University of Science and Technology (E-JUST)
 
 ## Contributing
