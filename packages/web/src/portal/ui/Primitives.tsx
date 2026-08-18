@@ -85,6 +85,30 @@ export function ProbationTrack({ count, cap = 6 }: { count: number; cap?: number
 
 const barTone = (cgpa: number) => (cgpa >= 3.0 ? 'good' : cgpa < 2.0 ? 'danger' : 'warn');
 
+/** CGPA color-key legend — every CGPA trend chart across every portal
+ *  (student, advisor, VP) reuses this one component and its same 3
+ *  `--su-*` tone tokens, so the color meaning never drifts between
+ *  screens: green = good standing (>= 3.0), yellow = at-risk (2.0-3.0),
+ *  red = probation (< 2.0) — the exact `barTone` thresholds the bars
+ *  themselves already use above. */
+export function CgpaLegend() {
+  const items: Array<{ tone: 'good' | 'warn' | 'danger'; label: string }> = [
+    { tone: 'good', label: 'Good standing (≥ 3.00)' },
+    { tone: 'warn', label: 'At-risk (2.00–2.99)' },
+    { tone: 'danger', label: 'Probation (< 2.00)' },
+  ];
+  return (
+    <div className="su-flex su-gap-14" style={{ flexWrap: 'wrap', marginTop: 10, fontSize: 11.5 }}>
+      {items.map(item => (
+        <div className="su-flex su-gap-8 su-items-center" key={item.tone}>
+          <span className="su-quick-dot" style={{ marginTop: 0, background: `var(--su-${item.tone})` }} />
+          <span className="su-muted">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CgpaBarChart({ points }: { points: { label: string; value: number }[] }) {
   if (points.length === 0) return <div className="su-muted">No CGPA history yet.</div>;
   return (
@@ -105,6 +129,7 @@ export function CgpaBarChart({ points }: { points: { label: string; value: numbe
           </div>
         ))}
       </div>
+      <CgpaLegend />
     </div>
   );
 }
