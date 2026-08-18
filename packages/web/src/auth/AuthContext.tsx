@@ -7,7 +7,7 @@
 // make the other parties' pages unreachable, not just unlinked.
 //
 // The professor role (the old Faculty Console, `/faculty/:id`) was removed
-// entirely — every professor at E-JUST is already also an advisor, and the
+// entirely — every professor is already also an advisor, and the
 // advisor console's own Venture Board already manages every project
 // directly (§ the pre-existing "no directory of other professors" design),
 // so the separate professor login never had anything the advisor console

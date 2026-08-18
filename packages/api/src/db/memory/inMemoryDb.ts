@@ -597,7 +597,7 @@ function generateFillerStudents(advisorId: string, count: number): SeedStudent[]
  *  listed a handful of "illustrative" courses per semester (see the
  *  original comment above `seedStudents`), which left real gaps — a
  *  student credited with reaching semester N who was nonetheless missing
- *  several of semester N's required courses entirely (E-JUST's program is
+ *  several of semester N's required courses entirely (this program is
  *  lock-step: every course scheduled for a semester the student has
  *  already reached should be on their transcript, not a hand-picked
  *  subset). This fills every such gap, up through the highest semester the

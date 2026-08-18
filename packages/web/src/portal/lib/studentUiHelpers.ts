@@ -20,7 +20,7 @@ export function creditCapDisplay(cgpa: number): { cap: number; reason: string } 
   return { cap: 20, reason: 'Standard registration limit' };
 }
 
-/** §2.1's ENG_SCALE — grades below C (D+, D, F) are what E-JUST regulations
+/** §2.1's ENG_SCALE — grades below C (D+, D, F) are what university regulations
  *  "highly encourage repeating" (retake-gate.pdf's own wording). F on record
  *  is a mandatory retake to graduate; D/D+ are recommended, not required. */
 export function gradeRecommendation(letter: string): { label: string; tone: 'danger' | 'warn' | 'neutral' } {

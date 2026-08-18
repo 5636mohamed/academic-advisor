@@ -2,7 +2,7 @@
 // app shows its brand mark (all 4 layout topbars + the login page), instead
 // of duplicating a light/dark ternary at each call site. Both source PNGs
 // (public assets, from the user-supplied Logo-dark-mode.png/Logo-white-
-// mode.png) are transparent cutouts, unlike the old ejust-logo.png which
+// mode.png) are transparent cutouts, unlike the old, since-replaced logo which
 // was its own opaque, theme-agnostic red circle — so which variant to show
 // now genuinely depends on what's behind it: the app's light theme paints
 // light/white surfaces (`--su-surface: #fff`), so the BLACK-lined

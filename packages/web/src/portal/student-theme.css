@@ -1,5 +1,5 @@
 /* ============================================================================
- * Student Portal design system — "E-JUST Academic Advising" visual language
+ * Student Portal design system — "AEGIS Academic Advising" visual language
  * (see /UI Design Student/*.pdf). Entirely scoped under `.su` so it can
  * never leak into the advisor console or faculty pages, which keep their
  * existing editorial/paper theme in styles.css untouched.
@@ -320,7 +320,7 @@
 
 /* ---------------------------------------------------------------------- *
  * Responsiveness — every portal in the system shares this shell
- * (PortalLayout, AdvisorLayout, FacultyLayout), so these rules cover all
+ * (PortalLayout, AdvisorLayout, VpLayout), so these rules cover all
  * three, no exception. The topbar was the one genuinely fixed-width
  * assumption: brand + role tag + nav + user block all fighting for one
  * row works fine at desktop widths but has nowhere to go on a phone. Below
@@ -826,17 +826,21 @@
   border-left: 1px solid var(--su-border);
 }
 .su-login-brand-logo { width: 100%; max-width: 220px; height: auto; object-fit: contain; }
-/* Left-anchored, fixed-width (not shrink-to-fit) so the text grows/shrinks
- * from a stable left edge as it types/deletes — the caret sits immediately
- * after the last character and only ever moves by growing from there,
- * instead of the whole line re-centering (and the caret jumping) on every
- * keystroke, which is what a `justify-content: center` shrink-to-fit box
- * used to do here. */
+/* Deliberately NOT `display: flex` — the text `<span>` and the caret
+ * `<span>` (Typewriter.tsx) are plain inline content, not flex items, so
+ * the caret is genuinely part of the same text flow: it always sits
+ * immediately after the last character, wrapping onto a second line
+ * together with the last word exactly like a real cursor would, instead
+ * of floating beside the whole (possibly two-line) block as a flex item
+ * would. `text-align: center` on a fixed-width (`width: 100%`, not
+ * shrink-to-fit) container centers each wrapped line independently and
+ * doesn't reintroduce the old jitter bug — that came from *shrinking* the
+ * box to the text's width every keystroke, not from centering itself; a
+ * fixed-width box was the actual fix; centering is just its text-align. */
 .su-login-typewriter {
   width: 100%;
-  min-height: 48px;
-  display: flex; align-items: center; justify-content: flex-start;
-  text-align: left;
+  min-height: 68px;
+  text-align: center;
   font-size: 15px; font-weight: 600; line-height: 1.5;
   color: var(--su-text);
   padding: 0 6px;
@@ -848,7 +852,6 @@
   background: currentColor;
   vertical-align: -0.15em;
   animation: su-caret-blink 900ms steps(1) infinite;
-  flex-shrink: 0;
 }
 @keyframes su-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 
@@ -856,5 +859,5 @@
   .su-login-columns { flex-direction: column; }
   .su-login-brand-col { order: -1; border-left: none; border-bottom: 1px solid var(--su-border); padding: 26px 24px; gap: 16px; }
   .su-login-brand-logo { max-width: 160px; }
-  .su-login-typewriter { font-size: 13.5px; min-height: 40px; }
+  .su-login-typewriter { font-size: 13.5px; min-height: 56px; }
 }

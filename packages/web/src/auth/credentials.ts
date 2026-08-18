@@ -18,13 +18,13 @@ export const ADVISOR_PASSWORD = 'Advisor@123';
 /** Single global account — one Vice President oversees all 5 advisors,
  *  same "one shared identity" shape the old pre-multi-advisor advisor
  *  login used to have. */
-export const VP_EMAIL = 'vice-president@ejust.edu.eg';
-export const VP_PASSWORD = 'EJUST@2025';
+export const VP_EMAIL = 'vice-president@aegis.edu.eg';
+export const VP_PASSWORD = 'AEGIS@2025';
 
 export function studentEmailFor(studentId: string): string {
-  return `${studentId}@ejust.edu.eg`;
+  return `${studentId}@aegis.edu.eg`;
 }
 
 export function advisorEmailFor(advisorId: string): string {
-  return `${advisorId}@ejust.edu.eg`;
+  return `${advisorId}@aegis.edu.eg`;
 }

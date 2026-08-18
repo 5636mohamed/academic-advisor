@@ -1619,10 +1619,13 @@ The system was rebuilt around a more realistic, hierarchical advising
 structure — a single shared advisor account became 5 real advisor
 identities, and a new Vice President role oversees all of them — plus a
 new accountability workflow for advisor course overrides and a 3-stage
-transfer approval chain. Rebranded as **AEGIS**; "E-JUST" remains the real
-institution name (still used throughout `@ejust.edu.eg` emails and
-existing docs), now shown as the subtitle beneath the primary "AEGIS"
-product name.
+transfer approval chain. Fully rebranded as **AEGIS** — the earlier
+"E-JUST" institution name was removed everywhere, including the demo
+credential domain (every student/advisor/VP email is now `@aegis.edu.eg`,
+not `@ejust.edu.eg`) and every in-app UI string that named it (login
+masthead, topbar subtitle, probation/transfer copy) — so the product now
+stands on its own rather than being presented as one specific
+university's system.
 
 ### 17.1 Multi-Advisor Model
 

@@ -2,6 +2,8 @@
   "name": "@advisor/api",
   "version": "0.1.0",
   "private": true,
+  "description": "AEGIS Academic Advisor System — the Express/TypeScript backend: predictive grading, probation/dismissal tracking, retake-gate planning, transfer execution, advisor/Vice-President oversight, and the full advising API.",
+  "homepage": "https://github.com/5636mohamed/academic-advisor#readme",
   "author": "Mohamed Elhariry, Department of Electronics and Communication Engineering, Egypt-Japan University of Science and Technology (E-JUST)",
   "license": "Apache-2.0",
   "scripts": {

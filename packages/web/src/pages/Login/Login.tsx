@@ -75,8 +75,8 @@ export function Login() {
 
       <div className="su-login-card su-login-card-wide">
         <div className="su-login-masthead">
-          <div className="su-login-masthead-title">Egypt-Japan University of Science &amp; Technology</div>
-          <div className="su-login-masthead-sub">AEGIS — Academic Advisor System</div>
+          <div className="su-login-masthead-title">AEGIS</div>
+          <div className="su-login-masthead-sub">Academic Advisor System</div>
         </div>
 
         <div className="su-login-columns">
@@ -95,7 +95,7 @@ export function Login() {
                     className="su-input"
                     type="text"
                     autoComplete="username"
-                    placeholder="e.g., ahmed-1@ejust.edu.eg or advisor@ejust.edu.eg"
+                    placeholder="e.g., ahmed-1@aegis.edu.eg or advisor-nabil@aegis.edu.eg"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                   />
@@ -129,7 +129,7 @@ export function Login() {
               </form>
 
               <div className="su-login-footer">
-                Having trouble logging in? Please contact ICT Helpdesk at E-JUST Headquarters.
+                Having trouble logging in? Please contact the ICT Helpdesk.
               </div>
             </div>
           </div>

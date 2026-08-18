@@ -37,7 +37,7 @@ export function AdvisorCoursePlanPage() {
     <div>
       <div className="su-flex su-justify-between su-items-center" style={{ marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div className="su-eyebrow">Auto-balanced algorithm strictly matching E-JUST credit limits</div>
+          <div className="su-eyebrow">Auto-balanced algorithm strictly matching the student's credit limit</div>
           <div className="su-title" style={{ fontSize: 22 }}>Personalized Academic Recovery Plan</div>
         </div>
         <div className="su-modetabs">

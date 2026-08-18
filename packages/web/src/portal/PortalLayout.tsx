@@ -51,7 +51,7 @@ export function PortalLayout() {
             <span className="su-brand-mark"><BrandMark /></span>
             <div className="su-brand-text">
               <div className="su-brand-name">AEGIS</div>
-              <div className="su-brand-sub">E-JUST Academic Advisor System</div>
+              <div className="su-brand-sub">Academic Advisor System</div>
             </div>
           </div>
           <div className="su-brand-divider" />

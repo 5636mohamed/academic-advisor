@@ -20,7 +20,7 @@ export function AcademicPerformanceGate({ onAnswer, onSkip }: { onAnswer: (consi
         <div className="su-eyebrow" style={{ color: 'var(--su-accent)' }}>Step 1: CGPA Repair Setup</div>
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: '6px 0 10px' }}>Academic Performance Gate</h1>
         <div className="su-subtitle" style={{ fontSize: 14 }}>
-          To lift academic probation and raise your GPA quickly, E-JUST regulations highly encourage repeating
+          To lift academic probation and raise your GPA quickly, academic policy highly encourages repeating
           courses with grades below C. Let us customize your course plan.
         </div>
       </div>

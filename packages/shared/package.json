@@ -2,6 +2,8 @@
   "name": "@advisor/shared",
   "version": "0.1.0",
   "private": true,
+  "description": "AEGIS Academic Advisor System — shared TypeScript types and grading tables used by both the API and web app, so grading/CGPA math can never drift between them.",
+  "homepage": "https://github.com/5636mohamed/academic-advisor#readme",
   "author": "Mohamed Elhariry, Department of Electronics and Communication Engineering, Egypt-Japan University of Science and Technology (E-JUST)",
   "license": "Apache-2.0",
   "main": "src/index.ts",

@@ -1,6 +1,8 @@
 {
   "name": "academic-advisor",
   "private": true,
+  "description": "AEGIS — a full-stack academic advising platform: predictive grading, probation tracking, multi-advisor & Vice President oversight, PDF reporting, and an innovation venture board.",
+  "homepage": "https://github.com/5636mohamed/academic-advisor#readme",
   "author": "Mohamed Elhariry, Department of Electronics and Communication Engineering, Egypt-Japan University of Science and Technology (E-JUST)",
   "license": "Apache-2.0",
   "workspaces": ["packages/*"]

@@ -1,18 +1,18 @@
 // Spec §10's advisor console, rebuilt to match /UI Design Professor/*.pdf —
-// same E-JUST red/white design system the student portal already uses
+// same AEGIS red/white design system the student portal already uses
 // (student-theme.css's `.su-*` classes are reused verbatim, not
 // reimplemented: this is genuinely the same visual language, just a
 // different role's screens). Topbar nav is exactly the mockups' three
 // items: Dashboard, All Students, Venture board — the §16.6 Faculty
 // Console's own venture-project management now lives here too (per the
-// product decision that every professor at E-JUST is also an academic
+// product decision that every professor is also an academic
 // advisor), reachable without a separate professor login.
 //
 // Multi-advisor epic: advisor is now a real per-id identity (5 named
 // advisors, see db/seed/seedAdvisors.ts), so the topbar shows the actual
-// logged-in advisor's real name/department — same pattern FacultyLayout.tsx
-// already uses for professors — instead of the old generic "Academic
-// Advisor" placeholder from back when advisor was one shared account.
+// logged-in advisor's real name/department instead of the old generic
+// "Academic Advisor" placeholder from back when advisor was one shared
+// account.
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api, AdvisorDTO } from '../api/client';
@@ -54,7 +54,7 @@ export function AdvisorLayout() {
             <span className="su-brand-mark"><BrandMark /></span>
             <div className="su-brand-text">
               <div className="su-brand-name">AEGIS</div>
-              <div className="su-brand-sub">E-JUST Academic Advisor System</div>
+              <div className="su-brand-sub">Academic Advisor System</div>
             </div>
           </div>
           <div className="su-brand-divider" />

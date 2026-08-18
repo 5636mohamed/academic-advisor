@@ -100,7 +100,7 @@ export function Overview() {
             <ProbationTrack count={student.probationCounter.count} />
             <div className="su-subtitle" style={{ marginTop: 4 }}>
               Warning: reaching 6 semesters on academic probation leads to mandatory suspension / program transfer
-              recommendation under E-JUST university bylaws.
+              recommendation under university bylaws.
             </div>
           </Section>
 

@@ -19,11 +19,11 @@ function explainSentence(explain: string, current: number, projected: number): s
     case 'no_departmental_alternative_improves_trend':
       return 'No department within your current faculty is projected to turn your trend around — a faculty transfer is recommended.';
     case 'probation_warning_3_internal_transfer_recommended':
-      return "You've reached warning 3 of 6. Per E-JUST policy, an internal department transfer is recommended at this stage.";
+      return "You've reached warning 3 of 6. Per academic policy, an internal department transfer is recommended at this stage.";
     case 'probation_warning_3_internal_transfer_already_used_escalating_to_faculty':
       return "You've reached warning 3 of 6 and already used your one internal-department transfer — escalating to a faculty transfer recommendation.";
     case 'probation_warning_4_plus_faculty_transfer_recommended':
-      return "You've reached warning 4 or more of 6. Per E-JUST policy, a faculty transfer is recommended at this stage.";
+      return "You've reached warning 4 or more of 6. Per academic policy, a faculty transfer is recommended at this stage.";
     default:
       return `Projected CGPA if you stay on this path: ${projected.toFixed(2)} (currently ${current.toFixed(2)}).`;
   }

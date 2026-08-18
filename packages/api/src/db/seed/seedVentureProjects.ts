@@ -44,7 +44,7 @@ export const PROFESSORS: ProfessorProfile[] = [
     researchTags: ['machine_learning', 'data_science'],
     acceptingUndergrads: true,
   },
-  // Product decision: every professor at E-JUST is also an academic
+  // Product decision: every professor is also an academic
   // advisor, and there's a single shared advisor account (no per-advisor
   // identity — see auth/AuthContext.tsx). This entry is the attribution
   // anchor for ventures the advisor posts directly through the advisor
@@ -58,7 +58,7 @@ export const PROFESSORS: ProfessorProfile[] = [
     id: 'advisor-owned',
     facultyId: 'ENG',
     departmentId: 'ECE',
-    name: 'E-JUST Academic Advising',
+    name: 'AEGIS Academic Advising',
     researchTags: [],
     acceptingUndergrads: true,
   },

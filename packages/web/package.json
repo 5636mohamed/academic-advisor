@@ -2,6 +2,8 @@
   "name": "@advisor/web",
   "version": "0.1.0",
   "private": true,
+  "description": "AEGIS Academic Advisor System — the React/TypeScript frontend: role-separated student, advisor, and Vice President portals with real-time predictive analytics, PDF reporting, and an innovation venture board.",
+  "homepage": "https://5636mohamed.github.io/academic-advisor/",
   "author": "Mohamed Elhariry, Department of Electronics and Communication Engineering, Egypt-Japan University of Science and Technology (E-JUST)",
   "license": "Apache-2.0",
   "scripts": {

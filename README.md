@@ -4,9 +4,11 @@
 
 # AEGIS — Academic Advising & Early-Warning System
 
-**Mohamed Elsayed Elhariry** — Department of Electronics and Communication, Faculty of Engineering<br>
-**Yamen Hany Ezzat** — Department of Digital Media, Faculty of Art and Design<br>
-*Egypt-Japan University of Science and Technology (E-JUST)*
+**Mohamed Elsayed Elhariry** — Department of Electronics and Communication, Faculty of Engineering, Egypt-Japan University of Science and Technology (E-JUST)<br>
+**Yamen Hany Ezzat** — Department of Digital Media, Faculty of Art and Design, Egypt-Japan University of Science and Technology (E-JUST)<br>
+**Mohamed Ehab** — Department of Artificial Intelligence, Faculty of Computer Science and Information Technology, Egypt-Japan University of Science and Technology (E-JUST)<br>
+
+
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/ci.yml?branch=master&label=tests&logo=vitest&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/ci.yml)
 [![Pages Deploy](https://img.shields.io/github/actions/workflow/status/5636mohamed/academic-advisor/pages.yml?branch=master&label=pages%20deploy&logo=githubpages&logoColor=white)](https://github.com/5636mohamed/academic-advisor/actions/workflows/pages.yml)
@@ -24,8 +26,8 @@
 The real, fully working system — not a static mockup. Frontend on GitHub
 Pages, backend API live on Railway; log in with any credential from
 `docs/LOGIN_CREDENTIALS.md` — try the Vice President
-(`vice-president@ejust.edu.eg` / `EJUST@2025`) for the full cross-advisor
-view, or any of the 5 advisors (e.g. `advisor-nabil@ejust.edu.eg` /
+(`vice-president@aegis.edu.eg` / `AEGIS@2025`) for the full cross-advisor
+view, or any of the 5 advisors (e.g. `advisor-nabil@aegis.edu.eg` /
 `Advisor@123`) for a single 25-student roster — and click through the real
 dashboard, course plans, transfer approvals, and venture board with real
 seeded data. The API's free tier can spin down after a period of
@@ -389,6 +391,9 @@ Egypt-Japan University of Science and Technology (E-JUST)
 **Yamen Hany Ezzat**<br>
 Department of Digital Media, Faculty of Art and Design<br>
 Egypt-Japan University of Science and Technology (E-JUST)
+
+**Mohamed Ehab**<br>
+Department of Artificial Intelligence, Faculty of Computer Science and Information Technology
 
 ## Contributing
 
