@@ -277,6 +277,11 @@ export interface VpAdvisorSummaryDTO {
   advisor: AdvisorDTO;
   studentCount: number;
   averageCgpa: number;
+  /** Names of students on this advisor's roster with a live (non-declined)
+   *  advisor-proposed course whose expected grade was no better than the
+   *  system's own recommendation — i.e., this advisor "took
+   *  responsibility" for at least one of these. Empty if none. */
+  flaggedStudentNames: string[];
 }
 
 export interface VpPendingProposalDTO {

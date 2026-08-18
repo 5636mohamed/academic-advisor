@@ -2,7 +2,7 @@
 // backend runtime dependency) from GET /api/advisor/report.
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { AdvisorReportRowDTO } from '../api/client';
+import { AdvisorReportRowDTO, VpAdvisorSummaryDTO } from '../api/client';
 import aegisIconLightPdf from '../assets/aegis-icon-light-pdf.png';
 
 // AEGIS rebrand — both PDFs below are white-page documents, so the black-
@@ -95,6 +95,69 @@ export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Pro
   });
 
   doc.save(`advisor-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+/** Vice President epic — the VP's own aggregate PDF, one row per advisor
+ *  (not per student — see downloadAdvisorReportPdf above for that). Same
+ *  highlight+legend pattern as the advisor's own roster report, just one
+ *  level up: an advisor's row is highlighted whenever ANY student on
+ *  their roster has a live advisor-proposed course the advisor "took
+ *  responsibility" for (§17.3) — the flag is computed server-side from
+ *  the exact same per-student data the advisor's own report highlights,
+ *  so the two PDFs can never disagree about who's flagged. */
+export async function downloadVpAdvisorsReportPdf(rows: VpAdvisorSummaryDTO[]): Promise<void> {
+  const doc = new jsPDF();
+  const logoDataUrl = await getLogoDataUrl();
+  const textLeft = logoDataUrl ? 32 : 14;
+  if (logoDataUrl) {
+    try { doc.addImage(logoDataUrl, 'PNG', 14, 10, 14, 15); } catch { /* non-fatal */ }
+  }
+  doc.setFontSize(16);
+  doc.text('Vice President — Advisor Oversight Report', textLeft, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
+
+  const flaggedAdvisors = rows.filter(r => r.flaggedStudentNames.length > 0);
+
+  autoTable(doc, {
+    startY: 32,
+    head: [['Advisor', 'Department', 'Students', 'Average CGPA', 'Responsibility flags']],
+    body: rows.map(r => [
+      r.advisor.name,
+      `${r.advisor.facultyId}/${r.advisor.departmentId}`,
+      String(r.studentCount),
+      r.averageCgpa.toFixed(2),
+      r.flaggedStudentNames.length > 0 ? String(r.flaggedStudentNames.length) : '—',
+    ]),
+    headStyles: { fillColor: [35, 32, 23] },
+    styles: { fontSize: 9 },
+    didParseCell: data => {
+      if (data.section === 'body' && flaggedAdvisors.some(a => a.advisor.name === String(rows[data.row.index]?.advisor.name))) {
+        data.cell.styles.fillColor = RESPONSIBILITY_HIGHLIGHT_RGB;
+      }
+    },
+    didDrawPage: data => {
+      if (flaggedAdvisors.length === 0) return;
+      let y = (data.cursor?.y ?? 32) + 10;
+      doc.setFillColor(...RESPONSIBILITY_HIGHLIGHT_RGB);
+      doc.rect(14, y - 4, 4, 4, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(60);
+      doc.text(
+        'Highlighted rows: this advisor took responsibility for at least one student\'s grade in a proposed course (a course whose expected grade was not better than the system\'s own recommendation).',
+        20, y,
+        { maxWidth: 175 }
+      );
+      y += 10;
+      for (const a of flaggedAdvisors) {
+        doc.text(`${a.advisor.name}: ${a.flaggedStudentNames.join(', ')}`, 20, y, { maxWidth: 175 });
+        y += 6;
+      }
+    },
+  });
+
+  doc.save(`vp-advisor-oversight-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export interface ResponsibilityLetterInput {

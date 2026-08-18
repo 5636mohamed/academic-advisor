@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, VpAdvisorSummaryDTO, VpPendingProposalDTO, VpTransferCounterDTO } from '../api/client';
 import { Loading, Section, StatCard } from '../portal/ui/Primitives';
 import { letterClass } from '../portal/lib/studentUiHelpers';
+import { downloadVpAdvisorsReportPdf } from '../lib/pdfReport';
 
 export function VpDashboard() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export function VpDashboard() {
   const [pending, setPending] = useState<VpPendingProposalDTO[] | null>(null);
   const [transferCounters, setTransferCounters] = useState<VpTransferCounterDTO[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const load = () => {
     api.vpAdvisorsSummary().then(setSummary);
@@ -45,6 +47,15 @@ export function VpDashboard() {
     }
   };
 
+  const downloadReport = async () => {
+    setDownloading(true);
+    try {
+      await downloadVpAdvisorsReportPdf(summary);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="su-fade">
       <div className="su-stat-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(160px,1fr))' }}>
@@ -53,7 +64,15 @@ export function VpDashboard() {
         <StatCard label="OVERALL AVG CGPA" value={overallAvgCgpa.toFixed(2)} unit="/ 4.00" accent sub="Weighted across all advisors" />
       </div>
 
-      <Section title="Advisors" eyebrow="Roster overview">
+      <Section
+        title="Advisors"
+        eyebrow="Roster overview"
+        right={
+          <button className="su-btn su-btn-secondary su-btn-sm" disabled={downloading} onClick={downloadReport}>
+            {downloading ? 'Building PDF…' : 'Generate Report (PDF)'}
+          </button>
+        }
+      >
         <div className="su-table-wrap su-mt-16">
           <table className="su-table">
             <thead><tr><th>Advisor</th><th>Department</th><th>Students</th><th>Average CGPA</th><th>Transfers in flight</th><th></th></tr></thead>

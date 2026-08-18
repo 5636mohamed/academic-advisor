@@ -797,7 +797,15 @@ app.get('/api/vp/advisors-summary', (_req, res) => {
     const avgCgpa = roster.length > 0
       ? roster.reduce((sum, s) => sum + db.getCurrentCgpa(s.id), 0) / roster.length
       : 0;
-    return { advisor: a, studentCount: roster.length, averageCgpa: Math.round(avgCgpa * 100) / 100 };
+    // Advisor-responsibility epic, VP-level view — reuses the same
+    // per-student flag §15.4/§17.3's roster report already computes
+    // (getAdvisorReport), so "this advisor took responsibility for a
+    // student" can never drift between the advisor's own PDF and the
+    // VP's aggregate one.
+    const flaggedStudentNames = db.getAdvisorReport(a.id)
+      .filter(r => r.hasBelowOrEqualAdvisorProposal)
+      .map(r => r.name);
+    return { advisor: a, studentCount: roster.length, averageCgpa: Math.round(avgCgpa * 100) / 100, flaggedStudentNames };
   });
   res.json(summary);
 });

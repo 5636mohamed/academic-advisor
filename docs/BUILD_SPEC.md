@@ -1663,6 +1663,12 @@ single-advisor account used to have) overseeing all 5 advisors:
   attributed to a `'vp-owned'` anchor identity ("Office of the Vice
   President"), mirroring the existing `'advisor-owned'` anchor the
   advisor console's own postings already used.
+- **Advisor Oversight PDF report**: one click on the dashboard exports a
+  PDF — one row per advisor (department, roster size, average CGPA) —
+  mirroring the advisor's own §15.4/§17.3 roster report one level up: an
+  advisor's row is highlighted whenever any student on their roster has
+  a live §17.3 responsibility flag, with a footnote naming which
+  student(s), so oversight isn't limited to reading numbers off a screen.
 
 ### 17.3 Advisor Responsibility Workflow
 
