@@ -125,6 +125,43 @@ retaking courses you could improve on?"*
   later CGPA figure is computed from that point forward only; the old
   faculty's grades stay on the transcript for the record but stop counting.
   *Spec §7.2 · [`transferSemester.builder.ts`](../packages/api/src/modules/transfer/transferSemester.builder.ts), [`externalTransfer.service.ts`](../packages/api/src/modules/transfer/externalTransfer.service.ts)*
+- **A transfer no longer executes on the student's click.** Clicking
+  "Request transfer" only ever creates a pending request. It has to be
+  approved by the student's own advisor, then separately approved by the
+  Vice President, before the math above actually runs — a decline at
+  either stage ends the request with nothing changed on the student's
+  record.
+  *Spec §17.4 · [`transferRequest.service.ts`](../packages/api/src/modules/transfer/transferRequest.service.ts)*
+
+## Multi-advisor model & Vice President oversight
+
+- **Every student has exactly one advisor**, one of 5 named advisors, each
+  with a 25-student roster (125 students total). An advisor only ever
+  sees their own roster — enforced server-side (`?advisorId=`), not just
+  hidden in the UI.
+  *Spec §17.1 · [`seedAdvisors.ts`](../packages/api/src/db/seed/seedAdvisors.ts)*
+- **The Vice President oversees all 5 advisors** without a full "browse
+  every student" view: per-advisor summaries and roster drill-down, plus
+  a flat queue of every student's still-pending system recommendation the
+  VP can approve directly — even before the student's own advisor has.
+  *Spec §17.2*
+
+## Advisor responsibility for course overrides
+
+- **Proposing a worse-or-equal course requires the advisor to say so.**
+  If an advisor overrides a slot with a course whose expected grade is
+  not strictly better than the system's own recommendation, the advisor
+  must type their name to confirm they're taking full responsibility for
+  the student's grade in it — including the retake process if it's
+  failed — before the override is created.
+  *Spec §17.3 · [`inMemoryDb.ts`](../packages/api/src/db/memory/inMemoryDb.ts)'s `addAdvisorAlternateProposal`*
+- **Once registered, a signed PDF letter is available** to both the
+  advisor and the student, naming both course codes, the grade effect,
+  and closing with the advisor's typed signature. The advisor's own
+  roster PDF report highlights every affected student's row, with a
+  footnote naming them; the same flag surfaces on the Vice President's
+  per-advisor view.
+  *Spec §17.3 · [`pdfReport.ts`](../packages/web/src/lib/pdfReport.ts)*
 
 ## Prediction math (how the system guesses a grade or a fit)
 

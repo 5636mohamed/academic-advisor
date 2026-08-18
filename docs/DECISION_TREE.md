@@ -21,10 +21,15 @@ flowchart TD
     G --> H[fetch warning counter]
     H --> I{Branch decision, see below}
     I --> J[Render plan + optional transfer recommendation card]
-    J --> K{Student confirms a transfer?}
-    K -- yes --> L[Execute transfer: §7] --> M[recomputeAdvisingProfile] --> C
+    J --> K{Student requests a transfer?}
+    K -- yes --> L["Create pending TransferRequest\n(§17.4 chain — see below, NOT executed yet)"]
     K -- no --> N[Done — plan stands as shown]
 ```
+
+Note: a transfer used to execute the moment the student clicked confirm
+(`L[Execute transfer: §7]` directly). It now only ever creates a pending
+request — see "The transfer pending chain" below for what actually runs
+`recomputeAdvisingProfile`/§7's execution.
 
 ## The branch decision (`decideAdvisingAction`)
 
@@ -51,6 +56,31 @@ flowchart TD
     T3 -- yes --> FacultyLow[RECOMMEND_FACULTY_TRANSFER\nexplain: cgpa_remains_below_2_after_projection]
     T3 -- no --> FacultyNoAlt[RECOMMEND_FACULTY_TRANSFER\nexplain: no_departmental_alternative_improves_trend]
 ```
+
+## The transfer pending chain (§17.4)
+
+Once §4.2/§8 recommends a transfer and the student clicks "Request
+transfer" (the `L` node above), §7's actual execution
+(`executeInternalTransferForStudent`/`executeExternalTransferForStudent`,
+unchanged) only ever runs at the very end of this 3-stage chain — never
+directly from the student's click:
+
+```mermaid
+flowchart TD
+    S[Student clicks Request transfer] --> P1["TransferRequest\nstatus: pending_advisor"]
+    P1 --> AD{Student's advisor decides}
+    AD -- approve --> P2["status: pending_vp\n(still not executed)"]
+    AD -- decline --> AEnd["status: advisor_declined\nChain ends — nothing changes"]
+    P2 --> VP{Vice President decides}
+    VP -- approve --> Exec["Execute transfer: §7\n(same executeInternal/ExternalTransferForStudent\nas the old immediate-execute path)"] --> Done["status: approved"]
+    VP -- decline --> VEnd["status: vp_declined\nChain ends — nothing changes"]
+```
+
+The request is visible to the student, the advisor, and the Vice
+President at every stage (not just once it reaches the final one), and
+the Vice President's dashboard counts per-advisor how many requests are
+still `pending_advisor` or `pending_vp` ("in flight"), split internal vs.
+external.
 
 ## Reading this against the code
 

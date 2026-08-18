@@ -1603,6 +1603,186 @@ project CRUD/candidates/accept-decline).
   student/advisor boundary (§12), enforced the same way: at the API layer,
   not just hidden in the UI.
 
+## 17. AEGIS Rebrand, Multi-Advisor Model & Vice President Oversight
+
+The system was rebuilt around a more realistic, hierarchical advising
+structure — a single shared advisor account became 5 real advisor
+identities, and a new Vice President role oversees all of them — plus a
+new accountability workflow for advisor course overrides and a 3-stage
+transfer approval chain. Rebranded as **AEGIS**; "E-JUST" remains the real
+institution name (still used throughout `@ejust.edu.eg` emails and
+existing docs), now shown as the subtitle beneath the primary "AEGIS"
+product name.
+
+### 17.1 Multi-Advisor Model
+
+| Entity | Key fields | Notes |
+|---|---|---|
+| **Advisor** | `id`, `name`, `facultyId`, `departmentId` | 5 seeded advisors, each with exactly 25 students. |
+| **Student** (extended) | `advisorId` | Every student, named or generated, belongs to exactly one advisor. |
+
+The 13 hand-authored named personas from §11's worked examples keep every
+field untouched and are distributed ~2-3 per advisor; the remaining ~112
+students per the 25-per-advisor target are deterministically generated
+(same `fillerHash`-seeded, never `Math.random`, approach the rest of this
+build already uses) with a realistic spread of standings (strong/good/
+average/at-risk/probation), reusing the existing `completeTranscript()`
+gap-filler unchanged — each generated student needs only one anchor
+attempt at a standing-appropriate percentage.
+
+**Roster scoping** is real server-side filtering, not just a UI
+narrowing: `GET /api/students` and `GET /api/advisor/report` both accept
+an optional `?advisorId=` query param. The advisor console's own URLs are
+unchanged from the single-advisor era (`/`, `/students`, etc.) — the
+logged-in advisor's identity comes from the client's auth session state,
+never a URL segment; a defense-in-depth check on the per-student advisor
+pages redirects away if a typed-in student id belongs to a different
+advisor's roster (§17.7's security note covers this in more depth).
+
+### 17.2 Vice President Role
+
+A single global account (no per-id identity, same shape the old
+single-advisor account used to have) overseeing all 5 advisors:
+
+- **Dashboard**: per-advisor summary (roster size, real average CGPA,
+  computed server-side) with drill-down into any one advisor's full
+  roster, **and** a flat, cross-advisor pending-approvals queue of every
+  student's still-pending system proposal — both access models at once,
+  not an either/or (confirmed against the request: "advisor-level
+  aggregate data... but also have a button to directly approve a
+  student's plan even if the student's own advisor hasn't approved it
+  yet"). Approving from this queue calls the exact same
+  `POST /api/advisor/proposals/:id/approve` route the advisor console
+  uses — no separate VP-only approval logic, no role restriction on that
+  route.
+- **Transfer requests**: the advisor-approved queue awaiting final VP
+  sign-off (§17.4), plus per-advisor in-flight counters (internal vs.
+  external) on the dashboard.
+- **Venture Board**: full parity with the advisor console's own Venture
+  Board (create/manage projects, review candidates) — new projects are
+  attributed to a `'vp-owned'` anchor identity ("Office of the Vice
+  President"), mirroring the existing `'advisor-owned'` anchor the
+  advisor console's own postings already used.
+
+### 17.3 Advisor Responsibility Workflow
+
+When an advisor proposes an alternate course for a slot (§15.3.2 step
+2(b)) whose expected grade is **not strictly better** than the system's
+own recommendation for that slot (a tie or a decrease), the advisor must
+explicitly acknowledge responsibility before the alternate is created:
+
+```
+proposeAlternate(slotKey, altCourseCode, acknowledgedByAdvisorName?):
+  scored = <same live scoring as §15.3.2 step 2(b), unchanged>
+  belowOrEqualSystemGrade = scored.expectedPoints <= system[slotKey].expectedPoints
+  if belowOrEqualSystemGrade and not acknowledgedByAdvisorName?.trim():
+      reject 400 — "type your name to confirm you're taking responsibility"
+  CourseProposal{ ..., belowOrEqualSystemGrade, acknowledgedByAdvisorName }
+```
+
+The advisor console shows a confirmation modal (course comparison, full
+responsibility/retake-liability text, a name input, OK disabled until
+non-blank) exactly when this condition is hit; a strictly-better
+alternate is unaffected and proceeds exactly as §15.3.2 already
+specified. Once such a course is **registered** (§15.3.2 step 3), both
+the advisor's and the student's own proposal views offer a
+"Download responsibility letter" button — a PDF (jsPDF, client-side, the
+AEGIS logo, "My dear student {name}", "I am your advisor, Prof.
+{name}", full text naming both course codes and the grade effect, full
+retake-liability language, and "Advisor Signature: {typed name}").
+
+The advisor's §15.4 PDF roster report highlights, in a distinct color,
+every row for a student with a **live** (non-declined) advisor proposal
+matching this condition, with a legend/footnote at the bottom naming the
+affected students. The Vice President's per-advisor drill-down surfaces
+the same flag for advisor-level oversight.
+
+### 17.4 Transfer Pending Chain
+
+§7's transfer execution (`executeInternalTransferForStudent`/
+`executeExternalTransferForStudent`) is **unchanged** — it is now only
+ever invoked from the very last step of a 3-stage approval chain instead
+of directly from the student's "Confirm transfer" click:
+
+```
+TransferRequest{ id, studentId, advisorId, type, toFacultyId?,
+                  toDepartmentId, status, createdAt,
+                  advisorDecidedAt?, vpDecidedAt?, declineReason? }
+
+status: pending_advisor -> pending_vp -> approved      (advisor then VP both approve)
+                        -> advisor_declined              (advisor declines — chain ends)
+                    pending_vp -> vp_declined            (VP declines — chain ends)
+```
+
+1. Student clicks "Request transfer" (internal or external, both types
+   unified into one chain) → `pending_advisor`. Nothing on the student's
+   record changes yet.
+2. The student's advisor sees it in a "Transfer requests" queue; approve
+   → `pending_vp` (still nothing executes); decline → `advisor_declined`,
+   chain ends.
+3. The Vice President sees advisor-approved requests in their own
+   "Transfer requests" queue (visible to student, advisor, and VP
+   throughout — not just at the final stage); approve → the existing
+   execute\* function actually runs, `status = 'approved'`; decline →
+   `vp_declined`, chain ends, nothing executes.
+
+The VP dashboard's per-advisor counters count only requests still
+`pending_advisor` or `pending_vp` ("in flight"), split internal vs.
+external.
+
+### 17.5 Venture Board Research Fields ("Research Portal")
+
+`VentureProject` gains 5 optional fields so the Venture Board can surface
+real published research alongside plain open positions — a project with
+none of them behaves exactly as before this section:
+
+```
+authors?: { name, link? }[]
+publishedPaperUrl?: string
+conferenceName?: string
+impactFactor?: number
+labName?: string
+```
+
+Both the advisor console's and the Faculty Console's own create-project
+forms gained the same 5 optional inputs (independently duplicated,
+matching how `requiredCourseCodes`/`preferredSkills` are already
+duplicated between the two forms); the Vice President's Venture Board
+reuses the advisor console's create form with a different attribution
+anchor (§17.2). Wherever a project renders (student-facing card, advisor/
+VP "manage all ventures" list, Faculty Console's own list), whichever of
+these 5 fields are actually present render in a themed "Published
+research" panel.
+
+### 17.6 CGPA Color-Key Legend
+
+Every CGPA trend chart (student dashboard, advisor per-student Overview,
+and any future reuse) shows a legend below the bars: green = good
+standing (≥ 3.00), yellow = at-risk (2.00–2.99), red = probation
+(< 2.00) — the same thresholds the bars themselves already used, now
+made explicit rather than left to be inferred from color alone.
+
+### 17.7 API routes (extends §9.2/§15.5/§16.7)
+
+```
+GET    /api/advisors                                              → the 5 advisors
+GET    /api/advisors/:id
+GET    /api/vp/advisors-summary                                   → §17.2 dashboard
+GET    /api/vp/pending-proposals                                  → §17.2 flat queue
+POST   /api/students/:id/transfer-requests                        → §17.4 step 1 (blockIfDismissed)
+GET    /api/students/:id/transfer-requests
+GET    /api/advisors/:advisorId/transfer-requests                 → §17.4 step 2 queue
+POST   /api/advisor/transfer-requests/:id/approve|decline         → §17.4 step 2
+GET    /api/vp/transfer-requests                                  → §17.4 step 3 queue + full history
+GET    /api/vp/transfer-requests-summary                          → §17.2 in-flight counters
+POST   /api/vp/transfer-requests/:id/approve|decline               → §17.4 step 3 (only path that executes)
+```
+
+The pre-existing `POST /students/:id/transfer/internal|external` routes
+(§7) are unchanged and still directly reachable — only the student-facing
+"Confirm transfer" button no longer calls them; the VP-approve handler
+above calls the same underlying functions those routes always called.
+
 ---
 
-*End of specification. This document, sections 1–16, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13.*
+*End of specification. This document, sections 1–17, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), §17 (AEGIS rebrand, multi-advisor model, Vice President oversight, advisor responsibility workflow, transfer pending chain), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13.*
