@@ -9,7 +9,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from '../portal/ui/Icons';
-import ejustLogo from '../assets/ejust-logo.png';
+import { BrandMark } from '../portal/ui/BrandMark';
 import '../portal/student-theme.css';
 
 export function VpLayout() {
@@ -29,10 +29,10 @@ export function VpLayout() {
       <div className="su-shell">
         <header className="su-topbar">
           <div className="su-brand">
-            <span className="su-brand-mark"><img src={ejustLogo} alt="" /></span>
+            <span className="su-brand-mark"><BrandMark /></span>
             <div className="su-brand-text">
-              <div className="su-brand-name">E-JUST</div>
-              <div className="su-brand-sub">Academic Advising</div>
+              <div className="su-brand-name">AEGIS</div>
+              <div className="su-brand-sub">E-JUST Academic Advisor System</div>
             </div>
           </div>
           <div className="su-brand-divider" />

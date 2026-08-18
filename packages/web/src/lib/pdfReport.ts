@@ -3,6 +3,36 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { AdvisorReportRowDTO } from '../api/client';
+import aegisIconLightPdf from '../assets/aegis-icon-light-pdf.png';
+
+// AEGIS rebrand — both PDFs below are white-page documents, so the black-
+// lined "icon-light" export (meant for light backgrounds) is the right
+// variant here regardless of the app's own light/dark toggle; a PDF page
+// has no theme. A dedicated, smaller-resolution copy is used here (rather
+// than the same asset the topbar/login use) since jsPDF embeds a PNG's
+// full source resolution regardless of its on-page display size — the
+// full-size topbar asset would otherwise bloat every generated PDF by
+// several hundred KB for no visible benefit at this tiny render size.
+// Fetched once and cached as a data: URL, since jsPDF's addImage needs
+// actual image data, not a bundled asset path.
+let cachedLogoDataUrl: string | null | undefined;
+async function getLogoDataUrl(): Promise<string | null> {
+  if (cachedLogoDataUrl !== undefined) return cachedLogoDataUrl;
+  try {
+    const res = await fetch(aegisIconLightPdf);
+    const blob = await res.blob();
+    cachedLogoDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    // A missing/failed logo fetch should never block the PDF itself.
+    cachedLogoDataUrl = null;
+  }
+  return cachedLogoDataUrl;
+}
 
 // A warm amber, distinct from the report's own dark header color and from
 // jsPDF's default white/striped body rows — used both for the highlighted
@@ -10,13 +40,18 @@ import { AdvisorReportRowDTO } from '../api/client';
 // read as visually related.
 const RESPONSIBILITY_HIGHLIGHT_RGB: [number, number, number] = [250, 224, 168];
 
-export function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): void {
+export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Promise<void> {
   const doc = new jsPDF();
+  const logoDataUrl = await getLogoDataUrl();
+  const textLeft = logoDataUrl ? 32 : 14;
+  if (logoDataUrl) {
+    try { doc.addImage(logoDataUrl, 'PNG', 14, 10, 14, 15); } catch { /* non-fatal */ }
+  }
   doc.setFontSize(16);
-  doc.text('Academic Advisor — Student Roster Report', 14, 18);
+  doc.text('Academic Advisor — Student Roster Report', textLeft, 18);
   doc.setFontSize(10);
   doc.setTextColor(110);
-  doc.text(`Generated ${new Date().toLocaleString()}`, 14, 25);
+  doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
 
   const flaggedNames = rows.filter(r => r.hasBelowOrEqualAdvisorProposal).map(r => r.name);
 
@@ -70,7 +105,6 @@ export interface ResponsibilityLetterInput {
   /** 'no change' when the proposed course's expected grade exactly ties
    *  the system's own recommendation; 'decrease' when it's strictly worse. */
   gradeEffect: 'no change' | 'decrease';
-  logoDataUrl?: string;
 }
 
 /** Advisor-responsibility epic — a signed letter to the student, generated
@@ -80,13 +114,14 @@ export interface ResponsibilityLetterInput {
  *  to download from both the advisor's and the student's own proposal
  *  views — same content either way, since it's addressed to the student
  *  but is really the advisor's own signed acknowledgement. */
-export function downloadResponsibilityLetterPdf(input: ResponsibilityLetterInput): void {
+export async function downloadResponsibilityLetterPdf(input: ResponsibilityLetterInput): Promise<void> {
   const doc = new jsPDF();
 
-  if (input.logoDataUrl) {
-    try { doc.addImage(input.logoDataUrl, 'PNG', 14, 12, 22, 22); } catch { /* a missing/invalid logo shouldn't block the letter itself */ }
+  const logoDataUrl = await getLogoDataUrl();
+  if (logoDataUrl) {
+    try { doc.addImage(logoDataUrl, 'PNG', 14, 12, 20, 22); } catch { /* a missing/invalid logo shouldn't block the letter itself */ }
   }
-  const textLeft = input.logoDataUrl ? 42 : 14;
+  const textLeft = logoDataUrl ? 40 : 14;
   doc.setFontSize(14);
   doc.setTextColor(20);
   doc.text('Academic Advising — Course Recommendation Letter', textLeft, 20);

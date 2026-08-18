@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Academic Advisor</title>
+    <title>AEGIS — Academic Advisor System</title>
+    <!-- AEGIS rebrand — theme-aware favicon via the OS-level
+         prefers-color-scheme media query (a browser-tab icon can't read
+         the in-app light/dark TOGGLE, only the OS preference — a
+         documented, standard limitation every theme-aware favicon has).
+         The dark-mode (light-lined) export goes with the dark-scheme tab
+         chrome, the white-mode (black-lined) export goes with light. -->
+    <link rel="icon" type="image/png" href="/aegis-favicon-light.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="/aegis-favicon-dark.png" media="(prefers-color-scheme: dark)" />
     <!-- Sets data-theme before first paint so there's no flash of the wrong
          theme while React/ThemeContext boot — kept in sync with the same
          localStorage key + OS-preference fallback ThemeContext uses. -->

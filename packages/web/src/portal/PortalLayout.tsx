@@ -13,7 +13,7 @@ import { api, StudentSummary } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from './ui/Icons';
-import ejustLogo from '../assets/ejust-logo.png';
+import { BrandMark } from './ui/BrandMark';
 import './student-theme.css';
 
 function initials(name: string) {
@@ -48,10 +48,10 @@ export function PortalLayout() {
       <div className="su-shell">
         <header className="su-topbar">
           <div className="su-brand">
-            <span className="su-brand-mark"><img src={ejustLogo} alt="" /></span>
+            <span className="su-brand-mark"><BrandMark /></span>
             <div className="su-brand-text">
-              <div className="su-brand-name">E-JUST</div>
-              <div className="su-brand-sub">Academic Advising</div>
+              <div className="su-brand-name">AEGIS</div>
+              <div className="su-brand-sub">E-JUST Academic Advisor System</div>
             </div>
           </div>
           <div className="su-brand-divider" />

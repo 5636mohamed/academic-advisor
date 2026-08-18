@@ -11,6 +11,8 @@ import { useTheme } from '../../theme/ThemeContext';
 import { api, AdvisorDTO, ProfessorSummaryDTO, StudentSummary } from '../../api/client';
 import { ADVISOR_PASSWORD, PROFESSOR_PASSWORD, STUDENT_PASSWORD, VP_EMAIL, VP_PASSWORD, advisorEmailFor, professorEmailFor, studentEmailFor } from '../../auth/credentials';
 import { IconMoon, IconSun } from '../../portal/ui/Icons';
+import { BrandMark } from '../../portal/ui/BrandMark';
+import { Typewriter } from '../../components/Typewriter';
 import '../../portal/student-theme.css';
 
 export function Login() {
@@ -80,61 +82,70 @@ export function Login() {
         {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
       </button>
 
-      <div className="su-login-card">
+      <div className="su-login-card su-login-card-wide">
         <div className="su-login-masthead">
           <div className="su-login-masthead-title">Egypt-Japan University of Science &amp; Technology</div>
-          <div className="su-login-masthead-sub">E-JUST Academic Advising Portal</div>
+          <div className="su-login-masthead-sub">AEGIS — Academic Advisor System</div>
         </div>
 
-        <div className="su-login-body">
-          <div className="su-login-heading">
-            <span className="su-login-heading-bar" />
-            E-JUST <span className="su-login-heading-accent">Advising Portal</span>
+        <div className="su-login-columns">
+          <div className="su-login-form-col">
+            <div className="su-login-body">
+              <div className="su-login-heading">
+                <span className="su-login-heading-bar" />
+                AEGIS <span className="su-login-heading-accent">Advising Portal</span>
+              </div>
+              <div className="su-subtitle" style={{ marginTop: 2, marginBottom: 22 }}>Log in using your academic portal credentials</div>
+
+              <form onSubmit={submit}>
+                <div className="su-field" style={{ marginBottom: 16 }}>
+                  <label>Student / Advisor Email</label>
+                  <input
+                    className="su-input"
+                    type="text"
+                    autoComplete="username"
+                    placeholder="e.g., ahmed-1@ejust.edu.eg or advisor@ejust.edu.eg"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="su-field">
+                  <div className="su-flex su-justify-between su-items-center">
+                    <label style={{ marginBottom: 0 }}>Password</label>
+                    <button type="button" className="su-login-forgot" onClick={() => setShowForgot(true)}>Forgot Password?</button>
+                  </div>
+                  <input
+                    className="su-input"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                </div>
+
+                {showForgot && (
+                  <div className="su-note su-mt-16" style={{ marginTop: 14 }}>
+                    Password resets aren't self-service in this demo — see the credential roster in{' '}
+                    <code>docs/LOGIN_CREDENTIALS.md</code>, or contact the ICT Helpdesk below.
+                  </div>
+                )}
+                {error && <div className="su-note danger su-mt-16" style={{ marginTop: 14 }}>{error}</div>}
+
+                <button type="submit" className="su-btn su-btn-block su-login-submit" disabled={submitting}>
+                  {submitting ? 'Signing in…' : 'Sign In to Advising Portal'}
+                </button>
+              </form>
+
+              <div className="su-login-footer">
+                Having trouble logging in? Please contact ICT Helpdesk at E-JUST Headquarters.
+              </div>
+            </div>
           </div>
-          <div className="su-subtitle" style={{ marginTop: 2, marginBottom: 22 }}>Log in using your academic portal credentials</div>
 
-          <form onSubmit={submit}>
-            <div className="su-field" style={{ marginBottom: 16 }}>
-              <label>Student / Advisor Email</label>
-              <input
-                className="su-input"
-                type="text"
-                autoComplete="username"
-                placeholder="e.g., ahmed-1@ejust.edu.eg or advisor@ejust.edu.eg"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="su-field">
-              <div className="su-flex su-justify-between su-items-center">
-                <label style={{ marginBottom: 0 }}>Password</label>
-                <button type="button" className="su-login-forgot" onClick={() => setShowForgot(true)}>Forgot Password?</button>
-              </div>
-              <input
-                className="su-input"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
-            </div>
-
-            {showForgot && (
-              <div className="su-note su-mt-16" style={{ marginTop: 14 }}>
-                Password resets aren't self-service in this demo — see the credential roster in{' '}
-                <code>docs/LOGIN_CREDENTIALS.md</code>, or contact the ICT Helpdesk below.
-              </div>
-            )}
-            {error && <div className="su-note danger su-mt-16" style={{ marginTop: 14 }}>{error}</div>}
-
-            <button type="submit" className="su-btn su-btn-block su-login-submit" disabled={submitting}>
-              {submitting ? 'Signing in…' : 'Sign In to Advising Portal'}
-            </button>
-          </form>
-
-          <div className="su-login-footer">
-            Having trouble logging in? Please contact ICT Helpdesk at E-JUST Headquarters.
+          <div className="su-login-brand-col">
+            <BrandMark variant="full" forceTheme="dark" className="su-login-brand-logo" />
+            <Typewriter className="su-login-typewriter" />
           </div>
         </div>
       </div>

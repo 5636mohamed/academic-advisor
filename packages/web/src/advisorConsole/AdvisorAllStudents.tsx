@@ -70,7 +70,7 @@ export function AdvisorAllStudents() {
   const downloadReport = async () => {
     setDownloading(true);
     try {
-      downloadAdvisorReportPdf(await api.advisorReport(advisorId));
+      await downloadAdvisorReportPdf(await api.advisorReport(advisorId));
     } finally {
       setDownloading(false);
     }
