@@ -8,19 +8,18 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { useTheme } from '../../theme/ThemeContext';
-import { api, AdvisorDTO, ProfessorSummaryDTO, StudentSummary } from '../../api/client';
-import { ADVISOR_PASSWORD, PROFESSOR_PASSWORD, STUDENT_PASSWORD, VP_EMAIL, VP_PASSWORD, advisorEmailFor, professorEmailFor, studentEmailFor } from '../../auth/credentials';
+import { api, AdvisorDTO, StudentSummary } from '../../api/client';
+import { ADVISOR_PASSWORD, STUDENT_PASSWORD, VP_EMAIL, VP_PASSWORD, advisorEmailFor, studentEmailFor } from '../../auth/credentials';
 import { IconMoon, IconSun } from '../../portal/ui/Icons';
 import { BrandMark } from '../../portal/ui/BrandMark';
 import { Typewriter } from '../../components/Typewriter';
 import '../../portal/student-theme.css';
 
 export function Login() {
-  const { loginAsAdvisor, loginAsStudent, loginAsProfessor, loginAsVicePresident } = useAuth();
+  const { loginAsAdvisor, loginAsStudent, loginAsVicePresident } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [students, setStudents] = useState<StudentSummary[] | null>(null);
-  const [professors, setProfessors] = useState<ProfessorSummaryDTO[] | null>(null);
   const [advisors, setAdvisors] = useState<AdvisorDTO[] | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +29,6 @@ export function Login() {
 
   useEffect(() => {
     api.listStudents().then(setStudents);
-    api.professors().then(setProfessors);
     api.advisors().then(setAdvisors);
   }, []);
 
@@ -61,13 +59,6 @@ export function Login() {
         if (password !== STUDENT_PASSWORD) return setError('Incorrect password.');
         loginAsStudent(student.id);
         navigate(`/portal/${student.id}`);
-        return;
-      }
-      const professor = professors?.find(p => professorEmailFor(p.id) === typedEmail);
-      if (professor) {
-        if (password !== PROFESSOR_PASSWORD) return setError('Incorrect password.');
-        loginAsProfessor(professor.id);
-        navigate(`/faculty/${professor.id}`);
         return;
       }
       setError('No account found for that email. See docs/LOGIN_CREDENTIALS.md for the demo roster.');
@@ -144,7 +135,7 @@ export function Login() {
           </div>
 
           <div className="su-login-brand-col">
-            <BrandMark variant="full" forceTheme="dark" className="su-login-brand-logo" />
+            <BrandMark variant="full" className="su-login-brand-logo" />
             <Typewriter className="su-login-typewriter" />
           </div>
         </div>

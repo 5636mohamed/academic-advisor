@@ -719,7 +719,19 @@
 .su-mt-20 { margin-top: 20px; }
 .su-w-full { width: 100%; }
 .su-muted { color: var(--su-text-muted); }
-.su-two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: flex-start; }
+/* `align-items: stretch` (not the old `flex-start`) so both columns end at
+ * the same bottom edge instead of the shorter one leaving a visible gap of
+ * bare page background below it — every dashboard using this class pairs a
+ * content-heavy column against a lighter one (a table vs. an alerts panel,
+ * a chart vs. a quick-links list), and CSS Grid's own row-height wouldn't
+ * otherwise ever equalize them. Each grid item becomes a flex column so
+ * its own LAST child (the bottom-most card, whichever column it's in) is
+ * the one that absorbs the extra stretched height as `flex: 1` — the
+ * shorter column's last card just gets a bit more internal breathing room
+ * at the bottom, rather than a visible dead zone appearing beside it. */
+.su-two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: stretch; }
+.su-two-col > * { display: flex; flex-direction: column; }
+.su-two-col > * > *:last-child { flex: 1 1 auto; }
 @media (max-width: 900px) { .su-two-col { grid-template-columns: 1fr; } }
 
 /* Venture Board's 3-pane dashboard (My venture / Pending approvals /
@@ -795,13 +807,12 @@
 
 /* AEGIS rebrand — the wide, two-column login layout: form on the left
  * (su-login-body, unchanged from the single-column version above) and a
- * fixed-dark brand panel on the right (the big logo + typewriter quotes).
- * The panel reuses `--su-banner-bg`/`--su-banner-text` — the same existing
- * dark-surface token pair the AI Advisory Warning banners already use
- * elsewhere in this app — rather than a new color, and stays dark
- * regardless of the light/dark toggle (BrandMark's `forceTheme="dark"`
- * matches that fixed background), same as the masthead above it already
- * does with its own fixed dark bar. */
+ * brand panel on the right (the big logo + typewriter quotes). The panel
+ * is genuinely theme-reactive — `--su-bg-soft` (a light gray in light
+ * theme, a dark gray in dark theme) gives it a subtle contrast against
+ * the login card's own `--su-surface` body in EITHER theme, rather than
+ * being pinned to always-dark; BrandMark (no `forceTheme` override) picks
+ * whichever logo variant actually reads correctly against that. */
 .su-login-card-wide { max-width: 920px; }
 .su-login-columns { display: flex; align-items: stretch; }
 .su-login-form-col { flex: 1 1 380px; min-width: 300px; }
@@ -811,16 +822,23 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 22px;
   padding: 36px 30px;
-  background: var(--su-banner-bg);
+  background: var(--su-bg-soft);
   border-left: 1px solid var(--su-border);
 }
 .su-login-brand-logo { width: 100%; max-width: 220px; height: auto; object-fit: contain; }
+/* Left-anchored, fixed-width (not shrink-to-fit) so the text grows/shrinks
+ * from a stable left edge as it types/deletes — the caret sits immediately
+ * after the last character and only ever moves by growing from there,
+ * instead of the whole line re-centering (and the caret jumping) on every
+ * keystroke, which is what a `justify-content: center` shrink-to-fit box
+ * used to do here. */
 .su-login-typewriter {
+  width: 100%;
   min-height: 48px;
-  display: flex; align-items: center; justify-content: center;
-  text-align: center;
+  display: flex; align-items: center; justify-content: flex-start;
+  text-align: left;
   font-size: 15px; font-weight: 600; line-height: 1.5;
-  color: var(--su-banner-text);
+  color: var(--su-text);
   padding: 0 6px;
 }
 .su-typewriter-caret {
@@ -830,6 +848,7 @@
   background: currentColor;
   vertical-align: -0.15em;
   animation: su-caret-blink 900ms steps(1) infinite;
+  flex-shrink: 0;
 }
 @keyframes su-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 

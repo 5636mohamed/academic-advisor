@@ -1758,11 +1758,11 @@ export function getVentureMatchesForStudent(studentId: string): StudentVentureMa
   return students.get(studentId)?.ventureMatches ?? [];
 }
 
-// --- §16.6 Faculty Console: professor-facing reads/writes ---
-
-export function listProfessors(): ProfessorProfile[] {
-  return PROFESSORS;
-}
+// --- Venture attribution reads. There is no professor login/Faculty
+// Console anymore (see AuthContext.tsx) — getProfessor is the one function
+// still needed here, for the "Hosted by Dr. X" display on a student's
+// Venture Board (withProfessorName in server.ts). prof-kamel/prof-adel
+// still exist purely as this attribution data. ---
 
 export function getProfessor(id: string): ProfessorProfile | undefined {
   return PROFESSORS.find(p => p.id === id);
@@ -1784,10 +1784,6 @@ export function listVentureProjects(): VentureProject[] {
 
 export function getVentureProject(id: string): VentureProject | undefined {
   return ventureProjects.find(p => p.id === id);
-}
-
-export function listVentureProjectsByProfessor(professorId: string): VentureProject[] {
-  return ventureProjects.filter(p => p.professorId === professorId);
 }
 
 let ventureProjectIdCounter = 0;

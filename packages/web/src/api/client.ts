@@ -253,19 +253,6 @@ export interface VentureQuizQuestionDTO {
   options: Array<{ id: string; label: string; traitTags: string[] }>;
 }
 
-export interface ProfessorSummaryDTO {
-  id: string;
-  facultyId: string;
-  departmentId: string;
-  name: string;
-  researchTags: string[];
-  acceptingUndergrads: boolean;
-}
-
-export interface ProfessorDetailDTO extends ProfessorSummaryDTO {
-  projects: VentureProjectDTO[];
-}
-
 export interface AdvisorDTO {
   id: string;
   name: string;
@@ -448,18 +435,19 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(cv ? { cvFileName: cv.fileName, cvDataUrl: cv.dataUrl } : {}),
     }),
-  professors: () => request<ProfessorSummaryDTO[]>('/professors'),
   advisors: () => request<AdvisorDTO[]>('/advisors'),
   advisor: (advisorId: string) => request<AdvisorDTO>(`/advisors/${advisorId}`),
   vpAdvisorsSummary: () => request<VpAdvisorSummaryDTO[]>('/vp/advisors-summary'),
   vpPendingProposals: () => request<VpPendingProposalDTO[]>('/vp/pending-proposals'),
-  professor: (professorId: string) => request<ProfessorDetailDTO>(`/professors/${professorId}`),
+  /** `professorId` here is an attribution field, not a login — every real
+   *  caller today passes 'advisor-owned' or 'vp-owned' (the two seeded
+   *  attribution anchors); prof-kamel/prof-adel still own their existing
+   *  seeded ventures for display purposes, but there's no professor login
+   *  left to create/edit a project as them. */
   createVentureProject: (professorId: string, input: Omit<VentureProjectDTO, 'id' | 'professorId' | 'createdAt'>) =>
     request<VentureProjectDTO>(`/professors/${professorId}/venture-projects`, { method: 'POST', body: JSON.stringify(input) }),
   updateVentureProject: (professorId: string, projectId: string, patch: Partial<VentureProjectDTO>) =>
     request<VentureProjectDTO>(`/professors/${professorId}/venture-projects/${projectId}`, { method: 'PUT', body: JSON.stringify(patch) }),
-  ventureCandidates: (professorId: string, projectId: string) =>
-    request<VentureCandidateDTO[]>(`/professors/${professorId}/venture-projects/${projectId}/candidates`),
   setVentureMatchStatus: (matchId: string, status: 'accepted' | 'declined') =>
     request<{ id: string; status: VentureMatchStatus }>(`/venture-matches/${matchId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   /** Advisor console's own Venture Board — every project across every

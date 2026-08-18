@@ -3,10 +3,11 @@
 The login page at `/login` is still a demo gate (client-side only, no real
 auth backend or password hashing — same documented simplification as
 before) — but it now actually validates an email + password pair instead of
-just picking an identity from a list. Every student/professor's email is
+just picking an identity from a list. Every student/advisor's email is
 **derived directly from their real seeded id** (`{id}@ejust.edu.eg`), not a
 second hand-maintained list, so this table can't drift from the real data —
-see `packages/web/src/auth/credentials.ts`.
+see `packages/web/src/auth/credentials.ts`. There is no professor login —
+see the note at the bottom of this file.
 
 ## Vice President
 
@@ -63,15 +64,18 @@ All students share one password: **`Student@123`**
 The other 112 students (ids like `advisor-nabil-gen-1`) are deterministically
 generated filler — same password, no individual login worth listing here.
 
-## Professors (Faculty Console)
+## No professor login
 
-All professors share one password: **`Professor@123`**
+There used to be a separate Faculty Console (`/faculty/:id`) with its own
+professor login — it was removed entirely. Every professor at E-JUST is
+already also an advisor, and the advisor console's own Venture Board
+already manages every venture directly (post/edit/archive, review
+candidates) across every professor's projects, so the separate login never
+had anything the advisor console didn't already do.
 
-| Name | Email |
-|---|---|
-| Dr. Youssef Kamel | `prof-kamel@ejust.edu.eg` |
-| Dr. Salma Adel | `prof-adel@ejust.edu.eg` |
-
-The Faculty Console (`/faculty/:id`) is kept as its own separate login path
-— the advisor console's own Venture Board is a superset that manages
-ventures directly and doesn't require signing in as a specific professor.
+The two originally-seeded professors, **Dr. Youssef Kamel** (`prof-kamel`)
+and **Dr. Salma Adel** (`prof-adel`), still exist as pure attribution data —
+their existing Venture Board projects still show "Hosted by Dr. Youssef
+Kamel" / "Hosted by Dr. Salma Adel" to students exactly as before. There is
+just no email/password for either of them anymore, and no `/faculty/*`
+route to reach.

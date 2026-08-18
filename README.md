@@ -41,8 +41,9 @@ probation/dismissal state machine, retake-gate planning, department/faculty
 best-fit engine, internal/external transfer execution, a role-restricted
 student portal, best-case grade projection, a dual advisor/student course
 approval-and-registration workflow, advisor PDF reporting (§15), the
-Innovation & Venture Catalyst — a research/spin-off matching engine with its
-own student, advisor, and Faculty Console surfaces (§16) — and a full
+Innovation & Venture Catalyst — a research/spin-off matching engine
+managed directly from the student, advisor, and Vice President surfaces
+(§16, no separate professor role/Faculty Console) — and a full
 multi-advisor model with Vice President oversight (§17): 5 real advisors
 each with their own 25-student roster, an advisor-responsibility workflow
 with signed PDF letters for course overrides, and a 3-stage transfer
@@ -50,23 +51,23 @@ approval chain (student → advisor → Vice President).
 
 ## Screenshots
 
-The student portal, advisor console, Vice President portal, **and** Faculty
-Console all share one AEGIS red/white design system (`packages/web/src/
+The student portal, advisor console, **and** Vice President portal all
+share one AEGIS red/white design system (`packages/web/src/
 portal/student-theme.css`), dark mode throughout, smooth transitions on
 every interactive surface, and verified responsive from mobile (375px)
 through desktop across every portal.
 
 ### 🎬 Full tour (all 3 roles)
 
-![Full tour: login, student portal, advisor console, Vice President portal, and Faculty Console](docs/media/full-tour-demo.gif)
+![Full tour: login, student portal, advisor console, and Vice President portal](docs/media/full-tour-demo.gif)
 
 Recorded straight off the running app (Playwright, headless Chromium),
 ~45 seconds: the redesigned login → student portal (dashboard, course
 plan, recommendations, transcript, venture board) → advisor console
 (students, venture board, transfer requests, a student file) → Vice
-President portal (advisor drill-down, transfer requests, venture board) →
-Faculty Console. Real navigation, real seeded data throughout, not a
-mockup. (A higher-quality MP4 of the same recording is also available at
+President portal (advisor drill-down, transfer requests, venture board).
+Real navigation, real seeded data throughout, not a mockup. (A
+higher-quality MP4 of the same recording is also available at
 `docs/media/full-tour-demo.mp4` if you'd rather watch it at full
 resolution.)
 
@@ -122,7 +123,7 @@ which spec section each file maps to (read the newest "SESSION N NOTE" at
 the top first). On top of the core engine (grading, prediction,
 probation/dismissal, retake gate, department/faculty fit, transfer
 execution, the full advisor/student frontend, best-case grading, and real
-student/professor/advisor/Vice-President access separation):
+student/advisor/Vice-President access separation):
 
 - **§17 Multi-advisor model & Vice President oversight** — a single shared
   advisor account became 5 real advisor identities, each with their own
@@ -145,34 +146,35 @@ student/professor/advisor/Vice-President access separation):
   either way — only when it runs changed.
 - **§16 Innovation & Venture Catalyst** — a `ventureFitScore` weighted-sum
   engine (course competency / skill alignment / academic trajectory)
-  matches students to professors' research projects and commercial
-  spin-offs. The Venture Gate + Interest Form live entirely on each
-  student's own **Venture Board** tab — never inside Course Plan, which
-  shows course recommendations only; venture/project matches are never
-  mixed into it. On the advisor side, the advisor owns and manages every
-  venture directly (post/edit/archive, review candidates) rather than
-  browsing a per-professor directory. Professors get their own **Faculty
-  Console** (`/faculty/:professorId`) to post projects and review a
-  ranked, auto-generated candidate list — each row's CV opens in a
-  near-fullscreen, in-page viewer (never a download), with a Close button
-  that turns the brand accent color on hover. Every Level 3+, non-dismissed
-  demo student — Mohamed included — comes with a pre-seeded Venture Gate
-  opt-in, so the whole eligible cohort shows up ranked from a cold boot;
-  Level 1–2 students never see the gate at all (real eligibility rule) and
-  a dismissed student is 403'd from venture matching same as every other
-  self-service route. Any project — advisor-, Vice-President-, or
-  Faculty-Console-posted — can also carry optional "research portal"
-  fields (authors with links, published paper, conference, impact factor,
-  lab), rendered wherever the project itself is shown.
+  matches students to research projects and commercial spin-offs. The
+  Venture Gate + Interest Form live entirely on each student's own
+  **Venture Board** tab — never inside Course Plan, which shows course
+  recommendations only; venture/project matches are never mixed into it.
+  There is no separate professor role: the advisor console (and the Vice
+  President's own Venture Board) manage every project directly across
+  every host — post/edit/archive, review a ranked, auto-generated
+  candidate list, each row's CV opening in a near-fullscreen, in-page
+  viewer (never a download), Accept/Decline with one click. Every Level
+  3+, non-dismissed demo student — Mohamed included — comes with a
+  pre-seeded Venture Gate opt-in, so the whole eligible cohort shows up
+  ranked from a cold boot; Level 1–2 students never see the gate at all
+  (real eligibility rule) and a dismissed student is 403'd from venture
+  matching same as every other self-service route. Any project can also
+  carry optional "research portal" fields (authors with links, published
+  paper, conference, impact factor, lab), rendered wherever the project
+  itself is shown — including the two originally-seeded professors'
+  (Dr. Youssef Kamel, Dr. Salma Adel) own pre-existing projects, still
+  correctly attributed even though neither has a login anymore.
 - **Night mode** — a systemwide light/dark theme (§9.4), not just one
   page: every color in the app is a CSS custom property with a dark
   counterpart, toggled from a button in every masthead (and the login
   page). Defaults to the OS's `prefers-color-scheme`, remembers an
   explicit choice across visits.
-- **Four-way access separation** — student, professor, advisor (one of 5
-  real identities, each roster-scoped server-side), and Vice President are
-  all enforced-separate parties: a demo login at `/login` picks one
-  identity, and route guards bounce any session away from another party's
+- **Three-way access separation** — student, advisor (one of 5 real
+  identities, each roster-scoped server-side), and Vice President are
+  all enforced-separate parties (there is no separate professor role): a
+  demo login at `/login` picks one identity, and route guards bounce any
+  session away from another party's
   pages, not just hide the links to them (verified live via a full
   cross-role sweep — see `.github/SECURITY.md`).
 - **Student portal** (`/portal/:studentId`) — the student's own restricted
@@ -222,15 +224,15 @@ packages/
               retake-gate, fit-engine, transfer-execution, proposal, and
               venture-matching modules + the full HTTP API (src/server.ts)
               over an in-memory data layer
-  web/      → @advisor/web — React/TS frontend — Vite + React Router. Four
+  web/      → @advisor/web — React/TS frontend — Vite + React Router. Three
               route trees: the advisor console, the student portal
-              (/portal/:id), the Faculty Console (/faculty/:id), and the
-              Vice President portal (/vp), each behind its own auth guard
+              (/portal/:id), and the Vice President portal (/vp), each
+              behind its own auth guard (no separate professor role)
 docs/
   BUILD_SPEC.md         → full specification (the single source of truth)
   HANDBOOK_RULES.md     → every business rule restated in plain language, cross-referenced to code
   DECISION_TREE.md      → the advising-cycle branch logic as a diagram, incl. the §17.4 transfer approval chain
-  LOGIN_CREDENTIALS.md  → the full demo credential roster (student/advisor/professor/VP)
+  LOGIN_CREDENTIALS.md  → the full demo credential roster (student/advisor/VP)
 ```
 
 ## Tech Stack
@@ -292,7 +294,7 @@ if you want to pull one down yourself.
 | Package | Version | Used for |
 |---|---|---|
 | `react` / `react-dom` | 18.3 | UI |
-| `react-router-dom` | 6.26 | Client-side routing — four separate route trees (advisor, student, faculty, Vice President), each behind its own `RequireRole` guard |
+| `react-router-dom` | 6.26 | Client-side routing — three separate route trees (advisor, student, Vice President), each behind its own `RequireRole` guard |
 | `vite` | 5.4 | Dev server and production build |
 | `@vitejs/plugin-react` | 4.3 | Vite's React integration (JSX/Fast Refresh) |
 | `jspdf` + `jspdf-autotable` | 4.2 / 5.0 | Client-side advisor roster PDF export (§15.4) |
@@ -344,9 +346,9 @@ npx vite                      # app on http://localhost:5173, proxies /api to :3
 
 Open `http://localhost:5173/login` and sign in with a real email + password
 (still a demo gate — client-side only, no server-side session) — one of the
-5 advisors, the Vice President, a student, or a professor. The full
-credential roster (every student/advisor/professor email is derived
-straight from their real seeded id) is in `docs/LOGIN_CREDENTIALS.md`. The
+5 advisors, the Vice President, or a student. The full credential roster
+(every student/advisor email is derived straight from their real seeded
+id) is in `docs/LOGIN_CREDENTIALS.md`. The
 demo roster includes personas for every worked example in spec §11 (a
 good-standing student, a mid-probation warning-ladder student, a
 mandatory-retake-overflow case, a dismissed student, a faculty-transfer

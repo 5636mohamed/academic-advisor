@@ -568,7 +568,7 @@ recomputeAdvisingProfile(student):
 Recommended stack (swap freely, the module boundaries below matter more than the specific framework):
 **Backend:** Node.js + TypeScript, Express (or NestJS), PostgreSQL, Prisma/TypeORM.
 **Frontend:** React + TypeScript, Vite, TanStack Query, a component library (or Tailwind, matching the prototype's editorial/paper aesthetic).
-**Auth:** JWT session, roles `student`, `advisor`, `registrar`, `admin`, `professor` (§16 — posts `VentureProject`s, reviews matched candidates; has no visibility into a student's probation/transfer state, only what a `VentureProject` and its matches expose).
+**Auth:** JWT session, roles `student`, `advisor`, `vice_president`, `registrar`, `admin` (§16's `VentureProject` create/edit/candidate-review capability lives on the `advisor`/`vice_president` roles — see §16.6 — not a separate `professor` role).
 
 ### 9.1 File / Directory Hierarchy
 
@@ -715,8 +715,9 @@ academic-advisor/
 │       │   │   │   │                                          Venture Gate/Interest Form panel (§16.1, moved
 │       │   │   │   │                                          here out of AdviseFlow) PLUS ranked
 │       │   │   │   └── VentureProject matches, "Express Interest" on every row (not just qualifying ones)
-│       │   │   └── FacultyConsole/                          # NEW §16.6 — role: professor. Post/edit
-│       │   │                                                  VentureProjects, ranked candidate list per project
+│       │   │   └── (VentureProject create/edit/candidates now lives      # §16.6 — folded into the advisor/VP
+│       │   │        in the advisor console's own Venture Board, below —    consoles directly, no separate
+│       │   │        no separate FacultyConsole/role)                       professor role/route tree
 │       │   ├── components/
 │       │   │   ├── CourseSlip.tsx
 │       │   │   ├── ProbationCounterPill.tsx                 # "3 / 6 semesters" warning badge
@@ -770,10 +771,10 @@ POST   /api/students/:id/venture-projects/:projectId/express-interest
                                                           → { cvFileName?, cvDataUrl? } → applied, same as above but
                                                             keyed by project — works even below matchThreshold,
                                                             creating a fresh row on the spot if none exists yet
-POST   /api/professors/:id/venture-projects             → create a VentureProject                       (role: professor)
-PUT    /api/professors/:id/venture-projects/:projectId  → edit title/description/requiredCourseCodes/etc. (role: professor)
-GET    /api/professors/:id/venture-projects/:projectId/candidates → ranked qualified-undergrad list, §16.6 (role: professor)
-PATCH  /api/venture-matches/:matchId                    → { status: 'accepted' | 'declined' }            (role: professor)
+POST   /api/professors/:id/venture-projects             → create a VentureProject       (role: advisor/vice_president, §16.6)
+PUT    /api/professors/:id/venture-projects/:projectId  → edit title/description/requiredCourseCodes/etc. (role: advisor/vice_president)
+GET    /api/advisor/venture-projects                    → every project across every professor, with candidates+counts (role: advisor/vice_president, §16.6)
+PATCH  /api/venture-matches/:matchId                    → { status: 'accepted' | 'declined' }            (role: advisor/vice_president)
 ```
 
 ### 9.3 Database Schema (essential tables — Prisma-style shorthand)
@@ -995,7 +996,7 @@ Client-side only — the API has no concept of a theme.
 7. **Probation History screen** (new) — timeline of `ProbationCounterLog` entries, human-readable ("Fall 2024: CGPA 1.84 → warning 1/6", "Spring 2025: CGPA 2.05 → warning reset to 0/6"), so a student can see exactly why they're at their current count.
 8. **Advisor Console** (new, role-gated) — same data as the student views plus the ability to override a recommendation, review/approve transfer executions, and see every `PlanningRun` for audit.
 9. **Venture Board** (new, §16.5, Level 3+ only) — every matched `VentureProject` for this student, ranked by `matchScore`, each with the same weighted-sum breakdown styling as step 5's dept-fit bars (course competency / skill alignment / academic trajectory) plus the full description and an "Express Interest" button (§16.4).
-10. **Faculty Console** (new, role-gated: `professor`, §16.6) — a professor's own `VentureProject`s (create/edit/toggle `isActive`), and per project a ranked, auto-generated list of the most qualified opted-in undergraduates with their `matchScore` breakdown and Accept/Decline actions on each `StudentVentureMatch`. Deliberately narrow: a professor sees only what a `VentureProject` and its matches expose — no probation counters, no transcripts beyond the required-course scores that feed `matchScore`.
+10. **Venture management** (role-gated: `advisor`/`vice_president`, §16.6 — there is no separate professor role) — every `VentureProject` across every professor in one flat list (create/edit/toggle `isActive`), and per project a ranked, auto-generated list of the most qualified opted-in undergraduates with their `matchScore` breakdown and Accept/Decline actions on each `StudentVentureMatch`.
 
 ---
 
@@ -1538,36 +1539,43 @@ subject blank" exception (that exception was retired this round): Level
 dismissed student (`nourhan-1`) is 403'd from every self-service route,
 venture matching included, regardless of any stored answer.
 
-### 16.6 Faculty Console (new role: `professor`, §10 step 10)
+### 16.6 Advisor & Vice President venture management (role: `advisor`/`vice_president` — REPLACES the old Faculty Console/`professor` role)
 
-A professor's own workspace, deliberately narrow in what it exposes:
+There is no separate professor login or Faculty Console anymore. Every
+professor at E-JUST is already also an advisor, and posting/managing
+`VentureProject`s was folded directly into the advisor console's own
+Venture Board (and, per §17.2, the Vice President's) instead of living
+behind a third, narrower role that duplicated the same capability:
 
 - **Post/edit `VentureProject`s** — title, description, `type`,
-  `requiredCourseCodes[]`, `preferredSkills[]`, `capacity`, and an
-  `isActive` toggle (an inactive project is immediately excluded from all
-  new matching, §16.8).
-- **Ranked candidate list per project** — every opted-in (Venture-Gate-YES)
-  Level 3+ student's `matchScore` against this specific project, sorted
-  descending, with the same three-segment breakdown the student sees.
-  Computed the same way the student-facing routes compute it — one
-  `ventureFitScore` implementation, called from both directions. Each row
-  also shows the attached CV (§16.4.1), if any, as a "View CV" button that
-  opens an inline, in-page PDF preview — never a download — so the
-  professor can judge genuine fit beyond the number without leaving the
-  console.
-- **Accept/Decline** on any `applied` `StudentVentureMatch`, subject to
-  `capacity` (§16.2).
-- **What a professor does NOT see:** probation counter, transcript beyond
-  the specific `requiredCourseCodes` scores that feed `matchScore`,
-  transfer history, or anything from §§4/7/15 — the Faculty Console reads
-  from `VentureProject`/`StudentVentureMatch` and a narrow, explicit
-  course-competency projection, never the full `Student` record.
+  `requiredCourseCodes[]`, `preferredSkills[]`, `capacity`, an `isActive`
+  toggle (an inactive project is immediately excluded from all new
+  matching, §16.8), and the §17.5 research-portal fields. The advisor
+  console attributes every project it creates to a fixed `'advisor-owned'`
+  identity (not the logged-in advisor's own id) since ventures are managed
+  collectively, not per-advisor; the Vice President's own Venture Board
+  works identically, attributed to `'vp-owned'`.
+- **A flat, cross-project view** — `GET /api/advisor/venture-projects`
+  returns every `VentureProject` across every professor/advisor/VP in one
+  shot, each still carrying its real owning `professorId`, so the console
+  is "every venture in the system," not a single professor's own list.
+- **Ranked candidate list per project + Accept/Decline** — same
+  `ventureFitScore`/`matchScore` computation the student-facing routes
+  use, same capacity enforcement (§16.2), same CV inline-preview
+  (§16.4.1), now surfaced inside the flat project list above instead of a
+  separate per-professor "my candidates" screen.
+- **Two originally-seeded real professors** (`prof-kamel`/`prof-adel`)
+  still exist purely as attribution data on their own pre-existing
+  projects — "Hosted by Dr. Youssef Kamel" still renders correctly on a
+  student's Venture Board — but there is no login and no route reachable
+  as either of them anymore.
 
 ### 16.7 API routes
 
 See §9.2's "§16 — Innovation & Venture Catalyst" block for the full route
-list (student-facing gate/form/matches/apply, professor-facing
-project CRUD/candidates/accept-decline).
+list (student-facing gate/form/matches/apply; project create/edit and
+match accept/decline, callable by the advisor/VP consoles above using
+`'advisor-owned'`/`'vp-owned'` in place of a professor's own id).
 
 ### 16.8 Edge cases & independence rules (extends §12)
 
@@ -1598,10 +1606,12 @@ project CRUD/candidates/accept-decline).
   history should score low, not crash or silently ignore that term.
 - **All three sub-weights and the 0.80 display threshold are configuration**
   (`predictionWeights.json`'s `ventureFit` block), per §12's existing rule.
-- **A `professor` role has no access to `/students/*`, `/advising/*`,
-  `/transfer/*`, or `/admin/*` routes** — the reverse of the existing
-  student/advisor boundary (§12), enforced the same way: at the API layer,
-  not just hidden in the UI.
+- **There is no `professor` role at all** (§16.6) — `VentureProject`
+  create/edit/candidate-review is reachable only via the `advisor`/
+  `vice_president` roles, which already have (and are meant to have) full
+  student-record access — so this section's old "professor can't see
+  `/students/*`" boundary rule no longer applies to anything; it's listed
+  here as a removed rule, not a currently-enforced one.
 
 ## 17. AEGIS Rebrand, Multi-Advisor Model & Vice President Oversight
 

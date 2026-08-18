@@ -6,9 +6,6 @@ import { PortalCoursePlan } from '../portal/PortalCoursePlan';
 import { PortalQuiz } from '../portal/PortalQuiz';
 import { PortalTranscript } from '../portal/PortalTranscript';
 import { PortalVentureBoard } from '../portal/PortalVentureBoard';
-import { FacultyLayout } from '../faculty/FacultyLayout';
-import { FacultyProjects } from '../faculty/FacultyProjects';
-import { FacultyProjectCandidates } from '../faculty/FacultyProjectCandidates';
 import { AdvisorLayout } from '../advisorConsole/AdvisorLayout';
 import { AdvisorDashboard } from '../advisorConsole/AdvisorDashboard';
 import { AdvisorAllStudents } from '../advisorConsole/AdvisorAllStudents';
@@ -24,18 +21,17 @@ import { VpDashboard } from '../vpConsole/VpDashboard';
 import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
 import { VpTransferRequests } from '../vpConsole/VpTransferRequests';
 import { VpVentureBoard } from '../vpConsole/VpVentureBoard';
-import { RequireAdvisor, RequireStudent, RequireProfessor, RequireVicePresident } from '../auth/RequireRole';
+import { RequireAdvisor, RequireStudent, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   {
     // Every route under here requires an advisor session (auth/RequireRole.tsx)
-    // — a student or professor session is redirected to their own pages instead.
-    // Rebuilt to match /UI Design Professor/*.pdf — see advisorConsole/*.
-    // The advisor's own Venture Board manages ventures directly (post/edit/
-    // review candidates) since every professor at E-JUST is also an
-    // academic advisor; the standalone Faculty Console below is left in
-    // place unchanged as its own login path.
+    // — a student or Vice President session is redirected to their own
+    // pages instead. Rebuilt to match /UI Design Professor/*.pdf — see
+    // advisorConsole/*. The advisor's own Venture Board manages ventures
+    // directly (post/edit/review candidates) — there is no separate
+    // professor login/Faculty Console anymore (see AuthContext.tsx).
     element: <RequireAdvisor />,
     children: [
       {
@@ -77,7 +73,7 @@ export const router = createBrowserRouter([
     // Spec §15.1 — the student portal. RequireStudent (bound at this path
     // level, where `:id` is defined) enforces that a student session can
     // only ever land on THEIR OWN id — no other student's portal, no
-    // advisor/professor pages.
+    // advisor/Vice-President pages.
     path: '/portal/:id',
     element: <RequireStudent />,
     children: [
@@ -95,23 +91,6 @@ export const router = createBrowserRouter([
           { path: 'target-cgpa', element: <Navigate to="../course-plan?mode=target" replace /> },
           { path: 'recommendations', element: <Navigate to="../course-plan?mode=recommendations" replace /> },
           { path: 'curriculum', element: <Navigate to="../transcript?tab=curriculum" replace /> },
-        ],
-      },
-    ],
-  },
-  {
-    // Spec §16.6 — the Faculty Console. Same own-id-only shape as the
-    // student portal — a professor can only ever land on their own console.
-    // Left as its own separate login/UI (unchanged) — the advisor console's
-    // new Venture Board (above) is an additive superset, not a replacement.
-    path: '/faculty/:id',
-    element: <RequireProfessor />,
-    children: [
-      {
-        element: <FacultyLayout />,
-        children: [
-          { index: true, element: <FacultyProjects /> },
-          { path: ':projectId', element: <FacultyProjectCandidates /> },
         ],
       },
     ],

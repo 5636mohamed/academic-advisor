@@ -766,17 +766,11 @@ function isPendingCandidate(c: { status: string; total: number }): boolean {
   return c.status === 'applied' || c.status === 'suggested' || (c.status === 'unscored' && c.total >= weights.ventureFit.matchThreshold);
 }
 
-// --- Faculty Console (role: professor) ---
-app.get('/api/professors', (_req, res) => {
-  // 'advisor-owned' and 'vp-owned' (seedVentureProjects.ts) are internal
-  // attribution anchors for ventures the advisor console / VP console post
-  // directly — not real professors a student should see hosting a project
-  // list or a login this route should ever surface as choosable.
-  res.json(db.listProfessors().filter(p => p.id !== 'advisor-owned' && p.id !== 'vp-owned'));
-});
-
 // --- Multi-advisor epic: the 5 named advisors (each with their own
-// 25-student roster) — mirrors the professors routes above exactly. ---
+// 25-student roster). There is no professor login/Faculty Console anymore
+// (see AuthContext.tsx) — prof-kamel/prof-adel still exist purely as
+// venture-attribution data (db.getProfessor, used below by
+// withProfessorName), not as a role with its own routes here. ---
 app.get('/api/advisors', (_req, res) => {
   res.json(db.listAdvisors());
 });
@@ -821,8 +815,8 @@ app.get('/api/vp/pending-proposals', (_req, res) => {
 // separate professors, so this returns every project across every
 // professor in one shot (each item still carries its real owning
 // professorId, which the client uses to call the existing per-professor
-// edit/candidates routes below — those still enforce that a project can
-// only be edited via ITS OWN professorId, unchanged).
+// edit route below — that still enforces that a project can only be
+// edited via ITS OWN professorId, unchanged).
 app.get('/api/advisor/venture-projects', (_req, res) => {
   const projects = db.listVentureProjects().map(project => {
     const candidates = db.getVentureProjectCandidates(project.id);
@@ -841,12 +835,6 @@ app.get('/api/advisor/venture-projects', (_req, res) => {
     };
   });
   res.json(projects);
-});
-
-app.get('/api/professors/:id', (req, res) => {
-  const professor = db.getProfessor(req.params.id);
-  if (!professor) return res.status(404).json({ error: 'professor not found' });
-  res.json({ ...professor, projects: db.listVentureProjectsByProfessor(req.params.id) });
 });
 
 app.post('/api/professors/:id/venture-projects', (req, res) => {
@@ -891,18 +879,6 @@ app.put('/api/professors/:id/venture-projects/:projectId', (req, res) => {
   if (project.professorId !== req.params.id) return res.status(403).json({ error: "not this professor's project" });
   try {
     res.json(db.updateVentureProject(req.params.projectId, req.body ?? {}));
-  } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
-
-// §16.6 — ranked, auto-generated candidate list for one project.
-app.get('/api/professors/:id/venture-projects/:projectId/candidates', (req, res) => {
-  const project = db.getVentureProject(req.params.projectId);
-  if (!project) return res.status(404).json({ error: 'venture project not found' });
-  if (project.professorId !== req.params.id) return res.status(403).json({ error: "not this professor's project" });
-  try {
-    res.json(db.getVentureProjectCandidates(req.params.projectId));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
