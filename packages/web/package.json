@@ -1,6 +1,6 @@
 {
   "name": "@advisor/web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "AEGIS Academic Advisor System — the React/TypeScript frontend: role-separated student, advisor, and Vice President portals with real-time predictive analytics, PDF reporting, and an innovation venture board.",
   "homepage": "https://5636mohamed.github.io/academic-advisor/",
