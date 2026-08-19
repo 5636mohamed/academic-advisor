@@ -889,7 +889,16 @@
   }
 }
 
-.su-login-theme-btn { position: absolute; top: 20px; right: 20px; }
+/* z-index needed here for a non-obvious reason, confirmed via an actual
+ * elementFromPoint() check at 375px: .su-login-card below has its own
+ * `animation` property, which — per spec — implicitly creates a NEW
+ * stacking context on that element even though its `position` stays
+ * `static`. Since the card comes AFTER this button in DOM order, that
+ * stacking context painted on top of the button (whose own z-index:auto
+ * has no context of its own to compete with), fully covering it on
+ * mobile where the dark masthead banner sits directly under this corner
+ * — the button was un-clickable, not just visually hidden. */
+.su-login-theme-btn { position: absolute; top: 20px; right: 20px; z-index: 5; }
 
 .su-login-card {
   width: 100%; max-width: 440px;
