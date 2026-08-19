@@ -7,11 +7,12 @@
 // eventually wrap around actual SQL — swapping this module out for Prisma
 // calls later shouldn't require touching any caller (routes/ports), only
 // this file.
-import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor } from '@advisor/shared';
+import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor, Project } from '@advisor/shared';
 import { CATALOG } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
 import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
 import { PROFESSORS, VENTURE_PROJECTS, COURSE_SKILL_TAGS, ELECTIVE_COURSE_CODES } from '../seed/seedVentureProjects';
+import { COLLIDER_PROJECTS } from '../seed/seedColliderProjects';
 import { ADVISORS, NAMED_STUDENT_ADVISOR, fillerCountFor, STANDING_CYCLE, STANDING_TARGET_PCT, StandingBucket } from '../seed/seedAdvisors';
 import { computeCGPA, latestAttemptPerCourse } from '../../modules/grading/cgpa';
 import { levelFromCredits } from '../../modules/grading/level';
@@ -841,6 +842,8 @@ export function __resetForTests(): void {
   seedInitialVentureOptIns();
   seedInitialRegisteredCourses();
   transferRequests.length = 0;
+  colliderProjects.length = 0;
+  colliderProjects.push(...COLLIDER_PROJECTS.map(p => ({ ...p, members: [...p.members], fundingAllocations: [...p.fundingAllocations] })));
 }
 
 // ---------------------------------------------------------------------
@@ -1958,6 +1961,39 @@ export function setVentureMatchStatusByProfessor(matchId: string, status: 'accep
     return s.ventureMatches[idx];
   }
   throw new Error(`no such venture match ${matchId}`);
+}
+
+// ---------------------------------------------------------------------
+// AI Features Blueprint §1.2 — Project Collider (advisor/VP-facing only,
+// no student-side mutation routes in this cut — see the seed file's own
+// header for why). Same "mutable clone of the seed list" pattern
+// ventureProjects (above) already uses, for the one mutation this cut
+// actually needs: VP micro-funding allocation.
+// ---------------------------------------------------------------------
+const colliderProjects: Project[] = COLLIDER_PROJECTS.map(p => ({ ...p, members: [...p.members], fundingAllocations: [...p.fundingAllocations] }));
+
+export function listColliderProjects(): Project[] {
+  return colliderProjects;
+}
+
+export function getColliderProject(id: string): Project | undefined {
+  return colliderProjects.find(p => p.id === id);
+}
+
+/** Every project on rosters belonging to this advisor OR any project whose
+ *  founder-equivalent member is this advisor's advisee — in practice here
+ *  that's just `advisorId` equality, since every seeded project is already
+ *  tagged with the advisor whose roster it's monitored under. */
+export function listColliderProjectsForAdvisor(advisorId: string): Project[] {
+  return colliderProjects.filter(p => p.advisorId === advisorId);
+}
+
+export function fundColliderProject(id: string, amount: number, note: string): Project {
+  const project = colliderProjects.find(p => p.id === id);
+  if (!project) throw Object.assign(new Error(`no such collider project ${id}`), { httpStatus: 404 });
+  if (!Number.isFinite(amount) || amount <= 0) throw Object.assign(new Error('amount must be a positive number'), { httpStatus: 400 });
+  project.fundingAllocations.push({ amount, note, allocatedAt: new Date().toISOString() });
+  return project;
 }
 
 export { courseByCode };

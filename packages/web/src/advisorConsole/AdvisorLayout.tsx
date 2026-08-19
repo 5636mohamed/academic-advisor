@@ -45,6 +45,8 @@ export function AdvisorLayout() {
     { to: '/students', label: 'All Students' },
     { to: '/venture-board', label: 'Venture board' },
     { to: '/transfer-requests', label: 'Transfer requests' },
+    { to: '/workload-overview', label: 'Workload' },
+    { to: '/collider-board', label: 'Collider board' },
   ];
 
   return (

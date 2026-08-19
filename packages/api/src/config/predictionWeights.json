@@ -44,5 +44,24 @@
     "trajectoryWeight": 0.20,
     "matchThreshold": 0.80,
     "minLevel": 3
+  },
+  "friction": {
+    "milestoneWeights": {
+      "quiz": 1,
+      "assignment": 2,
+      "lab_report": 3,
+      "midterm": 6,
+      "final": 10,
+      "project_deadline": 5
+    },
+    "overlapPenaltyPerExtraMilestone": 0.15,
+    "burnoutThreshold": 80,
+    "bottleneckTopDecile": 0.10,
+    "bottleneckMinConsistentSemesters": 2,
+    "bottleneckLookbackSemesters": 3
+  },
+  "collider": {
+    "matchThreshold": 0.35,
+    "maxSuggestions": 5
   }
 }

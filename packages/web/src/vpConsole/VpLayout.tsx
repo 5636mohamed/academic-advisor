@@ -23,6 +23,8 @@ export function VpLayout() {
     { to: '/vp', label: 'Dashboard', end: true },
     { to: '/vp/transfer-requests', label: 'Transfer requests' },
     { to: '/vp/venture-board', label: 'Venture board' },
+    { to: '/vp/innovation-topography', label: 'Innovation topography' },
+    { to: '/vp/institutional-friction', label: 'Institutional friction' },
   ];
 
   return (

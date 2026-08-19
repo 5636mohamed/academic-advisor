@@ -21,7 +21,7 @@ import { onFirstSemesterClose } from './modules/probation/firstSemesterRule.serv
 import { projectCGPATrend } from './modules/prediction/cgpaTrendProjection';
 import { deriveCgpaTrend } from './modules/grading/cgpa';
 import { chainUnlockValue, clearChainUnlockCache } from './modules/prediction/chainUnlockValue';
-import { CATALOG } from './db/seed/seedCatalog';
+import { CATALOG, CATALOG_BY_CODE } from './db/seed/seedCatalog';
 import { buildCandidatePool } from './modules/retakeGate/retakePreference.service';
 import { packPlan, PackPlanResult } from './modules/prediction/planPacker';
 import { DEPARTMENTS, OTHER_FACULTY_DEPARTMENTS, FACULTIES, QUIZ } from './modules/fitEngine/deptFitEngine';
@@ -30,6 +30,15 @@ import { projectExpectedVsBestCase } from './modules/prediction/whatIfProjection
 import { bestCasePct } from './modules/prediction/bestCaseProjection';
 import { VENTURE_QUIZ } from './modules/venture/ventureQuiz';
 import weights from './config/predictionWeights.json';
+// AI Features Blueprint — Cognitive Load Heatmap + Project Collider
+// (advisor/VP-facing only, see the seed files' own headers for scope).
+import { buildFrictionTimeline } from './modules/friction/frictionScore.service';
+import { computeInstitutionalBottlenecks, StudentForBottleneck } from './modules/friction/institutionalBottleneck.service';
+import { matchOpportunitiesForProject } from './modules/collider/colliderOpportunityMatch.service';
+import { buildTopography } from './modules/collider/innovationTopography.service';
+import { MILESTONES_BY_COURSE } from './db/seed/seedSyllabusMilestones';
+import { EXTERNAL_OPPORTUNITIES } from './db/seed/seedExternalOpportunities';
+import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
 
 const app = express();
 
@@ -855,6 +864,120 @@ app.get('/api/vp/responsibility-details', (_req, res) => {
 // re-render without a second round trip.
 app.post('/api/vp/pending-proposals/approve-all', (_req, res) => {
   res.json(db.approveAllPendingProposalsAcrossAllAdvisors());
+});
+
+// ---------------------------------------------------------------------
+// AI Features Blueprint (docs/AI_FEATURES_BLUEPRINT.md) — Cognitive Load
+// Heatmap. No student-facing NLP intake or auto-matching in the Collider
+// half of this epic (see seedColliderProjects.ts's header) — friction
+// scoring, however, IS fully real, live-computed math, not seeded.
+// ---------------------------------------------------------------------
+
+const courseCreditsFor = (code: string) => CATALOG_BY_CODE[code]?.credits;
+
+/** A PackPlanResult's course codes are nested inside coreq Bundles
+ *  (mandatoryBundles + optimizedBundles — carriedToNextSemester didn't
+ *  make it into THIS semester's plan, so it's excluded), not a flat list —
+ *  flattened here once for the friction routes below. */
+function courseCodesInPlan(plan: PackPlanResult): string[] {
+  return [...plan.mandatoryBundles, ...plan.optimizedBundles].flatMap(b => b.members.map(m => m.courseCode));
+}
+
+/** What "this student's course load" means for friction purposes: their
+ *  own system-recommended next-semester plan (the same buildScoredPlan
+ *  used by GET /plan/fast), not "currently registered" proposals — most
+ *  students in this demo have never gone through the manual
+ *  register/choose flow, so that set is usually empty. Framing it as the
+ *  RECOMMENDED plan is also the more useful product shape anyway: it lets
+ *  a student see burnout risk BEFORE committing to a plan, not just after. */
+app.get('/api/students/:id/friction-timeline', blockIfDismissed, async (req, res) => {
+  try {
+    const plan = await buildScoredPlan(paramStr(req, 'id'), 'fast');
+    const courseCodes = courseCodesInPlan(plan);
+    res.json({ courseCodes, ...buildFrictionTimeline(courseCodes, MILESTONES_BY_COURSE, courseCreditsFor) });
+  } catch (err) {
+    const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Advisor-level "who needs a check-in this week" — every active student on
+// this advisor's roster, their planned load's PEAK friction week, sorted
+// worst-first. Dismissed students are excluded (same §12 lockout as
+// everywhere else), not just hidden client-side.
+app.get('/api/advisors/:advisorId/friction-overview', async (req, res) => {
+  const advisorId = paramStr(req, 'advisorId');
+  if (!db.getAdvisor(advisorId)) return res.status(404).json({ error: 'advisor not found' });
+  const roster = db.listStudents().filter(s => s.advisorId === advisorId && s.status !== 'dismissed');
+  const overview = await Promise.all(roster.map(async s => {
+    const plan = await buildScoredPlan(s.id, 'fast');
+    const timeline = buildFrictionTimeline(courseCodesInPlan(plan), MILESTONES_BY_COURSE, courseCreditsFor);
+    const peak = timeline.readings.reduce((max, r) => (r.frictionScore > max.frictionScore ? r : max), timeline.readings[0]);
+    return { studentId: s.id, studentName: s.name, peakWeek: peak.weekNumber, peakFrictionScore: peak.frictionScore, anyBurnoutRisk: timeline.readings.some(r => r.burnoutRisk), trend: timeline.trend };
+  }));
+  overview.sort((a, b) => b.peakFrictionScore - a.peakFrictionScore);
+  res.json(overview);
+});
+
+// VP macro dashboard — real historical friction load from every student's
+// actual completed transcript (see institutionalBottleneck.service.ts's
+// header for exactly why this is grounded in real data rather than a
+// second synthetic table, and its honest scoping note about this demo
+// only having one real department).
+app.get('/api/vp/friction/institutional-bottlenecks', (_req, res) => {
+  const studentsData: StudentForBottleneck[] = db.listStudents().map(s => ({
+    departmentId: s.departmentId,
+    transcript: Object.values(db.getTranscript(s.id)).map(r => ({ courseCode: r.courseCode, semesterOrdinal: r.semesterOrdinal })),
+  }));
+  res.json(computeInstitutionalBottlenecks(studentsData, MILESTONES_BY_COURSE, courseCreditsFor));
+});
+
+// ---------------------------------------------------------------------
+// AI Features Blueprint — Project Collider (advisor/VP-facing only).
+// ---------------------------------------------------------------------
+
+/** Resolves each member id to a display name — real advisees via
+ *  db.getStudent, lightweight cross-faculty collaborators via
+ *  COLLABORATORS_BY_ID (see collider.ts's ProjectMember doc comment for
+ *  why the two are disambiguated by isCollaborator rather than living in
+ *  one store). Enriched at the HTTP boundary, same pattern
+ *  withProfessorName already establishes for venture matches. */
+function withMemberNames(project: ReturnType<typeof db.getColliderProject>) {
+  if (!project) return project;
+  return {
+    ...project,
+    members: project.members.map(m => ({
+      ...m,
+      name: m.isCollaborator ? (COLLABORATORS_BY_ID[m.id]?.name ?? 'Unknown collaborator') : (db.getStudent(m.id)?.name ?? 'Unknown student'),
+    })),
+  };
+}
+
+app.get('/api/advisors/:advisorId/collider/projects', (req, res) => {
+  const advisorId = paramStr(req, 'advisorId');
+  if (!db.getAdvisor(advisorId)) return res.status(404).json({ error: 'advisor not found' });
+  res.json(db.listColliderProjectsForAdvisor(advisorId).map(withMemberNames));
+});
+
+app.get('/api/collider/projects/:id/opportunity-matches', (req, res) => {
+  const project = db.getColliderProject(paramStr(req, 'id'));
+  if (!project) return res.status(404).json({ error: 'project not found' });
+  res.json(matchOpportunitiesForProject(project, EXTERNAL_OPPORTUNITIES));
+});
+
+app.get('/api/vp/collider/topography', (_req, res) => {
+  res.json(buildTopography(db.listColliderProjects()));
+});
+
+app.post('/api/vp/collider/projects/:id/fund', (req, res) => {
+  const { amount, note } = req.body ?? {};
+  if (typeof amount !== 'number') return res.status(400).json({ error: 'expected { amount: number, note?: string }' });
+  try {
+    res.json(withMemberNames(db.fundColliderProject(paramStr(req, 'id'), amount, typeof note === 'string' ? note : '')));
+  } catch (err) {
+    const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 // Advisor console's own Venture Board (advisorConsole/venture/*) — the

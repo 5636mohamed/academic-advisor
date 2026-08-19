@@ -8,7 +8,7 @@
 // var; the API itself needs CORS enabled for the Pages origin). Deliberately
 // plain fetch + small helpers rather than a data-fetching library — keeps
 // the surface easy to read alongside the routes it calls.
-import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course } from '@advisor/shared';
+import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch } from '@advisor/shared';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -275,6 +275,29 @@ export interface VpAdvisorSummaryDTO {
   flaggedStudentNames: string[];
 }
 
+// AI Features Blueprint — Cognitive Load Heatmap + Project Collider
+// (advisor/VP-facing only). Response shapes match the shared types
+// directly (no denormalization needed at this layer), imported above.
+export interface FrictionTimelineDTO {
+  courseCodes: string[];
+  readings: FrictionReading[];
+  trend: { slope: number | null; reading: FrictionTrendReading };
+}
+export interface FrictionOverviewRowDTO {
+  studentId: string;
+  studentName: string;
+  peakWeek: number;
+  peakFrictionScore: number;
+  anyBurnoutRisk: boolean;
+  trend: { slope: number | null; reading: FrictionTrendReading };
+}
+export interface ColliderProjectMemberDTO extends ProjectMember {
+  name: string;
+}
+export interface ColliderProjectDTO extends Omit<Project, 'members'> {
+  members: ColliderProjectMemberDTO[];
+}
+
 export interface VpPendingProposalDTO {
   proposalId: string;
   studentId: string;
@@ -476,6 +499,18 @@ export const api = {
    *  professor in one shot, since the advisor manages ventures directly
    *  rather than browsing a per-professor directory (see server.ts). */
   advisorVentureProjects: () => request<AdvisorVentureProjectRowDTO[]>('/advisor/venture-projects'),
+
+  // AI Features Blueprint — Cognitive Load Heatmap
+  frictionTimeline: (studentId: string) => request<FrictionTimelineDTO>(`/students/${studentId}/friction-timeline`),
+  advisorFrictionOverview: (advisorId: string) => request<FrictionOverviewRowDTO[]>(`/advisors/${advisorId}/friction-overview`),
+  vpInstitutionalBottlenecks: () => request<InstitutionalFrictionCell[]>('/vp/friction/institutional-bottlenecks'),
+
+  // AI Features Blueprint — Project Collider (advisor/VP-facing only)
+  advisorColliderProjects: (advisorId: string) => request<ColliderProjectDTO[]>(`/advisors/${advisorId}/collider/projects`),
+  colliderOpportunityMatches: (projectId: string) => request<OpportunityMatch[]>(`/collider/projects/${projectId}/opportunity-matches`),
+  vpInnovationTopography: () => request<TopographyCell[]>('/vp/collider/topography'),
+  vpFundColliderProject: (projectId: string, amount: number, note: string) =>
+    request<ColliderProjectDTO>(`/vp/collider/projects/${projectId}/fund`, { method: 'POST', body: JSON.stringify({ amount, note }) }),
 
   predictionWeights: () => request<Record<string, unknown>>('/admin/prediction-weights'),
   updatePredictionWeights: (patch: Record<string, unknown>) =>

@@ -6,6 +6,7 @@ import { PortalCoursePlan } from '../portal/PortalCoursePlan';
 import { PortalQuiz } from '../portal/PortalQuiz';
 import { PortalTranscript } from '../portal/PortalTranscript';
 import { PortalVentureBoard } from '../portal/PortalVentureBoard';
+import { PortalWorkload } from '../portal/PortalWorkload';
 import { AdvisorLayout } from '../advisorConsole/AdvisorLayout';
 import { AdvisorDashboard } from '../advisorConsole/AdvisorDashboard';
 import { AdvisorAllStudents } from '../advisorConsole/AdvisorAllStudents';
@@ -16,11 +17,15 @@ import { AdvisorCurriculumPage } from '../advisorConsole/studentFile/AdvisorCurr
 import { AdvisorProbationHistoryPage } from '../advisorConsole/studentFile/AdvisorProbationHistoryPage';
 import { AdvisorVentureBoard } from '../advisorConsole/venture/AdvisorVentureBoard';
 import { AdvisorTransferRequests } from '../advisorConsole/AdvisorTransferRequests';
+import { AdvisorFrictionOverview } from '../advisorConsole/AdvisorFrictionOverview';
+import { AdvisorColliderBoard } from '../advisorConsole/AdvisorColliderBoard';
 import { VpLayout } from '../vpConsole/VpLayout';
 import { VpDashboard } from '../vpConsole/VpDashboard';
 import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
 import { VpTransferRequests } from '../vpConsole/VpTransferRequests';
 import { VpVentureBoard } from '../vpConsole/VpVentureBoard';
+import { VpInnovationTopography } from '../vpConsole/VpInnovationTopography';
+import { VpInstitutionalFrictionDashboard } from '../vpConsole/VpInstitutionalFrictionDashboard';
 import { RequireAdvisor, RequireStudent, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -64,6 +69,8 @@ export const router = createBrowserRouter([
           // no per-professor sub-routes needed.
           { path: 'venture-board', element: <AdvisorVentureBoard /> },
           { path: 'transfer-requests', element: <AdvisorTransferRequests /> },
+          { path: 'workload-overview', element: <AdvisorFrictionOverview /> },
+          { path: 'collider-board', element: <AdvisorColliderBoard /> },
           { path: 'advisor-console', element: <Navigate to="/students" replace /> },
         ],
       },
@@ -85,6 +92,7 @@ export const router = createBrowserRouter([
           { path: 'quiz', element: <PortalQuiz /> },
           { path: 'transcript', element: <PortalTranscript /> },
           { path: 'venture-board', element: <PortalVentureBoard /> },
+          { path: 'workload', element: <PortalWorkload /> },
           // Old §15.1 route names, kept as redirects in case anything has
           // them bookmarked/linked from before this redesign.
           { path: 'advise', element: <Navigate to="../course-plan?mode=probation" replace /> },
@@ -109,6 +117,8 @@ export const router = createBrowserRouter([
           { path: 'advisors/:advisorId', element: <VpAdvisorDetail /> },
           { path: 'transfer-requests', element: <VpTransferRequests /> },
           { path: 'venture-board', element: <VpVentureBoard /> },
+          { path: 'innovation-topography', element: <VpInnovationTopography /> },
+          { path: 'institutional-friction', element: <VpInstitutionalFrictionDashboard /> },
         ],
       },
     ],

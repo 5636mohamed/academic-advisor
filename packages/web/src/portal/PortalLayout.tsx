@@ -39,6 +39,7 @@ export function PortalLayout() {
     { to: `/portal/${id}/course-plan`, label: 'Course Plan' },
     { to: `/portal/${id}/quiz`, label: 'Department Quiz' },
     { to: `/portal/${id}/transcript`, label: 'Transcript' },
+    { to: `/portal/${id}/workload`, label: 'Workload' },
     // §16.1/§16.5 — only ever shown to Level 3+ students, same gate as the
     // Venture Gate itself.
     ...(student && student.level >= 3 ? [{ to: `/portal/${id}/venture-board`, label: 'Venture board' }] : []),
