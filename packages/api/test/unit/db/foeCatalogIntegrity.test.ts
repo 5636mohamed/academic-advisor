@@ -4,8 +4,10 @@
 // but the structural invariants every catalog must hold for the rest of
 // the app (prereq graph, milestone generator, advising cycle) to work
 // against it safely.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { CATALOG, CATALOG_BY_CODE, CATALOG_BY_DEPARTMENT } from '../../../src/db/seed/seedCatalog';
+import * as db from '../../../src/db/memory/inMemoryDb';
+import { ADVISORS } from '../../../src/db/seed/seedAdvisors';
 
 describe('FoE catalog integrity — every real department', () => {
   it('every seeded department has a non-empty catalog', () => {
@@ -60,5 +62,34 @@ describe('FoE catalog integrity — every real department', () => {
   it('CATALOG_BY_CODE has no fewer entries than the union of every department catalog\'s distinct codes (dedup, not data loss)', () => {
     const allCodes = new Set(Object.values(CATALOG_BY_DEPARTMENT).flat().map(c => c.code));
     expect(Object.keys(CATALOG_BY_CODE).length).toBe(allCodes.size);
+  });
+});
+
+describe('student-facing course views are department-scoped, not the global 10-program union', () => {
+  beforeEach(() => {
+    db.__resetForTests();
+  });
+
+  it('getCurriculum only ever shows a student courses from their own department\'s real catalog', () => {
+    for (const advisor of ADVISORS) {
+      const student = db.listStudents().find(s => s.advisorId === advisor.id);
+      expect(student).toBeDefined();
+      const view = db.getCurriculum(student!.id);
+      const ownDeptCodes = new Set(CATALOG_BY_DEPARTMENT[advisor.departmentId].map(c => c.code));
+      const foreignCodes = view.map(v => v.course.code).filter(code => !ownDeptCodes.has(code));
+      expect(foreignCodes, `student ${student!.id} (${advisor.departmentId}) saw foreign codes`).toEqual([]);
+      // and it's not vacuously small — a real department's own catalog, not nothing
+      expect(view.length).toBe(ownDeptCodes.size);
+    }
+  });
+
+  it('getEligibleCourses never recommends a course from a different department', () => {
+    for (const advisor of ADVISORS) {
+      const student = db.listStudents().find(s => s.advisorId === advisor.id);
+      const eligible = db.getEligibleCourses(student!.id);
+      const ownDeptCodes = new Set(CATALOG_BY_DEPARTMENT[advisor.departmentId].map(c => c.code));
+      const foreign = eligible.filter(e => !ownDeptCodes.has(e.course.code));
+      expect(foreign, `student ${student!.id} (${advisor.departmentId}) had foreign-department eligible courses`).toEqual([]);
+    }
   });
 });

@@ -1033,7 +1033,13 @@ export function getEligibleCourses(id: string): Array<{ course: Course; isRetake
 
   const results: Array<{ course: Course; isRetake: boolean; oldLetter: string | null; oldPoints: number | null }> = [];
 
-  for (const course of CATALOG) {
+  // Scoped to the student's OWN department's real catalog — otherwise a
+  // student would see (and the advising cycle could recommend) courses
+  // from every other seeded department too, since this fed straight off
+  // the global 10-program CATALOG before real per-department catalogs
+  // existed to scope it against.
+  const deptCatalog = CATALOG_BY_DEPARTMENT[student.departmentId] ?? CATALOG;
+  for (const course of deptCatalog) {
     const rec = transcript[course.code];
     if (rec && ['D', 'D+', 'F'].includes(rec.letter)) {
       results.push({ course, isRetake: true, oldLetter: rec.letter, oldPoints: rec.points });
@@ -1139,7 +1145,11 @@ export function getCurriculum(id: string): CurriculumCourseView[] {
       .map(r => r.courseCode)
   );
 
-  return CATALOG.map((course): CurriculumCourseView => {
+  // Same department-scoping as getEligibleCourses above — the Curriculum
+  // tab should show this student's own program's real course list, not
+  // every seeded department's combined 300+ courses.
+  const deptCatalog = CATALOG_BY_DEPARTMENT[student.departmentId] ?? CATALOG;
+  return deptCatalog.map((course): CurriculumCourseView => {
     const rec = transcript[course.code];
     if (rec) {
       const passed = !['D', 'D+', 'F'].includes(rec.letter);
