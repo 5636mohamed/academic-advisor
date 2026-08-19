@@ -9,6 +9,7 @@ export type NotificationRole = 'student' | 'advisor' | 'vp';
 export type NotificationType =
   | 'proposal_approved'
   | 'proposal_declined'
+  | 'proposal_submitted'
   | 'venture_match_accepted'
   | 'venture_match_declined'
   | 'venture_new_candidate'
@@ -18,7 +19,9 @@ export type NotificationType =
   | 'transfer_vp_approved'
   | 'transfer_vp_declined'
   | 'transfer_awaiting_vp'
-  | 'task_rescheduled';
+  | 'task_rescheduled'
+  | 'grant_requested'
+  | 'grant_decided';
 
 export interface Notification {
   id: string;

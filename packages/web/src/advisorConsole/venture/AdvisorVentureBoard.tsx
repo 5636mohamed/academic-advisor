@@ -1,7 +1,12 @@
-// "Venture board" tab — rebuilt to match venture-board-advisor.pdf: the
-// advisor owns every venture directly (post/edit/archive, review
-// candidates) rather than browsing a directory of separate professors —
-// no other-professor attribution is shown anywhere on this screen. A
+// "Venture board" tab — rebuilt to match venture-board-advisor.pdf: an
+// advisor owns and sees only THEIR OWN ventures (post/edit/archive, review
+// candidates) — a real fix, not the original design: this used to show
+// every advisor's postings pooled together under one shared 'advisor-owned'
+// attribution anchor, a leftover from before 5 real advisor identities
+// existed (see seedVentureProjects.ts's PROFESSORS comment). The Vice
+// President's own board (VpVentureBoard.tsx) reuses this same component
+// with `viewAllAdvisors` — cross-advisor oversight is the VP's whole point
+// elsewhere in this app too, so that one deliberately stays unscoped. A
 // three-pane live dashboard: My venture (left) → Pending approvals (middle,
 // filterable by venture) → selected candidate's full profile (right,
 // Accept/Reject). "View all ventures" expands full project management
@@ -12,8 +17,7 @@ import { api, AdvisorVentureProjectRowDTO, StudentDetail, VentureCandidateDTO, V
 import { Loading, ScoreRow, SearchBox } from '../../portal/ui/Primitives';
 import { IconLayers, IconPeople, IconPlus } from '../../portal/ui/Icons';
 import { ResearchDetails } from '../../portal/venture/VentureProjectCard';
-
-const ADVISOR_PROFESSOR_ID = 'advisor-owned';
+import { useAuth } from '../../auth/AuthContext';
 
 /** Mirrors server.ts's isPendingCandidate (§16.2: a qualifying match only
  *  gets a real, actionable row once the student visits their own Venture
@@ -33,14 +37,18 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
 }
 
-/** `professorId` defaults to the shared advisor attribution anchor —
- *  VpVentureBoard.tsx reuses this whole component unmodified, just passing
- *  `professorId="vp-owned"` so new projects it creates are attributed to
- *  the Vice President instead. Every OTHER part of the board (the pending-
- *  approvals queue, candidate review, "manage all ventures") is already
- *  global across every professor — see /api/advisor/venture-projects — so
- *  nothing else needs to change for the VP to get full parity. */
-export function AdvisorVentureBoard({ professorId = ADVISOR_PROFESSOR_ID }: { professorId?: string } = {}) {
+/** `professorId` overrides the attribution new projects get created
+ *  under — VpVentureBoard.tsx passes `professorId="vp-owned"` (its own
+ *  singleton anchor) plus `viewAllAdvisors`. Left unset, both default to
+ *  the real logged-in advisor's own id (from AuthContext) — new projects
+ *  attribute to them by name, and the board only ever fetches/shows their
+ *  own ventures, never another advisor's. */
+export function AdvisorVentureBoard({ professorId, viewAllAdvisors = false }: { professorId?: string; viewAllAdvisors?: boolean } = {}) {
+  const { auth } = useAuth();
+  const ownAdvisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
+  const effectiveProfessorId = professorId ?? ownAdvisorId ?? '';
+  const scopeAdvisorId = viewAllAdvisors ? undefined : ownAdvisorId;
+
   const [rows, setRows] = useState<AdvisorVentureProjectRowDTO[] | null>(null);
   const [ventureQuiz, setVentureQuiz] = useState<VentureQuizQuestionDTO[] | null>(null);
   const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
@@ -49,12 +57,13 @@ export function AdvisorVentureBoard({ professorId = ADVISOR_PROFESSOR_ID }: { pr
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
-    api.advisorVentureProjects().then(setRows).catch(e => setError(e instanceof Error ? e.message : String(e)));
+    api.advisorVentureProjects(scopeAdvisorId).then(setRows).catch(e => setError(e instanceof Error ? e.message : String(e)));
   };
   useEffect(() => {
     load();
     api.ventureQuiz().then(setVentureQuiz);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeAdvisorId]);
 
   if (!rows) return <Loading label="Loading your ventures…" />;
 
@@ -85,10 +94,16 @@ export function AdvisorVentureBoard({ professorId = ADVISOR_PROFESSOR_ID }: { pr
       </div>
       {error && <div className="su-note danger su-mt-16" style={{ marginTop: 0, marginBottom: 16 }}>{error}</div>}
 
-      <div className="su-venture-3col">
-        {/* --- Left: My venture --- */}
-        <div>
-          <CreateVentureCard professorId={professorId} onCreated={load} />
+      {/* Projects live in a narrow sidebar; applicant review gets the
+          whole rest of the page instead of being squeezed into a third
+          equal column — reviewing an applicant's full profile (scores,
+          GPA, CV) needs real width, not 1/3 of it. Clicking "Review"
+          expands that applicant's data directly under their own row (an
+          accordion, not a separate panel elsewhere on the page). */}
+      <div className="su-flex su-gap-18" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* --- Sidebar: My venture --- */}
+        <div style={{ width: 280, flexShrink: 0 }}>
+          <CreateVentureCard professorId={effectiveProfessorId} onCreated={load} />
           <div className="su-card su-mt-16">
             <div className="su-title" style={{ fontSize: 15 }}>My venture</div>
             <div className="su-subtitle" style={{ marginTop: 2, marginBottom: 12 }}>Manage and track my ventures</div>
@@ -123,8 +138,8 @@ export function AdvisorVentureBoard({ professorId = ADVISOR_PROFESSOR_ID }: { pr
           </div>
         </div>
 
-        {/* --- Middle: Pending approvals --- */}
-        <div className="su-card">
+        {/* --- Main: Pending approvals, full remaining width --- */}
+        <div className="su-card" style={{ flex: 1, minWidth: 320 }}>
           <div className="su-title" style={{ fontSize: 15 }}>Pending approvals</div>
           <div className="su-subtitle" style={{ marginTop: 2 }}>Students interested in your ventures</div>
           <div className="su-subtabs su-mt-16">
@@ -139,33 +154,38 @@ export function AdvisorVentureBoard({ professorId = ADVISOR_PROFESSOR_ID }: { pr
             <div className="su-empty">No pending applications right now.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {pendingList.map(({ candidate, row }) => (
-                <div key={`${row.project.id}-${candidate.studentId}`} className="su-flex su-justify-between su-items-center" style={{ border: '1px solid var(--su-border)', borderRadius: 'var(--su-radius-sm)', padding: '10px 14px' }}>
-                  <div className="su-flex su-gap-10 su-items-center">
-                    <span className="su-avatar" style={{ width: 30, height: 30, fontSize: 11 }}>{initials(candidate.studentName)}</span>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{candidate.studentName}</div>
-                      <div className="su-muted" style={{ fontSize: 11.5 }}>{row.project.title}</div>
+              {pendingList.map(({ candidate, row }) => {
+                const isOpen = selected?.candidate.studentId === candidate.studentId && selected?.row.project.id === row.project.id;
+                return (
+                  <div key={`${row.project.id}-${candidate.studentId}`} style={{ border: '1px solid var(--su-border)', borderRadius: 'var(--su-radius-sm)', overflow: 'hidden' }}>
+                    <div className="su-flex su-justify-between su-items-center" style={{ padding: '10px 14px' }}>
+                      <div className="su-flex su-gap-10 su-items-center">
+                        <span className="su-avatar" style={{ width: 30, height: 30, fontSize: 11 }}>{initials(candidate.studentName)}</span>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 13.5 }}>{candidate.studentName}</div>
+                          <div className="su-muted" style={{ fontSize: 11.5 }}>{row.project.title}</div>
+                        </div>
+                      </div>
+                      <button className="su-btn su-btn-sm su-btn-outline" onClick={() => setSelected(isOpen ? null : { candidate, row })}>
+                        {isOpen ? 'Hide' : 'Review'}
+                      </button>
                     </div>
+                    {/* The applicant's full data, directly under their own
+                        name/row — not a separate panel elsewhere. */}
+                    {isOpen && (
+                      <div style={{ borderTop: '1px solid var(--su-border)', padding: 14, background: 'var(--su-surface-2)' }}>
+                        <CandidateDetail selected={selected!} ventureQuiz={ventureQuiz} onAct={act} onClose={() => setSelected(null)} />
+                      </div>
+                    )}
                   </div>
-                  <button className="su-btn su-btn-sm su-btn-outline" onClick={() => setSelected({ candidate, row })}>Review</button>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          )}
-        </div>
-
-        {/* --- Right: candidate detail --- */}
-        <div>
-          {selected ? (
-            <CandidateDetail selected={selected} ventureQuiz={ventureQuiz} onAct={act} onClose={() => setSelected(null)} />
-          ) : (
-            <div className="su-card su-empty" style={{ minHeight: 260 }}>Select a candidate from "Pending approvals" to review their profile.</div>
           )}
         </div>
       </div>
 
-      {manageOpen && <ManageVentures rows={rows} onChanged={load} />}
+      {manageOpen && <ManageVentures rows={rows} onChanged={load} viewAllAdvisors={viewAllAdvisors} />}
     </div>
   );
 }
@@ -320,17 +340,14 @@ function CandidateDetail({
       .filter((x): x is { question: string; label: string } => x !== null);
   }, [ventureQuiz, interestAnswers]);
 
+  // No name/avatar header here — the row this expands under (in
+  // AdvisorVentureBoard's "Pending approvals" list) already shows the
+  // applicant's name; this is deliberately just their data, under it.
   return (
-    <div className="su-card su-pop" key={candidate.studentId}>
+    <div className="su-pop" key={candidate.studentId}>
       <div className="su-flex su-justify-between su-items-center" style={{ flexWrap: 'wrap', gap: 12 }}>
-        <div className="su-flex su-gap-14 su-items-center">
-          <span className="su-avatar" style={{ width: 48, height: 48, fontSize: 16 }}>{initials(candidate.studentName)}</span>
-          <div>
-            <div className="su-title" style={{ fontSize: 17 }}>{candidate.studentName}</div>
-            <div className="su-muted" style={{ fontSize: 12.5 }}>
-              ID: {candidate.studentId}{student ? ` · Level ${student.level} · ${student.facultyId}/${student.departmentId}` : ''}
-            </div>
-          </div>
+        <div className="su-muted" style={{ fontSize: 12.5 }}>
+          ID: {candidate.studentId}{student ? ` · Level ${student.level} · ${student.facultyId}/${student.departmentId}` : ''}
         </div>
         {candidate.matchId && (candidate.status === 'applied' || candidate.status === 'suggested') ? (
           <div className="su-flex su-gap-8">
@@ -424,7 +441,89 @@ function CandidateDetail({
   );
 }
 
-function ManageVentures({ rows, onChanged }: { rows: AdvisorVentureProjectRowDTO[]; onChanged: () => void }) {
+/** "Request grant" (advisor) / "Approve · Decline" (VP, viewAllAdvisors)
+ *  for one project's funding ask — separate from Project Collider's own
+ *  VP-initiated micro-funding tool. Shown inline on each project card in
+ *  ManageVentures below, regardless of the project's active/archived
+ *  status (an archived project's team might still need funding to wrap
+ *  up). */
+function GrantRequestPanel({ row, viewAllAdvisors, onChanged }: { row: AdvisorVentureProjectRowDTO; viewAllAdvisors: boolean; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const request = row.project.grantRequest;
+
+  const submitRequest = async () => {
+    const n = Number(amount);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.requestVentureGrant(row.project.professorId, row.project.id, n, note);
+      setAmount(''); setNote(''); setOpen(false);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decide = async (decision: 'approved' | 'declined') => {
+    setBusy(true);
+    try {
+      await api.decideVentureGrantRequest(row.project.id, decision);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (request?.status === 'pending') {
+    return (
+      <div className="su-note warn su-mt-16" style={{ fontSize: 12 }}>
+        <div><b>Grant requested:</b> {request.amount.toLocaleString()} EGP{request.note ? ` — ${request.note}` : ''}</div>
+        {viewAllAdvisors ? (
+          <div className="su-flex su-gap-8 su-mt-16">
+            <button type="button" className="su-btn su-btn-sm" style={{ background: 'var(--su-good)' }} disabled={busy} onClick={() => decide('approved')}>Approve</button>
+            <button type="button" className="su-btn su-btn-sm su-btn-outline" disabled={busy} onClick={() => decide('declined')}>Decline</button>
+          </div>
+        ) : (
+          <div className="su-muted su-mt-16">Awaiting the Vice President's decision.</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="su-mt-16">
+      {request && (
+        <div className="su-muted" style={{ fontSize: 11.5, marginBottom: 6 }}>
+          Last request: {request.amount.toLocaleString()} EGP —{' '}
+          <span className={request.status === 'approved' ? 'su-good' : 'su-danger'} style={{ color: request.status === 'approved' ? 'var(--su-good)' : 'var(--su-danger)' }}>{request.status}</span>
+          {request.decisionNote ? ` (${request.decisionNote})` : ''}
+        </div>
+      )}
+      {!viewAllAdvisors && (
+        open ? (
+          <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+            <input className="su-input" style={{ maxWidth: 110 }} type="number" min={1} placeholder="Amount (EGP)" value={amount} onChange={e => setAmount(e.target.value)} />
+            <input className="su-input" style={{ maxWidth: 200 }} placeholder="What it's for" value={note} onChange={e => setNote(e.target.value)} />
+            <button type="button" className="su-btn su-btn-sm" disabled={busy || !amount} onClick={submitRequest}>{busy ? 'Requesting…' : 'Send request'}</button>
+            <button type="button" className="su-btn su-btn-sm su-btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        ) : (
+          <button type="button" className="su-btn su-btn-sm su-btn-outline" onClick={() => setOpen(true)}>Request grant</button>
+        )
+      )}
+      {error && <div className="su-note danger su-mt-16" style={{ fontSize: 11.5 }}>{error}</div>}
+    </div>
+  );
+}
+
+function ManageVentures({ rows, onChanged, viewAllAdvisors }: { rows: AdvisorVentureProjectRowDTO[]; onChanged: () => void; viewAllAdvisors: boolean }) {
   const [query, setQuery] = useState('');
   const filtered = rows.filter(r => !query.trim() || r.project.title.toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -446,6 +545,7 @@ function ManageVentures({ rows, onChanged }: { rows: AdvisorVentureProjectRowDTO
               <div className="su-title" style={{ fontSize: 15 }}>{r.project.title}</div>
               <span className={`su-badge ${r.project.isActive ? 'ok' : 'neutral'}`}>{r.project.isActive ? 'active' : 'archived'}</span>
             </div>
+            {viewAllAdvisors && r.project.professorName && <div className="su-muted" style={{ fontSize: 11.5 }}>Owned by {r.project.professorName}</div>}
             <div className="su-subtitle">{r.project.description}</div>
             {r.project.isGraduationProject && <span className="su-badge info" style={{ marginBottom: 8 }}>Graduation project</span>}
             <div className="su-muted" style={{ fontSize: 12, marginBottom: 12 }}>
@@ -453,6 +553,7 @@ function ManageVentures({ rows, onChanged }: { rows: AdvisorVentureProjectRowDTO
             </div>
             <ResearchDetails project={r.project} />
             <button className="su-btn su-btn-sm su-btn-ghost" onClick={() => toggleActive(r)}>{r.project.isActive ? 'Archive' : 'Reactivate'}</button>
+            <GrantRequestPanel row={r} viewAllAdvisors={viewAllAdvisors} onChanged={onChanged} />
           </div>
         ))}
         {filtered.length === 0 && <div className="su-empty">No ventures match “{query}”.</div>}

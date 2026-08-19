@@ -46,6 +46,26 @@ export interface VentureProject {
    *  graduation project either way. Optional/undefined = a regular
    *  faculty-posted venture, same as every project before this epic. */
   isGraduationProject?: boolean;
+  /** An advisor's own ask for university/external funding on THIS venture
+   *  — separate from Project Collider's VP-initiated micro-funding
+   *  (collider.ts's FundingAllocation, which the VP allocates directly
+   *  with no request step). This is the other direction: the advisor
+   *  requests, the VP decides. Can be requested regardless of the
+   *  project's isActive status — an archived project's team might still
+   *  need funding to wrap up, publish, or spin out. One at a time: a new
+   *  request can't be submitted while an earlier one is still 'pending'
+   *  (see requestGrantForVentureProject's own doc comment) — once
+   *  decided, the advisor is free to ask again. */
+  grantRequest?: VentureGrantRequest;
+}
+
+export interface VentureGrantRequest {
+  amount: number;
+  note: string;
+  requestedAt: string;
+  status: 'pending' | 'approved' | 'declined';
+  decidedAt?: string;
+  decisionNote?: string;
 }
 
 export interface StudentVentureMatch {

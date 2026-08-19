@@ -85,6 +85,31 @@ describe('real trigger points create the right notification', () => {
     expect(notifs.some(n => n.type === 'proposal_declined')).toBe(true);
   });
 
+  it('generating a course plan (the real "submit for advisor approval" moment) notifies the student\'s advisor', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    db.addProposalsFromPlan('ahmed-1', [candidate]);
+    const notifs = db.listNotifications('advisor', student.advisorId);
+    expect(notifs.some(n => n.type === 'proposal_submitted')).toBe(true);
+  });
+
+  it('re-generating with nothing NEW to add does not spam a duplicate notification', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    db.addProposalsFromPlan('ahmed-1', [candidate]);
+    db.addProposalsFromPlan('ahmed-1', [candidate]); // same slot already exists — addProposalsFromPlan filters it out
+    const notifs = db.listNotifications('advisor', student.advisorId).filter(n => n.type === 'proposal_submitted');
+    expect(notifs).toHaveLength(1);
+  });
+
   it('submitting a transfer request notifies that student\'s advisor', () => {
     const student = db.getStudent('hassan-1')!;
     db.createTransferRequestForStudent('hassan-1', 'internal_department', 'CSE');

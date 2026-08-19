@@ -44,28 +44,29 @@ export const PROFESSORS: ProfessorProfile[] = [
     researchTags: ['machine_learning', 'data_science'],
     acceptingUndergrads: true,
   },
-  // Product decision: every professor is also an academic
-  // advisor, and there's a single shared advisor account (no per-advisor
-  // identity — see auth/AuthContext.tsx). This entry is the attribution
-  // anchor for ventures the advisor posts directly through the advisor
-  // console's own Venture Board (advisorConsole/venture/*) — it deliberately
-  // does NOT get a login credential (docs/LOGIN_CREDENTIALS.md) and is
-  // filtered out of the student-facing "who hosts this" labels, since the
-  // advisor console's venture board is explicitly "my ventures" (§ the
-  // advisor manages everything directly, not a directory of other
-  // professors) rather than a person a student would ever see named.
-  {
-    id: 'advisor-owned',
-    facultyId: 'ENG',
-    departmentId: 'ECE',
-    name: 'AEGIS Academic Advising',
-    researchTags: [],
-    acceptingUndergrads: true,
-  },
-  // VP epic — the same attribution-anchor pattern as 'advisor-owned' above,
-  // for projects the Vice President posts directly (their own Venture
-  // Board tab reuses the advisor console's create-project UI). Also
-  // deliberately no login credential and filtered from student-facing
+  // Per-advisor venture ownership (superseding the old "single shared
+  // advisor account, one generic 'advisor-owned' attribution anchor for
+  // ALL 5 advisors' postings" design — that was a real product bug once
+  // 5 real advisor identities existed: every advisor's venture board
+  // showed every OTHER advisor's postings too, with no way to tell whose
+  // was whose). One ProfessorProfile per real advisor, SAME id as their
+  // Advisor entity in seedAdvisors.ts — "every professor is also an
+  // advisor" stays true, it's just a real id now instead of a shared
+  // anonymous bucket. Each advisor's own venture board scopes to
+  // `professorId === their own advisorId` (see server.ts's
+  // /api/advisor/venture-projects); the VP's own board stays unscoped
+  // (cross-advisor oversight is the VP's whole point elsewhere too).
+  { id: 'advisor-nabil', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Nabil Fathy', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-mervat', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Mervat Aziz', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-tarek', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Tarek Younis', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-hoda', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Hoda Sami', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-waleed', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Waleed Kassem', researchTags: [], acceptingUndergrads: true },
+  // VP epic — the same attribution-anchor pattern the advisors used to all
+  // share, kept for the VP specifically (a genuine singleton role, unlike
+  // the 5 advisors) — projects the Vice President posts directly (their
+  // own Venture Board tab reuses the advisor console's create-project UI).
+  // Deliberately no login credential of its own (VP already logs in via
+  // the VP role, not a "professor" one) and filtered from student-facing
   // "who hosts this" professor pickers.
   {
     id: 'vp-owned',
@@ -81,7 +82,7 @@ export const VENTURE_PROJECTS: VentureProject[] = [
   {
     // §11 Scenario N's worked example project, verbatim title from the request.
     id: 'proj-lora',
-    professorId: 'prof-kamel',
+    professorId: 'advisor-waleed',
     title: 'Object Detection for Small Objects in Wide Land Fields Using Injected LoRa',
     description:
       'Commercial spin-off building a low-power LoRa-networked sensor system for detecting small objects across large agricultural fields. Looking for hardware/software integration specialists comfortable with both embedded firmware and applied ML.',
@@ -94,7 +95,7 @@ export const VENTURE_PROJECTS: VentureProject[] = [
   },
   {
     id: 'proj-edge-ml',
-    professorId: 'prof-adel',
+    professorId: 'advisor-mervat',
     title: 'Low-Power Edge ML for Agricultural Sensors',
     description: 'Academic research project on running compact ML models on power-constrained microcontrollers for field sensing applications.',
     type: 'academic_research',
@@ -109,7 +110,7 @@ export const VENTURE_PROJECTS: VentureProject[] = [
     // matches (wired in inMemoryDb.ts), so this must never appear in a
     // fresh matching run despite otherwise scoring well for some students.
     id: 'proj-rf-full',
-    professorId: 'prof-kamel',
+    professorId: 'advisor-nabil',
     title: 'Compact RF Front-Ends for CubeSats',
     description: 'A fully-subscribed research slot — kept in the seed data specifically to demonstrate §16.8\'s capacity-exclusion rule.',
     type: 'academic_research',
@@ -123,7 +124,7 @@ export const VENTURE_PROJECTS: VentureProject[] = [
     // §16.8 edge case fixture — isActive:false must exclude it from
     // matching entirely, same as being at capacity.
     id: 'proj-archived',
-    professorId: 'prof-adel',
+    professorId: 'advisor-tarek',
     title: 'Archived: Legacy Sensor Fusion Prototype',
     description: 'No longer accepting applicants.',
     type: 'academic_research',
@@ -140,7 +141,7 @@ export const VENTURE_PROJECTS: VentureProject[] = [
   // demos both without needing a live-created example.
   {
     id: 'proj-grad-federated',
-    professorId: 'prof-adel',
+    professorId: 'advisor-hoda',
     title: 'Graduation Project: Federated Learning for Cross-Campus Course Recommendation',
     description:
       'Academic-research-track graduation project extending the department\'s recommendation models to a federated setting across multiple campuses without centralizing student data. Intended to conclude in a thesis and a submitted paper.',
@@ -154,7 +155,7 @@ export const VENTURE_PROJECTS: VentureProject[] = [
   },
   {
     id: 'proj-grad-fieldkit',
-    professorId: 'prof-kamel',
+    professorId: 'advisor-waleed',
     title: 'Graduation Project: FieldKit — Deployable Agri-Sensor Starter Kits',
     description:
       'Commercial-spin-off-track graduation project turning the lab\'s LoRa sensor research into a sellable starter kit for smallholder farms. Looking for teammates who want to carry their capstone into an actual company after graduation.',

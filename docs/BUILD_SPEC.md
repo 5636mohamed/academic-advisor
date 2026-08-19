@@ -1551,31 +1551,54 @@ behind a third, narrower role that duplicated the same capability:
   `requiredCourseCodes[]`, `preferredSkills[]`, `capacity`, an `isActive`
   toggle (an inactive project is immediately excluded from all new
   matching, §16.8), and the §17.5 research-portal fields. The advisor
-  console attributes every project it creates to a fixed `'advisor-owned'`
-  identity (not the logged-in advisor's own id) since ventures are managed
-  collectively, not per-advisor; the Vice President's own Venture Board
-  works identically, attributed to `'vp-owned'`.
-- **A flat, cross-project view** — `GET /api/advisor/venture-projects`
-  returns every `VentureProject` across every professor/advisor/VP in one
-  shot, each still carrying its real owning `professorId`, so the console
-  is "every venture in the system," not a single professor's own list.
+  console attributes every project it creates to the logged-in advisor's
+  own real id (e.g. `'advisor-nabil'`) — each of the 5 advisors is also
+  registered as a `ProfessorProfile` under that same id, so "every
+  professor is also an advisor" stays a real identity, not a shared
+  anonymous bucket. (An earlier version of this attributed every advisor-
+  created project to one fixed `'advisor-owned'` identity regardless of
+  who actually posted it — a real bug once 5 real advisor identities
+  existed: every advisor's board showed every other advisor's postings
+  too, pooled together with no way to tell whose was whose. Fixed.) The
+  Vice President's own Venture Board still works the old way, attributed
+  to the `'vp-owned'` singleton anchor — the VP is a genuine one-person
+  role, unlike the 5 advisors.
+- **Per-advisor scoping, VP stays cross-advisor** —
+  `GET /api/advisor/venture-projects?advisorId=...` returns only that one
+  advisor's own postings; omitted (the VP's own board calls it this way)
+  still returns every `VentureProject` across every advisor/VP, since
+  cross-advisor oversight is the VP's whole point here too, same as
+  everywhere else in this app.
 - **Ranked candidate list per project + Accept/Decline** — same
   `ventureFitScore`/`matchScore` computation the student-facing routes
   use, same capacity enforcement (§16.2), same CV inline-preview
-  (§16.4.1), now surfaced inside the flat project list above instead of a
-  separate per-professor "my candidates" screen.
+  (§16.4.1). Reviewing an applicant expands their full profile directly
+  under their own name/row in the pending-approvals list (an accordion),
+  rather than a separate panel elsewhere on the page — the project list
+  itself now lives in a narrow sidebar so the review area gets the full
+  remaining page width instead of a third of it.
+- **An advisor's own grant-request tool** — separate from Project
+  Collider's VP-initiated micro-funding (§ Innovation Topography): here
+  the advisor requests funding on one of their own ventures (regardless of
+  its active/archived status), the VP approves or declines, and each side
+  is notified of the other's action. One request at a time per project —
+  a new ask can't be submitted while an earlier one is still pending.
 - **Two originally-seeded real professors** (`prof-kamel`/`prof-adel`)
-  still exist purely as attribution data on their own pre-existing
-  projects — "Hosted by Dr. Youssef Kamel" still renders correctly on a
-  student's Venture Board — but there is no login and no route reachable
-  as either of them anymore.
+  still exist as `ProfessorProfile` entries (harmless legacy data) but no
+  longer own any seeded venture — every venture is now attributed to a
+  real advisor. There is no login and no route reachable as either of
+  them.
 
 ### 16.7 API routes
 
 See §9.2's "§16 — Innovation & Venture Catalyst" block for the full route
 list (student-facing gate/form/matches/apply; project create/edit and
-match accept/decline, callable by the advisor/VP consoles above using
-`'advisor-owned'`/`'vp-owned'` in place of a professor's own id).
+match accept/decline, callable by the advisor/VP consoles above using the
+logged-in advisor's own real id, or `'vp-owned'` for the VP). Plus the
+grant-request pair: `POST /api/professors/:id/venture-projects/:projectId/grant-request`
+(the owning advisor requests funding) and
+`POST /api/vp/venture-projects/:projectId/grant-request/decide` (the VP
+approves/declines).
 
 ### 16.8 Edge cases & independence rules (extends §12)
 
@@ -1672,10 +1695,12 @@ single-advisor account used to have) overseeing all 5 advisors:
   sign-off (§17.4), plus per-advisor in-flight counters (internal vs.
   external) on the dashboard.
 - **Venture Board**: full parity with the advisor console's own Venture
-  Board (create/manage projects, review candidates) — new projects are
-  attributed to a `'vp-owned'` anchor identity ("Office of the Vice
-  President"), mirroring the existing `'advisor-owned'` anchor the
-  advisor console's own postings already used.
+  Board (create/manage projects, review candidates, decide grant
+  requests) — new projects are attributed to a `'vp-owned'` anchor
+  identity ("Office of the Vice President"); unlike the advisor console
+  (scoped to each advisor's own postings only, §16.6), the VP's board
+  stays deliberately unscoped — cross-advisor oversight is the VP's whole
+  point here too.
 - **Advisor Oversight PDF report**: one click on the dashboard exports a
   PDF — one row per advisor (department, roster size, average CGPA) —
   mirroring the advisor's own §15.4/§17.3 roster report one level up: an

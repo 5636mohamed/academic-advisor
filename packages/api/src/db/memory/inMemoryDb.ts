@@ -1510,6 +1510,19 @@ export function addProposalsFromPlan(studentId: string, plan: CandidateCourseSco
   const freshPlan = plan.filter(c => !existingSlots.has(c.courseCode));
   const newProposals = buildProposalsFromPlan(studentId, freshPlan, bestCaseByCode);
   student.proposals.push(...newProposals);
+  // Real gap reported live: a student generating their plan (§15.3's
+  // "submit for advisor approval" moment — there's no separate submit
+  // click, generating IS what puts these in front of the advisor) never
+  // notified the advisor at all. Only fires when something NEW actually
+  // got added — re-generating with nothing fresh to add (freshPlan empty)
+  // would otherwise spam a duplicate notification on every reload.
+  if (newProposals.length > 0) {
+    createNotification(
+      'advisor', student.advisorId, 'proposal_submitted', 'New course plan awaiting your review',
+      `${student.name} generated a course plan with ${newProposals.length} course${newProposals.length === 1 ? '' : 's'} — awaiting your approval.`,
+      `students/${studentId}/course-plan?mode=proposals`
+    );
+  }
   return student.proposals;
 }
 
@@ -1925,6 +1938,18 @@ export function applyToVentureProject(studentId: string, projectId: string, cv?:
   const breakdown = ventureFitScore(fitInput, project);
   const created = createDirectApplication(studentId, projectId, breakdown.total, cv);
   student.ventureMatches.push(created);
+  // Real gap reported live: whoever owns this venture never found out a
+  // student applied at all except by happening to open their board.
+  // project.professorId is a real advisor id for an advisor-posted
+  // venture (see seedVentureProjects.ts's PROFESSORS — no longer the old
+  // shared 'advisor-owned' anchor every advisor's postings used to share),
+  // or the 'vp-owned' singleton for a VP-posted one — both resolved to a
+  // real notification recipient here, never a legacy/unknown id.
+  if (getAdvisor(project.professorId)) {
+    createNotification('advisor', project.professorId, 'venture_new_candidate', 'New venture applicant', `${student.name} applied to "${project.title}."`, 'venture-board');
+  } else if (project.professorId === 'vp-owned') {
+    createNotification('vp', 'vp', 'venture_new_candidate', 'New venture applicant', `${student.name} applied to "${project.title}."`, 'venture-board');
+  }
   return created;
 }
 
@@ -1972,6 +1997,52 @@ export function updateVentureProject(id: string, patch: Partial<Omit<VentureProj
   const idx = ventureProjects.findIndex(p => p.id === id);
   if (idx === -1) throw new Error(`no such venture project ${id}`);
   ventureProjects[idx] = { ...ventureProjects[idx], ...patch };
+  return ventureProjects[idx];
+}
+
+/** An advisor's own ask for funding on one of THEIR ventures — separate
+ *  direction from Project Collider's VP-initiated micro-funding (the VP
+ *  allocates directly there; here the advisor requests, the VP decides).
+ *  Allowed regardless of the project's isActive status (an archived
+ *  project's team might still need funding to wrap up or publish) — only
+ *  blocked while an earlier request on the SAME project is still
+ *  'pending', so a new ask doesn't silently clobber one already awaiting
+ *  a decision. */
+export function requestGrantForVentureProject(professorId: string, projectId: string, amount: number, note: string): VentureProject {
+  const idx = ventureProjects.findIndex(p => p.id === projectId);
+  if (idx === -1) throw Object.assign(new Error(`no such venture project ${projectId}`), { httpStatus: 404 });
+  const project = ventureProjects[idx];
+  if (project.professorId !== professorId) throw Object.assign(new Error("not this professor's project"), { httpStatus: 403 });
+  if (!Number.isFinite(amount) || amount <= 0) throw Object.assign(new Error('amount must be a positive number'), { httpStatus: 400 });
+  if (project.grantRequest?.status === 'pending') {
+    throw Object.assign(new Error('a grant request for this project is already pending a decision'), { httpStatus: 400 });
+  }
+  ventureProjects[idx] = { ...project, grantRequest: { amount, note, requestedAt: new Date().toISOString(), status: 'pending' } };
+  const advisor = getAdvisor(professorId);
+  createNotification(
+    'vp', 'vp', 'grant_requested', 'New grant request',
+    `${advisor?.name ?? 'An advisor'} requested ${amount.toLocaleString()} EGP for "${project.title}."`,
+    'venture-board'
+  );
+  return ventureProjects[idx];
+}
+
+export function decideVentureGrantRequest(projectId: string, decision: 'approved' | 'declined', decisionNote?: string): VentureProject {
+  const idx = ventureProjects.findIndex(p => p.id === projectId);
+  if (idx === -1) throw Object.assign(new Error(`no such venture project ${projectId}`), { httpStatus: 404 });
+  const project = ventureProjects[idx];
+  if (!project.grantRequest || project.grantRequest.status !== 'pending') {
+    throw Object.assign(new Error('this project has no pending grant request'), { httpStatus: 400 });
+  }
+  ventureProjects[idx] = { ...project, grantRequest: { ...project.grantRequest, status: decision, decidedAt: new Date().toISOString(), decisionNote } };
+  createNotification(
+    'advisor', project.professorId, 'grant_decided',
+    decision === 'approved' ? 'Grant request approved' : 'Grant request declined',
+    decision === 'approved'
+      ? `Your grant request for "${project.title}" was approved.`
+      : `Your grant request for "${project.title}" was declined.${decisionNote ? ` Reason: ${decisionNote}` : ''}`,
+    'venture-board'
+  );
   return ventureProjects[idx];
 }
 

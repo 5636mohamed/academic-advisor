@@ -239,6 +239,18 @@ export interface VentureProjectDTO {
    *  can be posted on either the academic-research or commercial-spinoff
    *  track (see the shared VentureProject type's own doc comment). */
   isGraduationProject?: boolean;
+  /** An advisor's own ask for funding on this venture — separate from
+   *  Project Collider's VP-initiated micro-funding. */
+  grantRequest?: VentureGrantRequestDTO;
+}
+
+export interface VentureGrantRequestDTO {
+  amount: number;
+  note: string;
+  requestedAt: string;
+  status: 'pending' | 'approved' | 'declined';
+  decidedAt?: string;
+  decisionNote?: string;
 }
 
 export interface VentureMatchResultDTO {
@@ -506,10 +518,19 @@ export const api = {
     request<VentureProjectDTO>(`/professors/${professorId}/venture-projects/${projectId}`, { method: 'PUT', body: JSON.stringify(patch) }),
   setVentureMatchStatus: (matchId: string, status: 'accepted' | 'declined') =>
     request<{ id: string; status: VentureMatchStatus }>(`/venture-matches/${matchId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  /** An advisor requesting funding on one of THEIR OWN ventures — allowed
+   *  regardless of the project's current active/archived status. */
+  requestVentureGrant: (professorId: string, projectId: string, amount: number, note: string) =>
+    request<VentureProjectDTO>(`/professors/${professorId}/venture-projects/${projectId}/grant-request`, { method: 'POST', body: JSON.stringify({ amount, note }) }),
+  decideVentureGrantRequest: (projectId: string, decision: 'approved' | 'declined', decisionNote?: string) =>
+    request<VentureProjectDTO>(`/vp/venture-projects/${projectId}/grant-request/decide`, { method: 'POST', body: JSON.stringify({ decision, decisionNote }) }),
   /** Advisor console's own Venture Board — every project across every
    *  professor in one shot, since the advisor manages ventures directly
    *  rather than browsing a per-professor directory (see server.ts). */
-  advisorVentureProjects: () => request<AdvisorVentureProjectRowDTO[]>('/advisor/venture-projects'),
+  /** Omit advisorId to see every advisor's ventures (the VP's own board
+   *  calls it this way — cross-advisor oversight is the VP's whole point).
+   *  A real advisorId scopes to that one advisor's own postings only. */
+  advisorVentureProjects: (advisorId?: string) => request<AdvisorVentureProjectRowDTO[]>(`/advisor/venture-projects${advisorId ? `?advisorId=${encodeURIComponent(advisorId)}` : ''}`),
 
   // AI Features Blueprint — Cognitive Load Heatmap
   frictionTimeline: (studentId: string) => request<FrictionTimelineDTO>(`/students/${studentId}/friction-timeline`),

@@ -1118,8 +1118,17 @@ app.post('/api/vp/collider/projects/:id/fund', (req, res) => {
 // professorId, which the client uses to call the existing per-professor
 // edit route below — that still enforces that a project can only be
 // edited via ITS OWN professorId, unchanged).
-app.get('/api/advisor/venture-projects', (_req, res) => {
-  const projects = db.listVentureProjects().map(project => {
+// Real bug fix: every advisor's venture board used to show EVERY advisor's
+// ventures (a leftover from before 5 real advisor identities existed — see
+// seedVentureProjects.ts's PROFESSORS comment). `?advisorId=` now scopes
+// this to that one advisor's own postings only; omitted (the VP's own
+// board calls it this way) still returns everything, since cross-advisor
+// oversight is the VP's whole point everywhere else in this app too.
+app.get('/api/advisor/venture-projects', (req, res) => {
+  const { advisorId } = req.query;
+  let projects = db.listVentureProjects();
+  if (typeof advisorId === 'string') projects = projects.filter(p => p.professorId === advisorId);
+  const rows = projects.map(project => {
     const candidates = db.getVentureProjectCandidates(project.id);
     return {
       project,
@@ -1135,7 +1144,7 @@ app.get('/api/advisor/venture-projects', (_req, res) => {
       pendingCount: candidates.filter(isPendingCandidate).length,
     };
   });
-  res.json(projects);
+  res.json(rows);
 });
 
 app.post('/api/professors/:id/venture-projects', (req, res) => {
@@ -1186,6 +1195,32 @@ app.put('/api/professors/:id/venture-projects/:projectId', (req, res) => {
     res.json(db.updateVentureProject(req.params.projectId, req.body ?? {}));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// An advisor requesting funding on one of THEIR OWN ventures — allowed
+// regardless of the project's current isActive status (see
+// requestGrantForVentureProject's own doc comment). Notifies the VP.
+app.post('/api/professors/:id/venture-projects/:projectId/grant-request', (req, res) => {
+  const { amount, note } = req.body ?? {};
+  if (typeof amount !== 'number') return res.status(400).json({ error: 'expected { amount: number, note?: string }' });
+  try {
+    res.json(db.requestGrantForVentureProject(paramStr(req, 'id'), paramStr(req, 'projectId'), amount, typeof note === 'string' ? note : ''));
+  } catch (err) {
+    const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// VP decides a pending grant request. Notifies the requesting advisor.
+app.post('/api/vp/venture-projects/:projectId/grant-request/decide', (req, res) => {
+  const { decision, decisionNote } = req.body ?? {};
+  if (decision !== 'approved' && decision !== 'declined') return res.status(400).json({ error: 'expected { decision: "approved"|"declined", decisionNote?: string }' });
+  try {
+    res.json(db.decideVentureGrantRequest(paramStr(req, 'projectId'), decision, typeof decisionNote === 'string' ? decisionNote : undefined));
+  } catch (err) {
+    const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
