@@ -120,6 +120,13 @@ export const QUIZ: QuizQuestion[] = [
   },
 ];
 
+// The 10 real FoE programs (`FOE Handbook.pdf`'s Table 2 "FoE Schools and
+// Programs") — real course-code gateways drawn from each program's own
+// early differentiator courses (see the matching seed<Program>Catalog.ts
+// files). Superseded the earlier ECE/CSE/MCE placeholder set once real
+// catalogs existed for every FoE program to point a gateway at — 'MCE'
+// never matched the handbook's own department code anyway (it's 'MTR',
+// program code 'MTE').
 export const DEPARTMENTS: DepartmentProfile[] = [
   {
     id: 'ECE',
@@ -133,14 +140,63 @@ export const DEPARTMENTS: DepartmentProfile[] = [
     name: 'Computer Science & Engineering',
     facultyId: 'ENG',
     traits: ['software', 'algorithmic', 'analytical'],
-    gatewayCourseCodes: ['CSE211', 'CSE213'],
+    gatewayCourseCodes: ['CSE311', 'CSE317'],
   },
   {
-    id: 'MCE',
+    id: 'MIE',
+    name: 'Biomedical & Bioinformatics Engineering',
+    facultyId: 'ENG',
+    traits: ['analytical', 'systems', 'hardware'],
+    gatewayCourseCodes: ['MIE314', 'MIE211'],
+  },
+  {
+    id: 'EPE',
+    name: 'Electrical Power Engineering',
+    facultyId: 'ENG',
+    traits: ['hardware', 'engineering', 'systems', 'math_heavy'],
+    gatewayCourseCodes: ['EPE321', 'ECE312'],
+  },
+  {
+    id: 'MTE',
     name: 'Mechatronics Engineering',
     facultyId: 'ENG',
     traits: ['hands_on', 'engineering', 'systems'],
-    gatewayCourseCodes: ['ECE221', 'CSE211'],
+    gatewayCourseCodes: ['MTE322', 'MTE323'],
+  },
+  {
+    id: 'MSE',
+    name: 'Materials Science & Engineering',
+    facultyId: 'ENG',
+    traits: ['analytical', 'engineering', 'hands_on'],
+    gatewayCourseCodes: ['MSE311', 'MSE322'],
+  },
+  {
+    id: 'IME',
+    name: 'Industrial & Manufacturing Engineering',
+    facultyId: 'ENG',
+    traits: ['business', 'engineering', 'analytical'],
+    gatewayCourseCodes: ['IME312', 'IME316'],
+  },
+  {
+    id: 'ERE',
+    name: 'Energy Resources Engineering',
+    facultyId: 'ENG',
+    traits: ['engineering', 'systems', 'analytical'],
+    gatewayCourseCodes: ['ERE312', 'ERE313'],
+  },
+  {
+    id: 'ENV',
+    name: 'Environmental Engineering',
+    facultyId: 'ENG',
+    traits: ['analytical', 'engineering', 'systems'],
+    gatewayCourseCodes: ['ENV312', 'ENV314'],
+  },
+  {
+    id: 'CPE',
+    name: 'Chemical & Petrochemical Engineering',
+    facultyId: 'ENG',
+    traits: ['analytical', 'engineering', 'math_heavy'],
+    gatewayCourseCodes: ['CPE312', 'CPE315'],
   },
 ];
 
@@ -171,7 +227,14 @@ export const OTHER_FACULTY_DEPARTMENTS: DepartmentProfile[] = [
 const ALUMNI_BY_DEPARTMENT: Record<string, AlumniStats> = {
   ECE: { employmentRate: 82, satisfaction: 3.9 },
   CSE: { employmentRate: 91, satisfaction: 4.2 },
-  MCE: { employmentRate: 78, satisfaction: 3.7 },
+  MIE: { employmentRate: 80, satisfaction: 3.9 },
+  EPE: { employmentRate: 83, satisfaction: 3.8 },
+  MTE: { employmentRate: 79, satisfaction: 3.8 },
+  MSE: { employmentRate: 76, satisfaction: 3.6 },
+  IME: { employmentRate: 85, satisfaction: 3.9 },
+  ERE: { employmentRate: 81, satisfaction: 3.7 },
+  ENV: { employmentRate: 77, satisfaction: 3.7 },
+  CPE: { employmentRate: 80, satisfaction: 3.7 },
   BIS: { employmentRate: 85, satisfaction: 4.0 },
   ACC: { employmentRate: 88, satisfaction: 3.8 },
   MKT: { employmentRate: 80, satisfaction: 3.6 },

@@ -47,8 +47,8 @@ describe('fitScore (§6 core formula)', () => {
   });
 
   it('strong gateway-course grades raise gwScore above the neutral prior', () => {
-    const dept = DEPARTMENTS.find(d => d.id === 'CSE')!; // gateway: CSE211, CSE213
-    const transcript = transcriptFrom([rec('CSE211', 4.0), rec('CSE213', 3.7)]);
+    const dept = DEPARTMENTS.find(d => d.id === 'CSE')!; // gateway: CSE311, CSE317
+    const transcript = transcriptFrom([rec('CSE311', 4.0), rec('CSE317', 3.7)]);
     const result = fitScore(dept, transcript, {}, { employmentRate: 90, satisfaction: 4.0 });
     expect(result.gwScore).toBeGreaterThan(0.6);
     expect(result.gwScore).toBeCloseTo((4.0 / 4 + 3.7 / 4) / 2, 5);
@@ -56,7 +56,7 @@ describe('fitScore (§6 core formula)', () => {
 
   it('total is the documented 0.5/0.3/0.2 weighted sum of quiz/gateway/alumni', () => {
     const dept = DEPARTMENTS.find(d => d.id === 'CSE')!;
-    const transcript = transcriptFrom([rec('CSE211', 4.0), rec('CSE213', 4.0)]); // gwScore = 1.0
+    const transcript = transcriptFrom([rec('CSE311', 4.0), rec('CSE317', 4.0)]); // gwScore = 1.0
     const alumni = { employmentRate: 100, satisfaction: 5.0 }; // alumScore = 1.0
     const result = fitScore(dept, transcript, cseLeaningAnswers, alumni); // quizScore ~1.0
     expect(result.quizScore).toBe(1);
@@ -69,8 +69,8 @@ describe('fitScore (§6 core formula)', () => {
 describe('recommendDepartments (§4.2 tier-2 input, restricted to student.facultyId)', () => {
   it('§11 Example H-shaped — CSE-leaning quiz + strong programming grades ranks CSE above ECE within the same faculty', () => {
     const transcript = transcriptFrom([
-      rec('CSE211', 4.0), // strong programming
-      rec('CSE213', 3.7),
+      rec('CSE311', 4.0), // strong programming (CSE's real gateway courses)
+      rec('CSE317', 3.7),
       rec('ECE314', 1.3), // weak signals/hardware
       rec('ECE317', 1.0),
       rec('ECE221', 1.7),
@@ -81,9 +81,11 @@ describe('recommendDepartments (§4.2 tier-2 input, restricted to student.facult
     expect(results[0].total).toBeGreaterThan(results.find(r => r.id === 'ECE')!.total);
   });
 
-  it('only returns departments within the given facultyId', () => {
+  it('only returns departments within the given facultyId (all 10 real FoE programs, no BUS-faculty placeholders)', () => {
     const results = recommendDepartments('ENG', {}, {});
-    expect(results.every(r => ['ECE', 'CSE', 'MCE'].includes(r.id))).toBe(true);
+    const realFoeProgramIds = ['ECE', 'CSE', 'MIE', 'EPE', 'MTE', 'MSE', 'IME', 'ERE', 'ENV', 'CPE'];
+    expect(results).toHaveLength(realFoeProgramIds.length);
+    expect(results.every(r => realFoeProgramIds.includes(r.id))).toBe(true);
     expect(results.some(r => r.id === 'BIS')).toBe(false);
   });
 

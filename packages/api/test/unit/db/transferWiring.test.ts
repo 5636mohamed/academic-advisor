@@ -4,6 +4,7 @@
 // "seeded directly, not derived" caveat from PROGRESS.md is resolved).
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as db from '../../../src/db/memory/inMemoryDb';
+import { CATALOG_BY_DEPARTMENT } from '../../../src/db/seed/seedCatalog';
 
 beforeEach(() => {
   db.__resetForTests();
@@ -39,6 +40,29 @@ describe('internal transfer wiring — §7.1', () => {
     expect(after.probationCounter.count).toBe(beforeCount); // untouched, §7.1
     expect(db.hasInternalTransfer('youssef-3')).toBe(true);
     expect(result.transferRecord.type).toBe('internal_department');
+  });
+
+  it('excess-credit determination uses CSE\'s REAL catalog (post real-department-expansion — no longer the old placeholder gateway-course-list workaround)', () => {
+    const beforeTranscript = db.getTranscript('youssef-3');
+    const passedCodes = Object.entries(beforeTranscript)
+      .filter(([, rec]) => rec.letter !== 'F')
+      .map(([code]) => code);
+
+    const result = db.executeInternalTransferForStudent('youssef-3', 'CSE', 'sem-6');
+
+    const cseCodes = new Set(CATALOG_BY_DEPARTMENT['CSE'].map(c => c.code));
+    // Every flagged-excess code is genuinely absent from CSE's real catalog...
+    for (const code of result.excessCreditCourseCodes) {
+      expect(cseCodes.has(code)).toBe(false);
+    }
+    // ...and conversely, every passed course that IS in CSE's real catalog
+    // never gets wrongly flagged as excess.
+    const wronglyExcess = passedCodes.filter(code => cseCodes.has(code) && result.excessCreditCourseCodes.includes(code));
+    expect(wronglyExcess).toEqual([]);
+    // The mechanism is actually doing something, not vacuously empty either
+    // way (youssef-3's weak-hardware profile means she has real ECE-only
+    // program courses on her transcript that CSE's catalog doesn't share).
+    expect(result.excessCreditCourseCodes.length).toBeGreaterThan(0);
   });
 });
 

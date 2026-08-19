@@ -71,7 +71,7 @@ describe('executeInternalTransfer — §7.1', () => {
       studentId: 's1',
       facultyId: 'ENG',
       fromDepartmentId: 'ECE',
-      toDepartmentId: 'MCE',
+      toDepartmentId: 'MTE',
       effectiveSemesterId: 'sem-4',
       cumulativeEarnedCredits: 40,
       passedCourses: [{ courseCode: 'MTH111', category: 'faculty' }],
