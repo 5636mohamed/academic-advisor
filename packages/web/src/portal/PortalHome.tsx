@@ -7,6 +7,7 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, CurriculumCourseDTO, FrictionTimelineDTO, StudentDetail } from '../api/client';
+import { ColdStartAssessment } from '@advisor/shared';
 import { CgpaBarChart, Empty, Loading, SearchBox, Section, StatCard } from './ui/Primitives';
 import { ProbationTrack } from './ui/Primitives';
 import { IconArrowRight, IconFileText, IconLayers, IconTarget } from './ui/Icons';
@@ -21,6 +22,23 @@ const TOTAL_DEGREE_CREDITS = 160; // §2.3 LEVEL_THRESHOLDS ceiling
 // transcript), not one shared component.
 const COLLAPSED_ROW_COUNT = 5;
 
+// Mirrors coldStart.service.ts's COLD_START_TIER_COPY — kept as plain
+// client-side copy (not fetched) since it's static text, same pattern
+// TYPE_LABEL/STAGE_LABEL etc. already use elsewhere for small closed enums.
+const COLD_START_TIER_LABEL: Record<string, string> = {
+  strong_start: 'Strong projected start',
+  solid_start: 'Solid projected start',
+  needs_early_support: 'Early support recommended',
+};
+const COLD_START_TIER_DETAIL: Record<string, string> = {
+  strong_start: 'Your G12 and entrance exam results put you well above the typical first-semester range — no early-support flag needed, just keep the same study habits going.',
+  solid_start: 'Your G12 and entrance exam results project a solid, on-track first semester. A quick check-in with your advisor after your first quiz/midterm results is still a good idea.',
+  needs_early_support: 'Your G12 and entrance exam results are on the lower end of the range that tends to need extra support in a demanding first semester — your advisor has been flagged to reach out early, before any real grades are in yet.',
+};
+const COLD_START_TIER_TONE: Record<string, 'ok' | 'warn' | 'danger'> = {
+  strong_start: 'ok', solid_start: 'warn', needs_early_support: 'danger',
+};
+
 export function PortalHome() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -29,12 +47,14 @@ export function PortalHome() {
   const [query, setQuery] = useState('');
   const [showAllGrades, setShowAllGrades] = useState(false);
   const [workload, setWorkload] = useState<FrictionTimelineDTO | null>(null);
+  const [coldStart, setColdStart] = useState<ColdStartAssessment | null | undefined>(undefined); // undefined = not loaded yet, null = not applicable
 
   useEffect(() => {
     if (!id) return;
     api.getStudent(id).then(setStudent);
     api.getCurriculum(id).then(setCurriculum);
     api.frictionTimeline(id).then(setWorkload);
+    api.coldStartAssessment(id).then(setColdStart);
   }, [id]);
 
   const nameByCode = useMemo(() => {
@@ -51,7 +71,8 @@ export function PortalHome() {
   if (!id) return null;
   if (!student) return <Loading label="Loading your dashboard…" />;
 
-  const cap = creditCapDisplay(student.cgpa);
+  const hasCompletedAnyCourse = (curriculum ?? []).some(r => r.status === 'passed' || r.status === 'needs_retake');
+  const cap = creditCapDisplay(student.cgpa, hasCompletedAnyCourse);
   const trend = [...student.cgpaSnapshots].sort((a, b) => a.semesterOrdinal - b.semesterOrdinal);
 
   const gradedRows = student.transcript
@@ -97,9 +118,37 @@ export function PortalHome() {
             </div>
           </Section>
 
-          <Section eyebrow="Trend" title="CGPA Semester Trend" className="su-mt-16">
-            <CgpaBarChart points={trend.map(s => ({ label: `S${s.semesterOrdinal}`, value: s.cgpa }))} />
-          </Section>
+          {coldStart ? (
+            <Section
+              eyebrow="Getting Started"
+              title={COLD_START_TIER_LABEL[coldStart.tier]}
+              right={<span className={`su-badge ${COLD_START_TIER_TONE[coldStart.tier]}`}>{coldStart.projectedLetter} projected</span>}
+              className="su-mt-16"
+            >
+              <div className="su-subtitle">{COLD_START_TIER_DETAIL[coldStart.tier]}</div>
+              <div className="su-flex su-gap-18 su-mt-16" style={{ flexWrap: 'wrap' }}>
+                <div>
+                  <div className="su-muted" style={{ fontSize: 11.5 }}>G12 (Thanaweya Amma)</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>{coldStart.g12Score}%</div>
+                </div>
+                <div>
+                  <div className="su-muted" style={{ fontSize: 11.5 }}>Entrance exam</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>{coldStart.entranceExamScore}%</div>
+                </div>
+                <div>
+                  <div className="su-muted" style={{ fontSize: 11.5 }}>Projected starting performance</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>{coldStart.projectedPct}% <span className="su-muted" style={{ fontSize: 13, fontWeight: 600 }}>({coldStart.projectedLetter})</span></div>
+                </div>
+              </div>
+              <div className="su-muted su-mt-16" style={{ fontSize: 11 }}>
+                No graded courses yet this semester, so there's no grade trend to chart — this projection is based on your G12 and entrance exam results instead, and will be replaced by a real trend once your first grades come in.
+              </div>
+            </Section>
+          ) : (
+            <Section eyebrow="Trend" title="CGPA Semester Trend" className="su-mt-16">
+              <CgpaBarChart points={trend.map(s => ({ label: `S${s.semesterOrdinal}`, value: s.cgpa }))} />
+            </Section>
+          )}
         </div>
 
         <div>

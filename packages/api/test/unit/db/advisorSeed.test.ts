@@ -1,7 +1,7 @@
 // Multi-advisor epic — the 5 named advisors, and the 125-student roster
-// (13 hand-authored §11 personas + generated filler students) each of
-// them owns 25 of. See db/seed/seedAdvisors.ts and inMemoryDb.ts's
-// generateFillerStudents().
+// (13 hand-authored §11 personas + the cold-start trial persona +
+// generated filler students) each of them owns 25 of. See
+// db/seed/seedAdvisors.ts and inMemoryDb.ts's generateFillerStudents().
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as db from '../../../src/db/memory/inMemoryDb';
 import { ADVISORS, NAMED_STUDENT_ADVISOR, STUDENTS_PER_ADVISOR } from '../../../src/db/seed/seedAdvisors';
@@ -42,14 +42,14 @@ describe('advisor seed — 5 advisors, 125 students total', () => {
     }
   });
 
-  it('the 13 hand-authored named personas keep their original ids and are assigned per NAMED_STUDENT_ADVISOR', () => {
+  it('the 14 hand-authored named personas keep their original ids and are assigned per NAMED_STUDENT_ADVISOR', () => {
     for (const [studentId, advisorId] of Object.entries(NAMED_STUDENT_ADVISOR)) {
       const student = db.getStudent(studentId);
       expect(student).toBeDefined();
       expect(student!.advisorId).toBe(advisorId);
     }
-    // exactly the 13 named ones, no more no less
-    expect(Object.keys(NAMED_STUDENT_ADVISOR)).toHaveLength(13);
+    // exactly the 14 named ones (13 original + the cold-start trial persona), no more no less
+    expect(Object.keys(NAMED_STUDENT_ADVISOR)).toHaveLength(14);
   });
 
   it('named personas keep their real hand-authored fields untouched (spot check Ahmed)', () => {

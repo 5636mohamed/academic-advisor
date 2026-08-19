@@ -61,6 +61,7 @@ All students share one password: **`Student@123`**
 | Hassan Reda (faculty transfer — Examples I/K) | `hassan.reda@aegis.edu.eg` | Prof. Hoda Sami | External/faculty transfer demo |
 | Fatma Zaher (mandatory-overflow — Example M) | `fatma.zaher@aegis.edu.eg` | Prof. Waleed Kassem | Mandatory-retake overflow demo |
 | Mohamed Farag (venture match — Scenario N) | `mohamed.farag@aegis.edu.eg` | Prof. Waleed Kassem | §16 venture-match demo |
+| Youssef Adel (cold start — new Level 1) | `youssef.adel@aegis.edu.eg` | Prof. Waleed Kassem | Zero completed courses — cold-start G12/entrance-exam recommendation demo |
 
 The other 112 students (ids like `advisor-nabil-gen-1`) are deterministically
 generated with their own realistic first+last name (from a fixed name pool)

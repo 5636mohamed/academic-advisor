@@ -10,5 +10,6 @@ export * from './types/venture';
 export * from './types/collider';
 export * from './types/friction';
 export * from './types/notification';
+export * from './types/coldStart';
 export * from './grading/engScale';
 export * from './grading/urScale';

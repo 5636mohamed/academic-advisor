@@ -15,4 +15,13 @@ export interface Student {
   /** Which of the 5 named advisors owns this student's roster slot — see
    *  types/advisor.ts. Every student has exactly one. */
   advisorId: string;
+  /** Cold-start recommendation inputs (§ "new Level 1, no records yet"
+   *  trial case) — Egyptian Thanaweya Amma (G12) final percentage and
+   *  university entrance exam percentage, both 0-100. Optional: only a
+   *  brand-new Level 1/semester-1 student with zero completed courses
+   *  actually needs these (see coldStart.service.ts) — every other
+   *  student's real transcript already carries far more predictive
+   *  signal, so these are never used once real grades exist. */
+  g12Score?: number;
+  entranceExamScore?: number;
 }

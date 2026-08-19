@@ -31,6 +31,7 @@ export const NAMED_STUDENT_ADVISOR: Record<string, string> = {
   'hassan-1': 'advisor-hoda',
   'fatma-1': 'advisor-waleed',
   'mohamed-1': 'advisor-waleed',
+  'youssef-adel-1': 'advisor-waleed',
 };
 
 /** Every advisor's roster is exactly this size (§ the VP epic's "25 students

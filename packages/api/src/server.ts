@@ -33,6 +33,7 @@ import weights from './config/predictionWeights.json';
 // AI Features Blueprint — Cognitive Load Heatmap + Project Collider
 // (advisor/VP-facing only, see the seed files' own headers for scope).
 import { buildFrictionTimeline, recommendTaskMoves, MOVABLE_MILESTONE_TYPES, MAX_MOVE_WEEKS } from './modules/friction/frictionScore.service';
+import { isColdStartStudent, assessColdStart } from './modules/prediction/coldStart.service';
 import { computeInstitutionalBottlenecks, StudentForBottleneck } from './modules/friction/institutionalBottleneck.service';
 import { matchOpportunitiesForProject } from './modules/collider/colliderOpportunityMatch.service';
 import { getAllOpportunities } from './modules/collider/externalOpportunitiesLive.service';
@@ -267,7 +268,8 @@ async function buildScoredPlan(studentId: string, mode: 'fast' | 'target_safe' |
   const scoredPool = await Promise.all(pool.map(c => ports.scoreEligibleCourse(student, c, retakeGateYes)));
   const scoredMandatory = await Promise.all(mandatory.map(c => ports.scoreEligibleCourse(student, c, retakeGateYes)));
   const isHalfLoad = await ports.isPostLowFirstSemester(studentId);
-  const cap = creditCapFor({ isPostLowFirstSemester: isHalfLoad, cgpa: student.cgpa });
+  const hasCompletedAnyCourse = Object.keys(db.getTranscript(studentId)).length > 0;
+  const cap = creditCapFor({ isPostLowFirstSemester: isHalfLoad, cgpa: student.cgpa, hasCompletedAnyCourse });
   return packPlan({ mandatory: scoredMandatory, pool: scoredPool, cap, mode });
 }
 
@@ -327,6 +329,20 @@ app.get('/api/students/:id/cgpa-trend', (req, res) => {
   const snapshots = displayCgpaSnapshots(req.params.id);
   const trend = projectCGPATrend(snapshots);
   res.json({ snapshots, trendSlope: trend.slope, reading: trend.reading });
+});
+
+// Cold-start trial — "Level 1, first semester, no records yet: what does
+// the system recommend?" `null` (not a 404) once a student has ANY real
+// completed course — this isn't a permanent profile field, it's only
+// meaningful for the exact window before real transcript data exists.
+app.get('/api/students/:id/cold-start-assessment', (req, res) => {
+  const student = db.getStudent(paramStr(req, 'id'));
+  if (!student) return res.status(404).json({ error: 'student not found' });
+  const completedCount = Object.keys(db.getTranscript(student.id)).length;
+  if (!isColdStartStudent(completedCount) || student.g12Score == null || student.entranceExamScore == null) {
+    return res.json(null);
+  }
+  res.json(assessColdStart(student.g12Score, student.entranceExamScore));
 });
 
 /** Spec's `POST /api/semesters/:id/close` — exposed here per-student since

@@ -63,5 +63,11 @@
   "collider": {
     "matchThreshold": 0.35,
     "maxSuggestions": 5
+  },
+  "coldStart": {
+    "g12Weight": 0.5,
+    "entranceExamWeight": 0.5,
+    "strongTierMinPct": 85,
+    "solidTierMinPct": 70
   }
 }

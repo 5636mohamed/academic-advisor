@@ -491,6 +491,34 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
     ],
     probationCounter: { studentId: 'mohamed-1', count: 0, armed: true },
   },
+  {
+    // Cold-start trial case — a genuinely fresh Level 1, semester 1
+    // student with ZERO completed courses (allAttempts/cgpaSnapshots both
+    // empty; completeTranscript's own already-existing early-return for
+    // this exact situation, line ~616, confirms it was already an
+    // anticipated case, not a new one this persona invents). No trend/
+    // cohort-projection module has anything to work from yet — the
+    // system's recommendation instead comes from coldStart.service.ts,
+    // blending his G12 (Thanaweya Amma) and university entrance exam
+    // results. Deliberately in the needs_early_support tier (projected
+    // ~64%) — the more useful scenario to demo end-to-end, since it's the
+    // one that actually flags the advisor for early outreach before any
+    // real grade exists.
+    id: 'youssef-adel-1',
+    name: 'Youssef Adel (cold start — new Level 1)',
+    facultyId: 'ENG',
+    departmentId: 'ECE',
+    status: 'active',
+    activeBaseSnapshotId: null,
+    cumulativeEarnedCredits: 0,
+    level: 1,
+    g12Score: 66,
+    entranceExamScore: 61,
+    quizAnswers: {},
+    allAttempts: [],
+    cgpaSnapshots: [],
+    probationCounter: { studentId: 'youssef-adel-1', count: 0, armed: true },
+  },
 ];
 
 /** Small stable hash, same technique as seedCourseOfferings.ts — deterministic

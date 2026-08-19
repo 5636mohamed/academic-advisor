@@ -14,9 +14,17 @@ export function levelLabel(level: number): string {
 /** Mirrors packages/api/src/modules/grading/level.ts's creditCapFor, minus
  *  the half-load (post-low-first-semester) tier, which isn't exposed on the
  *  student summary DTO — the two tiers that matter for this display
- *  (probation vs. standard) are both derivable from `cgpa` alone. */
-export function creditCapDisplay(cgpa: number): { cap: number; reason: string } {
-  if (cgpa < 2.0) return { cap: 14, reason: 'Reduced due to probation' };
+ *  (probation vs. standard) are both derivable from `cgpa` alone.
+ *
+ *  `hasCompletedAnyCourse` defaults true (every existing caller's real
+ *  behavior, unchanged) — pass `false` only for a genuine cold-start
+ *  student (zero completed courses). Without it, a brand-new student's
+ *  cgpa=0 (no grade yet at all, not poor performance) trips the same
+ *  "Reduced due to probation" cap a student who actually earned a sub-2.0
+ *  GPA gets — a real, misleading claim to show someone who's never taken
+ *  an exam, caught via the cold-start trial persona's own dashboard. */
+export function creditCapDisplay(cgpa: number, hasCompletedAnyCourse = true): { cap: number; reason: string } {
+  if (cgpa < 2.0 && hasCompletedAnyCourse) return { cap: 14, reason: 'Reduced due to probation' };
   return { cap: 20, reason: 'Standard registration limit' };
 }
 

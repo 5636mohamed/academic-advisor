@@ -154,4 +154,40 @@ describe('runAdvisingCycle (§4.2 orchestrator, full async wiring)', () => {
     // Still shows the in-major plan as the fallback/status-quo option (§4.2).
     expect(result.plan.length).toBe(1);
   });
+
+  it('cold-start student (cgpa=0, no cgpaSnapshots yet) gets the normal 20-credit cap and "fast" mode, not the probation 14-credit cap/mode — real bug the cold-start trial persona surfaced', async () => {
+    const student = baseStudent(0); // a brand-new student's cgpa really is 0 — no grade exists yet, not poor performance
+    // Enough eligible credit-mass that a wrongly-applied 14-credit
+    // probation cap would visibly truncate the plan below what a genuine
+    // 20-credit cap allows — the actual observable signal, not an
+    // internal implementation detail.
+    const eligible: EligibleCourse[] = [
+      { course: course('MTH111', 3), isRetake: false, oldLetter: null, oldPoints: null },
+      { course: course('PHY111', 3), isRetake: false, oldLetter: null, oldPoints: null },
+      { course: course('CHM111', 3), isRetake: false, oldLetter: null, oldPoints: null },
+      { course: course('MCE111', 3), isRetake: false, oldLetter: null, oldPoints: null },
+      { course: course('IME111', 3), isRetake: false, oldLetter: null, oldPoints: null },
+      { course: course('LRA101', 2), isRetake: false, oldLetter: null, oldPoints: null },
+    ]; // 17 credits total — fits under 20, would be truncated under 14
+
+    const ports: AdvisingCyclePorts = {
+      getRetakeGateAnswer: () => true,
+      getEligibleCourses: () => eligible,
+      scoreEligibleCourse: (_s, c) => ({ ...scored(c.course.code), credits: c.course.credits }),
+      isPostLowFirstSemester: () => false,
+      projectPlanCGPA: () => 3.0, // a real first plan obviously "raises" a from-zero cgpa -> tier-1 short-circuits, same as Example A
+      getCgpaSnapshots: () => [], // the real "no semester has ever closed" signal
+      recommendDepartments: vi.fn(),
+      simulateUnderDepartment: vi.fn(),
+      rankFacultiesByFit: vi.fn(),
+      alreadyTransferredInternallyOnce: vi.fn(),
+      getProbationCounter: () => ({ studentId: student.id, count: 0, armed: true }),
+    };
+
+    const result = await runAdvisingCycle(student, ports);
+    const totalCredits = result.plan.reduce((sum, p) => sum + (eligible.find(e => e.course.code === p.courseCode)?.course.credits ?? 0), 0);
+
+    expect(totalCredits).toBeGreaterThan(14); // proves the 20-credit cap applied, not the 14-credit probation one
+    expect(result.action).toBe('SHOW_PLAN'); // not routed through the probation-repair branch at all
+  });
 });

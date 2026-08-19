@@ -360,14 +360,26 @@ export async function runAdvisingCycle(student: StudentWithCgpa, ports: Advising
     mandatory.map(c => ports.scoreEligibleCourse(student, c, retakeGateYes))
   );
 
+  // Fetched once, ahead of the cap/mode decision below, so it can double
+  // as the "has this student ever closed a real semester yet" signal too —
+  // an empty snapshot series is this app's actual definition of "no real
+  // grade history exists" (a snapshot is only ever written when a
+  // semester CLOSES, §4.1), which is exactly the cold-start case (a
+  // brand-new Level-1/semester-1 student). Without this, student.cgpa=0
+  // (no grade at all, not poor performance) tripped the same
+  // 'probation_repair' mode and 14-credit cap a student who actually
+  // EARNED a sub-2.0 GPA gets — a real bug the cold-start trial persona's
+  // own first plan-generation surfaced.
+  const snapshots = await ports.getCgpaSnapshots(student.id);
+  const hasCompletedAnyCourse = snapshots.length > 0;
+
   const isHalfLoad = await ports.isPostLowFirstSemester(student.id);
-  const cap = creditCapFor({ isPostLowFirstSemester: isHalfLoad, cgpa: student.cgpa });
-  const mode: PlanMode = student.cgpa < 2.0 ? 'probation_repair' : 'fast'; // §4.3
+  const cap = creditCapFor({ isPostLowFirstSemester: isHalfLoad, cgpa: student.cgpa, hasCompletedAnyCourse });
+  const mode: PlanMode = student.cgpa < 2.0 && hasCompletedAnyCourse ? 'probation_repair' : 'fast'; // §4.3
 
   const planResult = packPlan({ mandatory: scoredMandatory, pool: scoredPool, cap, mode });
 
   const projectedCGPA = await ports.projectPlanCGPA(student, planResult); // §3.4(1)
-  const snapshots = await ports.getCgpaSnapshots(student.id);
   const trend = projectCGPATrend(snapshots); // §3.4(2)
 
   const plan = bundlesToPlan(planResult.mandatoryBundles, planResult.optimizedBundles, mode);

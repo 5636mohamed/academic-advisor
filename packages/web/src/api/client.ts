@@ -8,7 +8,7 @@
 // var; the API itself needs CORS enabled for the Pages origin). Deliberately
 // plain fetch + small helpers rather than a data-fetching library — keeps
 // the surface easy to read alongside the routes it calls.
-import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation } from '@advisor/shared';
+import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation, ColdStartAssessment } from '@advisor/shared';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -401,6 +401,10 @@ export const api = {
   probation: (id: string) => request<{ count: number; armed: boolean; history: ProbationCounterLogEntry[] }>(`/students/${id}/probation`),
   cgpaTrend: (id: string) =>
     request<{ snapshots: CgpaSnapshot[]; trendSlope: number | null; reading: string }>(`/students/${id}/cgpa-trend`),
+  /** null once the student has any real completed course — this is only
+   *  ever meaningful in the exact window before real transcript data
+   *  exists (see coldStart.service.ts). */
+  coldStartAssessment: (id: string) => request<ColdStartAssessment | null>(`/students/${id}/cold-start-assessment`),
   transferInternal: (id: string, toDepartmentId: string) =>
     request<unknown>(`/students/${id}/transfer/internal`, { method: 'POST', body: JSON.stringify({ toDepartmentId }) }),
   transferExternal: (id: string, toFacultyId: string, toDepartmentId: string) =>
