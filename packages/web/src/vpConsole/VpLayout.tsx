@@ -11,6 +11,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from '../portal/ui/Icons';
 import { BrandMark } from '../portal/ui/BrandMark';
 import { TopbarNav } from '../portal/ui/TopbarNav';
+import { NotificationBell } from '../portal/ui/NotificationBell';
 import '../portal/student-theme.css';
 
 export function VpLayout() {
@@ -49,6 +50,7 @@ export function VpLayout() {
           <TopbarNav tabs={tabs} />
 
           <div className="su-topbar-user">
+            <NotificationBell role="vp" recipientId="vp" basePath="/vp" />
             <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
               {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
             </button>

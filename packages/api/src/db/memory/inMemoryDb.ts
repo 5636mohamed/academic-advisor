@@ -7,7 +7,7 @@
 // eventually wrap around actual SQL — swapping this module out for Prisma
 // calls later shouldn't require touching any caller (routes/ports), only
 // this file.
-import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor, Project } from '@advisor/shared';
+import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor, Project, Notification, NotificationRole, NotificationType } from '@advisor/shared';
 import { CATALOG } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
 import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
@@ -845,6 +845,9 @@ export function __resetForTests(): void {
   colliderProjects.length = 0;
   colliderProjects.push(...COLLIDER_PROJECTS.map(p => ({ ...p, members: [...p.members], fundingAllocations: [...p.fundingAllocations] })));
   completedFrictionMilestones.clear();
+  milestoneWeekOverrides.clear();
+  notifications.length = 0;
+  notificationSeq = 0;
 }
 
 // ---------------------------------------------------------------------
@@ -1285,6 +1288,11 @@ export function createTransferRequestForStudent(
     toDepartmentId,
   });
   transferRequests.push(request);
+  createNotification(
+    'advisor', student.advisorId, 'transfer_submitted', 'New transfer request',
+    `${student.name} requested a ${type === 'internal_department' ? 'department' : 'faculty'} transfer — awaiting your review.`,
+    'transfer-requests'
+  );
   return request;
 }
 
@@ -1333,6 +1341,15 @@ export function advisorDecideTransferRequest(requestId: string, decision: 'appro
   const updated = decision === 'approve' ? advisorApproveRequest(request) : advisorDeclineRequest(request, reason);
   const idx = transferRequests.findIndex(r => r.id === requestId);
   transferRequests[idx] = updated;
+  if (decision === 'approve') {
+    createNotification('student', request.studentId, 'transfer_advisor_approved', 'Transfer request approved by your advisor', 'Your advisor approved your transfer request — it now awaits the Vice President\'s review.', 'transfer-requests');
+    // Singleton VP recipientId — there's exactly one VP identity in this
+    // app (see VpLayout.tsx's own "single global identity" comment), not
+    // a per-VP-account id to look up.
+    createNotification('vp', 'vp', 'transfer_awaiting_vp', 'Transfer request awaiting your review', `${request.studentName}'s transfer request cleared advisor review — now awaiting VP decision.`, 'transfer-requests');
+  } else {
+    createNotification('student', request.studentId, 'transfer_advisor_declined', 'Transfer request declined by your advisor', reason ? `Your advisor declined your transfer request: ${reason}` : 'Your advisor declined your transfer request.', 'transfer-requests');
+  }
   return updated;
 }
 
@@ -1350,6 +1367,7 @@ export function vpDecideTransferRequest(requestId: string, decision: 'approve' |
     const updated = vpDeclineRequest(request, reason);
     const idx = transferRequests.findIndex(r => r.id === requestId);
     transferRequests[idx] = updated;
+    createNotification('student', request.studentId, 'transfer_vp_declined', 'Transfer request declined by the Vice President', reason ? `The Vice President declined your transfer request: ${reason}` : 'The Vice President declined your transfer request.', 'transfer-requests');
     return updated;
   }
   if (request.type === 'internal_department') {
@@ -1362,6 +1380,7 @@ export function vpDecideTransferRequest(requestId: string, decision: 'approve' |
   const updated = vpApproveRequest(request);
   const idx = transferRequests.findIndex(r => r.id === requestId);
   transferRequests[idx] = updated;
+  createNotification('student', request.studentId, 'transfer_vp_approved', 'Transfer request approved', 'The Vice President approved your transfer request — it has been executed.', 'transfer-requests');
   return updated;
 }
 
@@ -1470,6 +1489,7 @@ export function approveProposalById(proposalId: string): CourseProposal {
   const student = findStudentByProposalId(proposalId);
   const idx = student.proposals.findIndex(p => p.id === proposalId);
   student.proposals[idx] = approveProposal(student.proposals[idx]);
+  createNotification('student', student.id, 'proposal_approved', 'A course proposal was approved', `Your advisor approved ${student.proposals[idx].courseCode} for your plan.`, 'course-plan');
   return student.proposals[idx];
 }
 
@@ -1499,6 +1519,7 @@ export function declineProposalById(proposalId: string): CourseProposal {
   const student = findStudentByProposalId(proposalId);
   const idx = student.proposals.findIndex(p => p.id === proposalId);
   student.proposals[idx] = declineProposal(student.proposals[idx]);
+  createNotification('student', student.id, 'proposal_declined', 'A course proposal was declined', `Your advisor declined ${student.proposals[idx].courseCode} — check your Course Plan for next steps.`, 'course-plan');
   return student.proposals[idx];
 }
 
@@ -1959,6 +1980,14 @@ export function setVentureMatchStatusByProfessor(matchId: string, status: 'accep
       }
     }
     s.ventureMatches[idx] = setMatchStatus(match, status);
+    const projectTitle = getVentureProject(match.ventureProjectId)?.title ?? 'the venture project';
+    createNotification(
+      'student', s.id,
+      status === 'accepted' ? 'venture_match_accepted' : 'venture_match_declined',
+      status === 'accepted' ? 'Venture application accepted' : 'Venture application declined',
+      status === 'accepted' ? `You were accepted onto "${projectTitle}."` : `Your application to "${projectTitle}" was declined.`,
+      'venture-board'
+    );
     return s.ventureMatches[idx];
   }
   throw new Error(`no such venture match ${matchId}`);
@@ -2031,6 +2060,59 @@ export function toggleCompletedMilestone(studentId: string, milestoneId: string)
   else set.add(milestoneId);
   completedFrictionMilestones.set(studentId, set);
   return [...set];
+}
+
+/** "Move this task a week or two later" — a per-student override, same
+ *  shape/reasoning as completedFrictionMilestones above (self-service
+ *  session state, not a real syllabus change: this student's own personal
+ *  plan to do it later, not a rescheduled exam date for the whole class).
+ *  Value is the NEW week number; absence means "at its template week." */
+const milestoneWeekOverrides = new Map<string, Map<string, number>>();
+
+export function getMilestoneWeekOverrides(studentId: string): Record<string, number> {
+  return Object.fromEntries(milestoneWeekOverrides.get(studentId) ?? []);
+}
+
+export function setMilestoneWeekOverride(studentId: string, milestoneId: string, newWeek: number): Record<string, number> {
+  const map = milestoneWeekOverrides.get(studentId) ?? new Map<string, number>();
+  map.set(milestoneId, newWeek);
+  milestoneWeekOverrides.set(studentId, map);
+  return Object.fromEntries(map);
+}
+
+// ---------------------------------------------------------------------
+// Cross-cutting in-app notifications — see notification.ts's own header
+// for the overall shape. One flat array, same "small in-memory table"
+// pattern as transferRequests below it used to be introduced with.
+// ---------------------------------------------------------------------
+const notifications: Notification[] = [];
+let notificationSeq = 0;
+
+export function createNotification(role: NotificationRole, recipientId: string, type: NotificationType, title: string, body: string, link?: string): Notification {
+  const n: Notification = { id: `notif-${++notificationSeq}-${Date.now()}`, role, recipientId, type, title, body, link, createdAt: new Date().toISOString(), read: false };
+  notifications.push(n);
+  return n;
+}
+
+/** Newest first — a notification list reads top-to-bottom as "what just
+ *  happened," not chronologically forward. */
+export function listNotifications(role: NotificationRole, recipientId: string): Notification[] {
+  return notifications.filter(n => n.role === role && n.recipientId === recipientId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function unreadNotificationCount(role: NotificationRole, recipientId: string): number {
+  return notifications.filter(n => n.role === role && n.recipientId === recipientId && !n.read).length;
+}
+
+export function markNotificationRead(id: string): void {
+  const n = notifications.find(x => x.id === id);
+  if (n) n.read = true;
+}
+
+export function markAllNotificationsRead(role: NotificationRole, recipientId: string): void {
+  for (const n of notifications) {
+    if (n.role === role && n.recipientId === recipientId) n.read = true;
+  }
 }
 
 export { courseByCode };

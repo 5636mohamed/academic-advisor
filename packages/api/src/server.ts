@@ -987,6 +987,37 @@ function withMemberNames(project: ReturnType<typeof db.getColliderProject>) {
   };
 }
 
+// ---------------------------------------------------------------------
+// Cross-cutting in-app notifications — see notification.ts's own header.
+// `role`/`recipientId` are client-supplied query params, same demo-grade
+// auth rigor as the rest of this app (no session token to derive them
+// from server-side) — every caller passes its own AuthContext identity,
+// exactly like advisorId scoping already works for /api/students.
+// ---------------------------------------------------------------------
+function parseNotificationRole(v: unknown): 'student' | 'advisor' | 'vp' | null {
+  return v === 'student' || v === 'advisor' || v === 'vp' ? v : null;
+}
+
+app.get('/api/notifications', (req, res) => {
+  const role = parseNotificationRole(req.query.role);
+  const recipientId = req.query.recipientId;
+  if (!role || typeof recipientId !== 'string') return res.status(400).json({ error: 'expected ?role=student|advisor|vp&recipientId=...' });
+  res.json({ notifications: db.listNotifications(role, recipientId), unreadCount: db.unreadNotificationCount(role, recipientId) });
+});
+
+app.post('/api/notifications/:id/read', (req, res) => {
+  db.markNotificationRead(paramStr(req, 'id'));
+  res.json({ ok: true });
+});
+
+app.post('/api/notifications/read-all', (req, res) => {
+  const { role, recipientId } = req.body ?? {};
+  const parsedRole = parseNotificationRole(role);
+  if (!parsedRole || typeof recipientId !== 'string') return res.status(400).json({ error: 'expected { role: "student"|"advisor"|"vp", recipientId: string }' });
+  db.markAllNotificationsRead(parsedRole, recipientId);
+  res.json({ ok: true });
+});
+
 app.get('/api/advisors/:advisorId/collider/projects', (req, res) => {
   const advisorId = paramStr(req, 'advisorId');
   if (!db.getAdvisor(advisorId)) return res.status(404).json({ error: 'advisor not found' });

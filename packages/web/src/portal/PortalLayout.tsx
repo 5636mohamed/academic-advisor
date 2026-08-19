@@ -15,6 +15,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from './ui/Icons';
 import { BrandMark } from './ui/BrandMark';
 import { TopbarNav } from './ui/TopbarNav';
+import { NotificationBell } from './ui/NotificationBell';
 import './student-theme.css';
 
 function initials(name: string) {
@@ -62,6 +63,7 @@ export function PortalLayout() {
           <TopbarNav tabs={tabs} />
 
           <div className="su-topbar-user">
+            <NotificationBell role="student" recipientId={id} basePath={`/portal/${id}`} />
             <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
               {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
             </button>

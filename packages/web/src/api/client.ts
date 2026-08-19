@@ -8,7 +8,7 @@
 // var; the API itself needs CORS enabled for the Pages origin). Deliberately
 // plain fetch + small helpers rather than a data-fetching library — keeps
 // the surface easy to read alongside the routes it calls.
-import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch } from '@advisor/shared';
+import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole } from '@advisor/shared';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -524,6 +524,13 @@ export const api = {
   vpInnovationTopography: () => request<TopographyCell[]>('/vp/collider/topography'),
   vpFundColliderProject: (projectId: string, amount: number, note: string, source: 'university' | 'external_grant', grantName?: string) =>
     request<ColliderProjectDTO>(`/vp/collider/projects/${projectId}/fund`, { method: 'POST', body: JSON.stringify({ amount, note, source, grantName }) }),
+
+  // Cross-cutting in-app notifications
+  notifications: (role: NotificationRole, recipientId: string) =>
+    request<{ notifications: Notification[]; unreadCount: number }>(`/notifications?role=${role}&recipientId=${encodeURIComponent(recipientId)}`),
+  markNotificationRead: (id: string) => request<{ ok: true }>(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead: (role: NotificationRole, recipientId: string) =>
+    request<{ ok: true }>('/notifications/read-all', { method: 'POST', body: JSON.stringify({ role, recipientId }) }),
 
   predictionWeights: () => request<Record<string, unknown>>('/admin/prediction-weights'),
   updatePredictionWeights: (patch: Record<string, unknown>) =>
