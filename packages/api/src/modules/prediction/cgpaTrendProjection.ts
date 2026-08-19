@@ -3,7 +3,7 @@
 // series, which together drive the §4.2 branch decision (show plan vs.
 // recommend a department/faculty transfer).
 import { CgpaSnapshot } from '@advisor/shared';
-import { ols } from './linearRegression';
+import { ols, recencyWeights } from './linearRegression';
 import weights from '../../config/predictionWeights.json';
 
 export type TrendReading = 'improving' | 'flat' | 'declining' | 'insufficient_history';
@@ -16,7 +16,11 @@ export function projectCGPATrend(snapshots: CgpaSnapshot[]): { slope: number | n
   const sorted = [...snapshots].sort((a, b) => a.semesterOrdinal - b.semesterOrdinal);
   const x = sorted.map(s => s.semesterOrdinal);
   const y = sorted.map(s => s.cgpa);
-  const { b: slope } = ols(x, y);
+  // Recency-weighted so a recent turnaround (or slump) is reflected in the
+  // improving/declining call faster than plain OLS would, without letting
+  // a single latest snapshot dominate outright (halfLife=5, same tuning as
+  // studentTrend/cohortTrend — see recencyWeights' doc comment).
+  const { b: slope } = ols(x, y, recencyWeights(x.length, weights.trend.recencyHalfLife));
 
   let reading: TrendReading;
   if (slope > weights.trend.improvingSlopeThreshold) reading = 'improving';

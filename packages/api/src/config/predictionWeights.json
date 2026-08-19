@@ -35,7 +35,8 @@
   "trend": {
     "improvingSlopeThreshold": 0.01,
     "decliningSlopeThreshold": -0.01,
-    "minSnapshotsForTrend": 3
+    "minSnapshotsForTrend": 3,
+    "recencyHalfLife": 5
   },
   "ventureFit": {
     "courseCompetencyWeight": 0.40,

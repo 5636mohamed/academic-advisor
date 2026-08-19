@@ -2,7 +2,8 @@
 // comparable-category courses (program/faculty vs ur_*) so a run of easy
 // LRA marks doesn't distort a projection for a hard core course.
 import { EnrollmentRecord, Course, CourseCategory } from '@advisor/shared';
-import { ols, project, clamp } from './linearRegression';
+import { ols, project, clamp, recencyWeights } from './linearRegression';
+import weights from '../../config/predictionWeights.json';
 
 const MIN_COMPARABLE_FOR_REGRESSION = 3;
 const UR_CATEGORIES: CourseCategory[] = ['ur_core', 'ur_elective'];
@@ -32,7 +33,10 @@ export function studentTrendPct(
 
   const x = comparable.map((_, i) => i);
   const y = comparable.map(r => r.pct);
-  const fit = ols(x, y);
+  // Recency-weighted — a student's more recent grades are more predictive
+  // of their next one than grades from several semesters ago; see
+  // recencyWeights' own doc comment for the backtest that justifies this.
+  const fit = ols(x, y, recencyWeights(x.length, weights.trend.recencyHalfLife));
   const next = project(fit, comparable.length);
   return clamp(next, 0, 100);
 }

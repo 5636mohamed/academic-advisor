@@ -18,7 +18,7 @@
 // nothing else here should need to change.
 import { Transcript, CgpaSnapshot } from '@advisor/shared';
 import { computeCGPA } from '../grading/cgpa';
-import { ols } from '../prediction/linearRegression';
+import { ols, recencyWeights } from '../prediction/linearRegression';
 import { TrendReading } from '../prediction/cgpaTrendProjection';
 import weights from '../../config/predictionWeights.json';
 
@@ -90,7 +90,10 @@ export function simulateUnderDepartment(input: SimulateUnderDepartmentInput): Si
     return { projectedCGPA, trend: { slope: null, reading: 'insufficient_history' } };
   }
 
-  const { b: slope } = ols(seriesX, seriesY);
+  // Same recency-weighted OLS as cgpaTrendProjection.ts's real trend read —
+  // this series is that same kind of data (CGPA snapshots) plus one
+  // simulated point, so it gets the same tuned weighting.
+  const { b: slope } = ols(seriesX, seriesY, recencyWeights(seriesX.length, weights.trend.recencyHalfLife));
   const reading: TrendReading =
     slope > weights.trend.improvingSlopeThreshold ? 'improving' : slope < weights.trend.decliningSlopeThreshold ? 'declining' : 'flat';
 
