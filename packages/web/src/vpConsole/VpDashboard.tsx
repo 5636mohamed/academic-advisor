@@ -78,7 +78,13 @@ export function VpDashboard() {
 
   return (
     <div className="su-fade">
-      <div className="su-stat-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(160px,1fr))' }}>
+      {/* No inline gridTemplateColumns override here anymore — it was
+          hardcoding exactly 3 columns at every viewport width, which
+          defeated .su-stat-grid's own responsive auto-fit rule and caused
+          a real horizontal-overflow bug on mobile (found via an actual
+          375px-viewport screenshot). Same class every other dashboard's
+          stat-card row already uses unmodified. */}
+      <div className="su-stat-grid">
         <StatCard label="ADVISORS" value={String(summary.length)} sub="Each with a 25-student roster" />
         <StatCard label="TOTAL STUDENTS" value={String(totalStudents)} sub="Across every advisor" />
         <StatCard label="OVERALL AVG CGPA" value={overallAvgCgpa.toFixed(2)} unit="/ 4.00" accent sub="Weighted across all advisors" />

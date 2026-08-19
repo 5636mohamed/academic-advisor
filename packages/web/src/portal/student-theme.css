@@ -395,6 +395,13 @@
  * on a small screen. Below 520px, tightened further for phones
  * specifically.
  * ---------------------------------------------------------------------- */
+/* Base (desktop) state for the role-tag short/full swap below — MUST come
+ * before the @media block that overrides it: at equal specificity, CSS
+ * resolves by source order, so a later unconditional rule would beat an
+ * earlier media-query rule even while the media query's condition holds
+ * true (a real bug this exact ordering mistake caused during testing —
+ * the short label stayed hidden at every viewport width). */
+.su-role-tag-short { display: none; }
 @media (max-width: 860px) {
   .su-topbar { padding: 10px 16px; }
   .su-topbar-nav-desktop { display: none; }
@@ -402,6 +409,21 @@
   .su-topbar-user .su-user-meta { display: none; }
   .su-body { padding: 18px 16px 40px; }
   .su-stat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  /* Once .su-topbar-nav-desktop (the row's one flex:1 child) disappears
+   * above, every other topbar child is flex-shrink:0 — their widths just
+   * sum, with nothing left to absorb overflow. That sum fits under the
+   * narrowest supported viewport for "Student"/"Advisor", but "Vice
+   * President" is long enough to push the hamburger button (and the
+   * whole row) past the edge — a real horizontal-overflow bug found via
+   * an actual 375px-viewport screenshot, not assumed. A flex-shrink+
+   * ellipsis fix looked simpler but over-triggered in testing (the
+   * browser's flex algorithm clipped even the short "Advisor" label,
+   * which was never broken) — an explicit short/full swap, same
+   * hide-at-breakpoint pattern .su-brand-sub/.su-user-meta already use
+   * on this exact rule, is what actually stays correct for every label
+   * length instead of guessing at a shrink budget. */
+  .su-role-tag-full { display: none; }
+  .su-role-tag-short { display: inline; }
 }
 @media (max-width: 520px) {
   .su-brand-text .su-brand-sub { display: none; }

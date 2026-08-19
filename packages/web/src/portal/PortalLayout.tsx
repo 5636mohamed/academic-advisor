@@ -57,7 +57,7 @@ export function PortalLayout() {
             </div>
           </div>
           <div className="su-brand-divider" />
-          <div className="su-role-tag">Student</div>
+          <div className="su-role-tag"><span className="su-role-tag-full">Student</span><span className="su-role-tag-short">Student</span></div>
 
           <TopbarNav tabs={tabs} />
 

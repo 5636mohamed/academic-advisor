@@ -85,7 +85,18 @@ export function FrictionTimeline({
               At least one week crosses the burnout-risk threshold — several deadlines are landing in the same week. Consider spacing this plan out if possible{interactive ? ', or check off anything you\'ve already finished — done tasks no longer count toward the score.' : '.'}
             </div>
           )}
-          <div className="su-flex su-gap-8" style={{ alignItems: 'flex-end', height: 140 }}>
+          {/* 14 fixed-content-width columns (each needs room for its own
+              "W14 (3)" label) don't actually shrink below that label's
+              natural width no matter how much flex-shrink allows in
+              theory — min-width:auto is the flexbox default, and text
+              content sets that floor. On a narrow phone the 14-column
+              total genuinely exceeds the viewport (found via an actual
+              375px screenshot: this row alone was ~550px wide) — same
+              "wide content scrolls in its own box, the page never does"
+              rule .su-table-wrap already applies to wide tables, applied
+              here to a wide chart instead. */}
+          <div style={{ overflowX: 'auto' }}>
+          <div className="su-flex su-gap-8" style={{ alignItems: 'flex-end', height: 140, minWidth: 480 }}>
             {readings.map(r => {
               const tone = severityTone(r.frictionScore, burnoutThreshold);
               const heightPct = Math.max(4, (r.frictionScore / maxScore) * 100);
@@ -106,6 +117,7 @@ export function FrictionTimeline({
                 </div>
               );
             })}
+          </div>
           </div>
           <div className="su-flex su-gap-14" style={{ flexWrap: 'wrap', marginTop: 14, fontSize: 11.5 }}>
             {(['good', 'warn', 'danger'] as const).map(tone => (

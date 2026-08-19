@@ -61,7 +61,7 @@ export function AdvisorLayout() {
             </div>
           </div>
           <div className="su-brand-divider" />
-          <div className="su-role-tag">Advisor</div>
+          <div className="su-role-tag"><span className="su-role-tag-full">Advisor</span><span className="su-role-tag-short">Advisor</span></div>
 
           <TopbarNav tabs={tabs} />
 

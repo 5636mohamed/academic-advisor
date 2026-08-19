@@ -39,7 +39,12 @@ export function VpLayout() {
             </div>
           </div>
           <div className="su-brand-divider" />
-          <div className="su-role-tag">Vice President</div>
+          {/* "Vice President" is long enough to overflow the topbar on a
+              narrow phone once the nav row hides (found via an actual
+              375px screenshot) — "VP" below (matching the avatar's own
+              abbreviation) only ever shows at that same breakpoint, via
+              CSS, same hide/show pattern .su-brand-sub already uses. */}
+          <div className="su-role-tag"><span className="su-role-tag-full">Vice President</span><span className="su-role-tag-short">VP</span></div>
 
           <TopbarNav tabs={tabs} />
 
