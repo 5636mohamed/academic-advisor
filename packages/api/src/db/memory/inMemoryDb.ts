@@ -1597,6 +1597,21 @@ function liveSystemProposalForSlot(studentId: string, slotKey: string): CoursePr
   return student?.proposals.find(p => p.slotKey === slotKey && p.origin === 'system' && p.status !== 'declined');
 }
 
+/** Real bug fix: `liveSystemProposalForSlot` above only ever checked THIS
+ *  slot's own system pick — an advisor could still propose course X as an
+ *  "alternate" for slot A even though X was simultaneously the system's
+ *  live recommendation for a completely different slot B in the same
+ *  plan, which is exactly the "already recommended by the system"
+ *  situation this whole rule exists to block, just missed because it
+ *  only ever checked one slot at a time. Scans every OTHER slot's live
+ *  system proposal too. */
+function liveSystemProposalForCourseElsewhere(studentId: string, courseCode: string, excludeSlotKey: string): CourseProposal | undefined {
+  const student = students.get(studentId);
+  return student?.proposals.find(
+    p => p.slotKey !== excludeSlotKey && p.origin === 'system' && p.status !== 'declined' && p.courseCode === courseCode
+  );
+}
+
 /** Dry run — lets the advisor see a candidate alternate's expected AND
  *  best-case grade (and, on the frontend, its grade-point consequence
  *  versus the system's originally recommended course) before committing to
@@ -1612,6 +1627,10 @@ export function previewAdvisorAlternate(
   const systemProposal = liveSystemProposalForSlot(studentId, slotKey);
   if (systemProposal && systemProposal.courseCode === courseCode) {
     throw Object.assign(new Error(`${courseCode} is already the system's recommended course for this slot — pick a different course, or approve the system's suggestion instead.`), { httpStatus: 400 });
+  }
+  const elsewhere = liveSystemProposalForCourseElsewhere(studentId, courseCode, slotKey);
+  if (elsewhere) {
+    throw Object.assign(new Error(`${courseCode} is already the system's recommended course for another slot (${elsewhere.slotKey}) in this plan — pick a different course.`), { httpStatus: 400 });
   }
   return scoreCandidateFields(studentId, courseCode, scored);
 }
@@ -1633,6 +1652,10 @@ export function addAdvisorAlternateProposal(
   const systemProposal = liveSystemProposalForSlot(studentId, slotKey);
   if (systemProposal && systemProposal.courseCode === courseCode) {
     throw Object.assign(new Error(`${courseCode} is already the system's recommended course for this slot — pick a different course, or approve the system's suggestion instead.`), { httpStatus: 400 });
+  }
+  const elsewhere = liveSystemProposalForCourseElsewhere(studentId, courseCode, slotKey);
+  if (elsewhere) {
+    throw Object.assign(new Error(`${courseCode} is already the system's recommended course for another slot (${elsewhere.slotKey}) in this plan — pick a different course.`), { httpStatus: 400 });
   }
   const fields = scoreCandidateFields(studentId, courseCode, scored);
 

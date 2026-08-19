@@ -136,6 +136,14 @@ export function AdvisorProposalsTab({ studentId, studentName }: { studentId: str
   };
 
   const slots = groupBySlot(proposals);
+  // Real bug fix: the alternate-course dropdown below used to only exclude
+  // THIS slot's own system pick — an advisor could still select a course
+  // as an "alternate" for slot A that was simultaneously the system's live
+  // recommendation for a completely different slot B in the same plan
+  // (the backend now rejects that too, but the dropdown shouldn't even
+  // offer it in the first place). Every live system-recommended course
+  // across every slot, not just this one.
+  const allSystemCourseCodes = new Set(slots.map(s => s.system?.courseCode).filter((c): c is string => !!c));
   // A slot is "still pending" once its final word — the advisor's alternate
   // if there is one, otherwise the system's own proposal — hasn't been
   // approved yet. That's exactly the set §15.3.2 step 3 sends to the
@@ -255,7 +263,7 @@ export function AdvisorProposalsTab({ studentId, studentName }: { studentId: str
                   <label>Propose alternate</label>
                   <select className="su-input" value={altPicker[slot.slotKey] ?? ''} onChange={e => pickAlternate(slot.slotKey, e.target.value)}>
                     <option value="">Choose a course…</option>
-                    {eligible.filter(e => e.course.code !== slot.system?.courseCode).map(e => <option key={e.course.code} value={e.course.code}>{e.course.code} — {e.course.name}</option>)}
+                    {eligible.filter(e => !allSystemCourseCodes.has(e.course.code)).map(e => <option key={e.course.code} value={e.course.code}>{e.course.code} — {e.course.name}</option>)}
                   </select>
                 </div>
                 <button

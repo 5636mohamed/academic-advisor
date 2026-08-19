@@ -177,6 +177,33 @@ describe('advisor alternate proposals — cannot re-propose the system\'s own re
     const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE314', scored);
     expect(alt.courseCode).toBe('ECE314'); // now allowed — the system's recommendation is no longer live
   });
+
+  // Real bug, reported live: an advisor could still propose a course as an
+  // "alternate" for one slot even though that exact course was
+  // simultaneously the system's own live recommendation for a DIFFERENT
+  // slot in the same plan — the original guard only ever checked the one
+  // slot being edited.
+  it('addAdvisorAlternateProposal throws when courseCode is the system\'s live recommendation for a DIFFERENT slot', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314'), candidate('ECE322')]);
+    // ECE322 is the system's own pick for slot ECE322 — proposing it as an
+    // "alternate" for slot ECE314 must be blocked too, not just same-slot reuse.
+    expect(() => db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', scored)).toThrow(/already the system's recommended course for another slot/);
+  });
+
+  it('previewAdvisorAlternate throws the same cross-slot guard before persisting anything', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314'), candidate('ECE322')]);
+    const before = db.getProposals('ahmed-1').length;
+    expect(() => db.previewAdvisorAlternate('ahmed-1', 'ECE314', 'ECE322', scored)).toThrow(/already the system's recommended course for another slot/);
+    expect(db.getProposals('ahmed-1')).toHaveLength(before);
+  });
+
+  it('the cross-slot guard only fires while that OTHER slot\'s system proposal is still live', () => {
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314'), candidate('ECE322')]);
+    const otherSystemProposal = db.getProposals('ahmed-1').find(p => p.slotKey === 'ECE322' && p.origin === 'system')!;
+    db.declineProposalById(otherSystemProposal.id);
+    const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE314', 'ECE322', scored);
+    expect(alt.courseCode).toBe('ECE322'); // now allowed — ECE322 is no longer live anywhere
+  });
 });
 
 // Advisor-responsibility epic — proposing a course whose expected grade is
