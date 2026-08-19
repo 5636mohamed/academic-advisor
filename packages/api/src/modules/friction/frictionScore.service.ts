@@ -19,10 +19,21 @@
 // anymore). It's still returned in `contributingMilestones` (with
 // `done: true`) so the UI can show the full task list, including what's
 // already checked off — only the score itself treats it as gone.
-import { MilestoneType, SyllabusMilestone, FrictionReading, FrictionTimeline, FrictionTrendReading } from '@advisor/shared';
+//
+// "Move a task a week or two later" (the task-movement feature): only
+// MOVABLE_TYPES can move — an assignment/quiz/lab_report is genuinely the
+// student's own to reschedule, a midterm/final/project_deadline has a
+// real institutional date nobody can just personally defer. `weekOverrides`
+// (milestoneId -> new week) relocates a milestone's CONTRIBUTION to that
+// week for every score/overlap calculation — it still originates from its
+// real course, just counted where the student says they'll actually do it.
+import { MilestoneType, SyllabusMilestone, FrictionReading, FrictionTimeline, FrictionTrendReading, TaskMoveRecommendation } from '@advisor/shared';
 import { ols, project, recencyWeights, clamp } from '../prediction/linearRegression';
 import weights from '../../config/predictionWeights.json';
 import { SEMESTER_WEEKS } from '../../db/seed/seedSyllabusMilestones';
+
+export const MOVABLE_MILESTONE_TYPES: MilestoneType[] = ['assignment', 'quiz', 'lab_report'];
+export const MAX_MOVE_WEEKS = 2;
 
 export interface CourseCreditLookup {
   (courseCode: string): number | undefined;
@@ -34,20 +45,26 @@ export interface CourseCreditLookup {
  *  against a bad/unknown code) simply contribute nothing that week rather
  *  than throwing. `doneIds` (default empty) excludes those milestones from
  *  the score/overlap-penalty math while still listing them, marked done —
- *  see this file's header for why. */
+ *  see this file's header for why. `weekOverrides` (default empty)
+ *  relocates a milestone to a different week, same section. */
 export function weeklyFriction(
   courseCodes: string[],
   milestonesByCourse: Record<string, SyllabusMilestone[]>,
   creditsFor: CourseCreditLookup,
-  doneIds: ReadonlySet<string> = new Set()
+  doneIds: ReadonlySet<string> = new Set(),
+  weekOverrides: Readonly<Record<string, number>> = {}
 ): FrictionReading[] {
   const milestoneWeights = weights.friction.milestoneWeights as Record<MilestoneType, number>;
-  const readings: FrictionReading[] = [];
 
+  // Effective-week membership computed once for the whole set — the
+  // override applies regardless of which week we're currently scoring,
+  // not re-derived per iteration.
+  const allMilestones = courseCodes.flatMap(code => (milestonesByCourse[code] ?? []).map(m => ({ ...m, courseCode: code })));
+  const effectiveWeekOf = (m: SyllabusMilestone) => weekOverrides[m.id] ?? m.weekNumber;
+
+  const readings: FrictionReading[] = [];
   for (let week = 1; week <= SEMESTER_WEEKS; week++) {
-    const thisWeek = courseCodes.flatMap(code =>
-      (milestonesByCourse[code] ?? []).filter(m => m.weekNumber === week).map(m => ({ ...m, courseCode: code }))
-    );
+    const thisWeek = allMilestones.filter(m => effectiveWeekOf(m) === week);
     const remaining = thisWeek.filter(m => !doneIds.has(m.id));
     const overlapPenalty = remaining.length > 0 ? 1 + weights.friction.overlapPenaltyPerExtraMilestone * (remaining.length - 1) : 1;
 
@@ -94,10 +111,64 @@ export function buildFrictionTimeline(
   courseCodes: string[],
   milestonesByCourse: Record<string, SyllabusMilestone[]>,
   creditsFor: CourseCreditLookup,
-  doneIds: ReadonlySet<string> = new Set()
+  doneIds: ReadonlySet<string> = new Set(),
+  weekOverrides: Readonly<Record<string, number>> = {}
 ): FrictionTimeline {
-  const readings = weeklyFriction(courseCodes, milestonesByCourse, creditsFor, doneIds);
+  const readings = weeklyFriction(courseCodes, milestonesByCourse, creditsFor, doneIds, weekOverrides);
   return { readings, trend: frictionTrend(readings) };
+}
+
+/** For every burnout-risk week, suggest moving ONE movable (assignment/
+ *  quiz/lab_report — never an exam/deadline) milestone out of it, to
+ *  whichever of the next MAX_MOVE_WEEKS weeks currently has the LOWEST
+ *  friction score — a real comparison against those weeks' actual current
+ *  readings, not a static rule. Among a burnout week's movable candidates,
+ *  picks the LOWEST base-weight one (a quiz before an assignment before a
+ *  lab report, per predictionWeights.json's own ordering) — the least
+ *  disruptive single move to actually recommend, since moving everything
+ *  at once isn't the point (the student can always move more than one). */
+export function recommendTaskMoves(
+  readings: FrictionReading[],
+  milestonesByCourse: Record<string, SyllabusMilestone[]>,
+  doneIds: ReadonlySet<string> = new Set()
+): TaskMoveRecommendation[] {
+  const milestoneWeights = weights.friction.milestoneWeights as Record<MilestoneType, number>;
+  const byId = new Map<string, SyllabusMilestone>();
+  for (const list of Object.values(milestonesByCourse)) for (const m of list) byId.set(m.id, m);
+
+  const recommendations: TaskMoveRecommendation[] = [];
+  for (const reading of readings) {
+    if (!reading.burnoutRisk) continue;
+    const movableCandidates = reading.contributingMilestones
+      .filter(m => !m.done && MOVABLE_MILESTONE_TYPES.includes(m.type))
+      .map(m => ({ ...m, weight: milestoneWeights[m.type] ?? 0 }))
+      .sort((a, b) => a.weight - b.weight);
+    if (movableCandidates.length === 0) continue; // nothing movable this week (e.g. only exams collided)
+
+    const best = movableCandidates[0];
+    const template = byId.get(best.id);
+    if (!template) continue;
+
+    const candidateWeeks = Array.from({ length: MAX_MOVE_WEEKS }, (_, i) => reading.weekNumber + i + 1).filter(w => w <= SEMESTER_WEEKS);
+    if (candidateWeeks.length === 0) continue; // already at/near the end of the semester
+
+    const targetWeek = candidateWeeks.reduce((lightest, w) => {
+      const score = readings.find(r => r.weekNumber === w)?.frictionScore ?? Infinity;
+      const lightestScore = readings.find(r => r.weekNumber === lightest)?.frictionScore ?? Infinity;
+      return score < lightestScore ? w : lightest;
+    }, candidateWeeks[0]);
+
+    recommendations.push({
+      weekNumber: reading.weekNumber,
+      milestoneId: best.id,
+      courseCode: best.courseCode,
+      title: best.title,
+      suggestedNewWeek: targetWeek,
+      currentWeekScoreBefore: reading.frictionScore,
+      targetWeekScoreBefore: readings.find(r => r.weekNumber === targetWeek)?.frictionScore ?? 0,
+    });
+  }
+  return recommendations;
 }
 
 /** Only used once, offline (packages/api/scratch/friction-percentile.ts,

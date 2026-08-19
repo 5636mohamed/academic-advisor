@@ -56,6 +56,21 @@ export interface FrictionTimeline {
   trend: { slope: number | null; reading: FrictionTrendReading };
 }
 
+/** "Ease the load" suggestion for one burnout-risk week — see
+ *  frictionScore.service.ts's recommendTaskMoves for exactly how the
+ *  target week is chosen (a real comparison against that week's current
+ *  score, not a static rule). Never suggests moving an exam/deadline —
+ *  only MOVABLE_MILESTONE_TYPES (assignment/quiz/lab_report). */
+export interface TaskMoveRecommendation {
+  weekNumber: number;
+  milestoneId: string;
+  courseCode: string;
+  title: string;
+  suggestedNewWeek: number;
+  currentWeekScoreBefore: number;
+  targetWeekScoreBefore: number;
+}
+
 /** One (department x week) cell in the VP macro-dashboard — mean friction
  *  score across every student registered in that department this
  *  semester, plus how often it crossed the burnout threshold. */

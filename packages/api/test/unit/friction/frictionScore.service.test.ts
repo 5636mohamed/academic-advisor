@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weeklyFriction, frictionTrend, buildFrictionTimeline } from '../../../src/modules/friction/frictionScore.service';
+import { weeklyFriction, frictionTrend, buildFrictionTimeline, recommendTaskMoves, MOVABLE_MILESTONE_TYPES } from '../../../src/modules/friction/frictionScore.service';
 import { SyllabusMilestone } from '@advisor/shared';
 
 const milestonesByCourse: Record<string, SyllabusMilestone[]> = {
@@ -125,5 +125,84 @@ describe('buildFrictionTimeline', () => {
     const timeline = buildFrictionTimeline(['A', 'B'], milestonesByCourse, credits);
     expect(timeline.readings).toHaveLength(14);
     expect(timeline.trend).toBeDefined();
+  });
+});
+
+describe('weekOverrides — "move this task a week or two later"', () => {
+  it('relocates a milestone\'s contribution to its overridden week, not its template week', () => {
+    const readings = weeklyFriction(['A'], milestonesByCourse, credits, new Set(), { 'A::3::quiz': 5 });
+    const week3 = readings.find(r => r.weekNumber === 3)!;
+    const week5 = readings.find(r => r.weekNumber === 5)!;
+    expect(week3.frictionScore).toBe(0); // moved away
+    expect(week5.frictionScore).toBeGreaterThan(0); // now lands here
+    expect(week5.contributingMilestones.map(m => m.id)).toContain('A::3::quiz');
+  });
+
+  it('moving a milestone OUT of a clustered week also recalculates that week\'s overlap penalty', () => {
+    const clustered = weeklyFriction(['A', 'B'], milestonesByCourse, credits).find(r => r.weekNumber === 7)!;
+    // Move A's midterm is not allowed in reality (exams are fixed), but the
+    // math itself doesn't know that — this tests the pure relocation
+    // mechanism, independent of the route-level movable-type restriction.
+    const afterMove = weeklyFriction(['A', 'B'], milestonesByCourse, credits, new Set(), { 'A::7::midterm': 8 }).find(r => r.weekNumber === 7)!;
+    expect(afterMove.frictionScore).toBeLessThan(clustered.frictionScore);
+    expect(afterMove.contributingMilestones).toHaveLength(1);
+  });
+
+  it('an override past the semester length is simply never matched by any week 1..14 (no crash, just dropped from the visible window)', () => {
+    const readings = weeklyFriction(['A'], milestonesByCourse, credits, new Set(), { 'A::3::quiz': 99 });
+    expect(readings.every(r => !r.contributingMilestones.some(m => m.id === 'A::3::quiz'))).toBe(true);
+  });
+});
+
+describe('recommendTaskMoves — "ease the heavy load"', () => {
+  it('never recommends moving a fixed-date exam/deadline, only MOVABLE_MILESTONE_TYPES', () => {
+    expect(MOVABLE_MILESTONE_TYPES).toEqual(expect.arrayContaining(['assignment', 'quiz', 'lab_report']));
+    expect(MOVABLE_MILESTONE_TYPES).not.toContain('midterm');
+    expect(MOVABLE_MILESTONE_TYPES).not.toContain('final');
+  });
+
+  it('suggests nothing for a week that is not burnout risk', () => {
+    const readings = weeklyFriction(['A'], milestonesByCourse, credits); // A alone never crosses the real burnoutThreshold in this fixture
+    const recs = recommendTaskMoves(readings, milestonesByCourse);
+    expect(recs.find(r => r.weekNumber === 3)).toBeUndefined();
+  });
+
+  it('suggests nothing for a burnout week whose only contributors are fixed-type (exams/deadlines) — nothing safe to move', () => {
+    const examOnly: Record<string, SyllabusMilestone[]> = {
+      X: [{ id: 'X::5::final', courseCode: 'X', weekNumber: 5, type: 'final', title: 'X final' }],
+      Y: [{ id: 'Y::5::final', courseCode: 'Y', weekNumber: 5, type: 'final', title: 'Y final' }],
+    };
+    const heavyCredits = () => 5;
+    const readings = weeklyFriction(['X', 'Y'], examOnly, heavyCredits);
+    const week5 = readings.find(r => r.weekNumber === 5)!;
+    expect(week5.burnoutRisk).toBe(true); // two 5-credit finals clustered — definitely over threshold
+    const recs = recommendTaskMoves(readings, examOnly);
+    expect(recs.find(r => r.weekNumber === 5)).toBeUndefined();
+  });
+
+  it('recommends the target week with the genuinely lowest current score among the reachable candidates', () => {
+    const scenario: Record<string, SyllabusMilestone[]> = {
+      C: [
+        { id: 'C::4::assignment', courseCode: 'C', weekNumber: 4, type: 'assignment', title: 'C hw' },
+        { id: 'C::4::midterm', courseCode: 'C', weekNumber: 4, type: 'midterm', title: 'C midterm' },
+      ],
+      D: [{ id: 'D::4::midterm', courseCode: 'D', weekNumber: 4, type: 'midterm', title: 'D midterm' }],
+      // Week 5 has something light; week 6 is completely empty (score 0) — the real lightest target.
+      E: [{ id: 'E::5::quiz', courseCode: 'E', weekNumber: 5, type: 'quiz', title: 'E quiz' }],
+    };
+    const heavyCredits = () => 5; // pushes week 4's real score past the real burnoutThreshold (80)
+    const readings = weeklyFriction(['C', 'D', 'E'], scenario, heavyCredits);
+    expect(readings.find(r => r.weekNumber === 4)!.burnoutRisk).toBe(true);
+    const recs = recommendTaskMoves(readings, scenario);
+    const week4Rec = recs.find(r => r.weekNumber === 4);
+    expect(week4Rec).toBeDefined();
+    expect(week4Rec!.milestoneId).toBe('C::4::assignment'); // the only movable candidate that week
+    expect(week4Rec!.suggestedNewWeek).toBe(6); // strictly lighter than week 5
+  });
+
+  it('a done milestone is never recommended for a move', () => {
+    const readings = weeklyFriction(['A', 'B'], milestonesByCourse, credits, new Set(['A::7::midterm', 'B::7::midterm']));
+    // both midterms done -> week 7 no longer burnout risk at all, nothing to recommend
+    expect(recommendTaskMoves(readings, milestonesByCourse, new Set(['A::7::midterm', 'B::7::midterm']))).toEqual([]);
   });
 });

@@ -8,7 +8,7 @@
 // var; the API itself needs CORS enabled for the Pages origin). Deliberately
 // plain fetch + small helpers rather than a data-fetching library — keeps
 // the surface easy to read alongside the routes it calls.
-import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole } from '@advisor/shared';
+import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation } from '@advisor/shared';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -282,6 +282,8 @@ export interface FrictionTimelineDTO {
   courseCodes: string[];
   readings: FrictionReading[];
   trend: { slope: number | null; reading: FrictionTrendReading };
+  weekOverrides: Record<string, number>;
+  recommendations: TaskMoveRecommendation[];
 }
 export interface FrictionOverviewRowDTO {
   studentId: string;
@@ -514,6 +516,15 @@ export const api = {
     request<FrictionTimelineDTO>(`/students/${studentId}/friction-timeline/toggle-milestone`, {
       method: 'POST',
       body: JSON.stringify({ milestoneId }),
+    }),
+  /** "Move this task a week or two later" — bounded server-side to
+   *  MAX_MOVE_WEEKS ahead of the milestone's own template week, and only
+   *  for movable types (assignment/quiz/lab_report). Returns the
+   *  recalculated timeline, same one-round-trip shape as toggle above. */
+  rescheduleFrictionMilestone: (studentId: string, milestoneId: string, newWeek: number) =>
+    request<FrictionTimelineDTO>(`/students/${studentId}/friction-timeline/reschedule-milestone`, {
+      method: 'POST',
+      body: JSON.stringify({ milestoneId, newWeek }),
     }),
   advisorFrictionOverview: (advisorId: string) => request<FrictionOverviewRowDTO[]>(`/advisors/${advisorId}/friction-overview`),
   vpInstitutionalBottlenecks: () => request<InstitutionalFrictionCell[]>('/vp/friction/institutional-bottlenecks'),

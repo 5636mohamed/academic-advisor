@@ -6,7 +6,7 @@
 // table with the advisor system's retake recommendation per row.
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, CurriculumCourseDTO, StudentDetail } from '../api/client';
+import { api, CurriculumCourseDTO, FrictionTimelineDTO, StudentDetail } from '../api/client';
 import { CgpaBarChart, Empty, Loading, SearchBox, Section, StatCard } from './ui/Primitives';
 import { ProbationTrack } from './ui/Primitives';
 import { IconArrowRight, IconFileText, IconLayers, IconTarget } from './ui/Icons';
@@ -28,11 +28,13 @@ export function PortalHome() {
   const [curriculum, setCurriculum] = useState<CurriculumCourseDTO[] | null>(null);
   const [query, setQuery] = useState('');
   const [showAllGrades, setShowAllGrades] = useState(false);
+  const [workload, setWorkload] = useState<FrictionTimelineDTO | null>(null);
 
   useEffect(() => {
     if (!id) return;
     api.getStudent(id).then(setStudent);
     api.getCurriculum(id).then(setCurriculum);
+    api.frictionTimeline(id).then(setWorkload);
   }, [id]);
 
   const nameByCode = useMemo(() => {
@@ -139,6 +141,35 @@ export function PortalHome() {
           </Section>
         </div>
       </div>
+
+      {workload && workload.readings.length > 0 && (() => {
+        const peak = workload.readings.reduce((max, r) => (r.frictionScore > max.frictionScore ? r : max), workload.readings[0]);
+        const anyBurnout = workload.readings.some(r => r.burnoutRisk);
+        const pendingTaskCount = workload.readings.reduce((n, r) => n + r.contributingMilestones.filter(m => !m.done).length, 0);
+        return (
+          <Section
+            eyebrow="Cognitive Load"
+            title="Your workload this semester"
+            right={<button className="su-btn su-btn-secondary su-btn-sm" onClick={() => navigate(`/portal/${id}/workload`)}>View full workload</button>}
+            className="su-mt-16"
+          >
+            <div className="su-flex su-gap-18" style={{ flexWrap: 'wrap' }}>
+              <div>
+                <div className="su-muted" style={{ fontSize: 11.5 }}>Peak week</div>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>Week {peak.weekNumber} <span className="su-muted" style={{ fontSize: 13, fontWeight: 600 }}>({peak.frictionScore} score)</span></div>
+              </div>
+              <div>
+                <div className="su-muted" style={{ fontSize: 11.5 }}>Pending tasks</div>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{pendingTaskCount}</div>
+              </div>
+              <div>
+                <div className="su-muted" style={{ fontSize: 11.5 }}>Status</div>
+                {anyBurnout ? <span className="su-badge danger">Burnout risk this semester</span> : <span className="su-badge ok">On track</span>}
+              </div>
+            </div>
+          </Section>
+        );
+      })()}
 
       <Section title="My grades" right={<SearchBox value={query} onChange={setQuery} placeholder="Course code / Name" />} className="su-mt-16">
         {student.transcript.some(r => r.status === 'registered') && (

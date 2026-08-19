@@ -32,12 +32,12 @@ import { VENTURE_QUIZ } from './modules/venture/ventureQuiz';
 import weights from './config/predictionWeights.json';
 // AI Features Blueprint — Cognitive Load Heatmap + Project Collider
 // (advisor/VP-facing only, see the seed files' own headers for scope).
-import { buildFrictionTimeline } from './modules/friction/frictionScore.service';
+import { buildFrictionTimeline, recommendTaskMoves, MOVABLE_MILESTONE_TYPES, MAX_MOVE_WEEKS } from './modules/friction/frictionScore.service';
 import { computeInstitutionalBottlenecks, StudentForBottleneck } from './modules/friction/institutionalBottleneck.service';
 import { matchOpportunitiesForProject } from './modules/collider/colliderOpportunityMatch.service';
 import { getAllOpportunities } from './modules/collider/externalOpportunitiesLive.service';
 import { buildTopography } from './modules/collider/innovationTopography.service';
-import { MILESTONES_BY_COURSE } from './db/seed/seedSyllabusMilestones';
+import { MILESTONES_BY_COURSE, SYLLABUS_MILESTONES, SEMESTER_WEEKS } from './db/seed/seedSyllabusMilestones';
 import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
 
 const app = express();
@@ -889,14 +889,24 @@ function courseCodesInPlan(plan: PackPlanResult): string[] {
  *  students in this demo have never gone through the manual
  *  register/choose flow, so that set is usually empty. Framing it as the
  *  RECOMMENDED plan is also the more useful product shape anyway: it lets
- *  a student see burnout risk BEFORE committing to a plan, not just after. */
+ *  a student see burnout risk BEFORE committing to a plan, not just after.
+ *
+ *  Shared by all three friction-timeline routes below (GET, toggle-
+ *  milestone, reschedule-milestone) — each ends with "recompute and
+ *  return the full picture," so the recompute step lives once here. */
+async function buildFullFrictionTimeline(studentId: string) {
+  const plan = await buildScoredPlan(studentId, 'fast');
+  const courseCodes = courseCodesInPlan(plan);
+  const doneIds = new Set(db.getCompletedMilestoneIds(studentId));
+  const weekOverrides = db.getMilestoneWeekOverrides(studentId);
+  const timeline = buildFrictionTimeline(courseCodes, MILESTONES_BY_COURSE, courseCreditsFor, doneIds, weekOverrides);
+  const recommendations = recommendTaskMoves(timeline.readings, MILESTONES_BY_COURSE, doneIds);
+  return { courseCodes, weekOverrides, recommendations, ...timeline };
+}
+
 app.get('/api/students/:id/friction-timeline', blockIfDismissed, async (req, res) => {
   try {
-    const studentId = paramStr(req, 'id');
-    const plan = await buildScoredPlan(studentId, 'fast');
-    const courseCodes = courseCodesInPlan(plan);
-    const doneIds = new Set(db.getCompletedMilestoneIds(studentId));
-    res.json({ courseCodes, ...buildFrictionTimeline(courseCodes, MILESTONES_BY_COURSE, courseCreditsFor, doneIds) });
+    res.json(await buildFullFrictionTimeline(paramStr(req, 'id')));
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
@@ -913,10 +923,41 @@ app.post('/api/students/:id/friction-timeline/toggle-milestone', blockIfDismisse
     const { milestoneId } = req.body ?? {};
     if (typeof milestoneId !== 'string') return res.status(400).json({ error: 'expected { milestoneId: string }' });
     db.toggleCompletedMilestone(studentId, milestoneId);
-    const plan = await buildScoredPlan(studentId, 'fast');
-    const courseCodes = courseCodesInPlan(plan);
-    const doneIds = new Set(db.getCompletedMilestoneIds(studentId));
-    res.json({ courseCodes, ...buildFrictionTimeline(courseCodes, MILESTONES_BY_COURSE, courseCreditsFor, doneIds) });
+    res.json(await buildFullFrictionTimeline(studentId));
+  } catch (err) {
+    const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// "Move this task a week or two later" — bounded to MAX_MOVE_WEEKS ahead
+// of the milestone's own real template week (never backward, never past
+// that bound, and never for a fixed-date exam/deadline — see
+// MOVABLE_MILESTONE_TYPES). Notifies the student of the schedule change
+// in the same request, and returns the recalculated timeline.
+app.post('/api/students/:id/friction-timeline/reschedule-milestone', blockIfDismissed, async (req, res) => {
+  try {
+    const studentId = paramStr(req, 'id');
+    const { milestoneId, newWeek } = req.body ?? {};
+    if (typeof milestoneId !== 'string' || typeof newWeek !== 'number') {
+      return res.status(400).json({ error: 'expected { milestoneId: string, newWeek: number }' });
+    }
+    const template = SYLLABUS_MILESTONES.find(m => m.id === milestoneId);
+    if (!template) return res.status(404).json({ error: `no such milestone ${milestoneId}` });
+    if (!MOVABLE_MILESTONE_TYPES.includes(template.type)) {
+      return res.status(400).json({ error: `${template.type} has a fixed institutional date and can't be personally rescheduled` });
+    }
+    if (newWeek < template.weekNumber || newWeek > template.weekNumber + MAX_MOVE_WEEKS || newWeek > SEMESTER_WEEKS) {
+      return res.status(400).json({ error: `can only move this task up to ${MAX_MOVE_WEEKS} week(s) later than its original week ${template.weekNumber}` });
+    }
+    if (!db.getStudent(studentId)) return res.status(404).json({ error: 'student not found' });
+    db.setMilestoneWeekOverride(studentId, milestoneId, newWeek);
+    db.createNotification(
+      'student', studentId, 'task_rescheduled', 'Task rescheduled',
+      `You moved "${template.title}" from Week ${template.weekNumber} to Week ${newWeek}.`,
+      'workload'
+    );
+    res.json(await buildFullFrictionTimeline(studentId));
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
