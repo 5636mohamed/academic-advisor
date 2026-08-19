@@ -28,8 +28,11 @@ export const MIE_CATALOG: Course[] = [
   c('MIE314', 'Biomedical Electronics', 3, 5, ['ECE211'], ['MIE315'], 'program'),
   c('MIE315', 'Biomedical Electronics Lab', 1, 5, [], ['MIE314'], 'program'),
 
-  // ---- Semester 6 ----
+  // ---- Semester 6 (handbook places MTE324/325 in MIE's own semester 8 —
+  // kept here instead, per seedFoeSharedCourses.ts's earliest-adopter-wins
+  // rule) ----
   LRA102, LRAE3,
+  MTE324, MTE325,
   c('MIE426', 'Project Based Learning on Biomedical and Bioinformatics Engineering', 3, 6, ['MIE314'], [], 'program'),
   c('MIE320', 'Medical Instruments and Instrumentation', 3, 6, ['EPE221'], [], 'program'),
   c('MIE322', 'Biomedical Signal Processing', 3, 6, ['ECE314'], [], 'program'),
@@ -48,7 +51,6 @@ export const MIE_CATALOG: Course[] = [
   // ---- Semester 8 ----
   LRA201,
   c('MIE422', 'HealthCare Information Systems', 3, 8, ['MIE414'], [], 'program'),
-  MTE324, MTE325,
   c('MIEEL4', 'Program Elective 4', 3, 8, [], [], 'program_elective'),
   c('MIEEL5', 'Program Elective 5', 3, 8, [], [], 'program_elective'),
   c('MIE424', 'Graduation Project (1)', 3, 8, ['MIE410'], [], 'special'),

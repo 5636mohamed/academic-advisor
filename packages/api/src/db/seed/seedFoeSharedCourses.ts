@@ -104,16 +104,17 @@ export const CPE221 = c('CPE221', 'Fundamentals of Fluid Mechanics', 2, 4, [], [
 export const CPE223 = c('CPE223', 'Thermodynamics', 2, 4, ['CPE213'], [], 'program');
 
 // ---- MTE324/325 "Automatic Control" — MTE-owned course code, cross-listed
-// into several other programs' plans (already the case in the existing ECE
-// catalog, which places it in semester 8). The handbook places it in
-// semester 6 for MTE/IME/ENV's own programs and semester 8 for
-// ECE/EPE/MIE/MSE's — since this catalog model keys courses globally by
-// code (one Course record per code, not one per program-offering-of-that-
-// code), a single code can't carry two different semesterOrdinals at once.
-// Kept at semester 8 (matching the existing, already-tested ECE catalog)
-// for every program that takes it, including MTE/IME/ENV — a documented
-// simplification: those three programs' own advising cycles will treat it
-// as available a semester later (Level 4 instead of Level 3) than their
-// real handbook plan shows.
-export const MTE324 = c('MTE324', 'Automatic Control', 2, 8, ['MTH121'], ['MTE325'], 'program');
-export const MTE325 = c('MTE325', 'Automatic Control Lab', 1, 8, [], ['MTE324'], 'program');
+// into several other programs' plans at a LATER point in their own real
+// plan (ECE/EPE/MIE/MSE take it at their own semester 8; MTE/IME/ENV, where
+// it's a home requirement, take it at semester 6). Canonicalized here at
+// semester 6 — the EARLIEST semester any adopter uses — rather than the
+// latest, because a shared course must never end up scheduled AFTER
+// something that lists it as a prereq (MTE's own MTE414 "Robotics", sem 7,
+// requires it) — taking a prereq-satisfying course earlier than a
+// particular program's own plan strictly needs is harmless; the reverse
+// isn't. ECE/EPE/MIE/MSE's own advising cycles will therefore show it
+// available a semester earlier (Level 3 instead of Level 4) than their real
+// handbook plan does — a documented simplification of the same kind as
+// every other cross-listed-course placement in this file.
+export const MTE324 = c('MTE324', 'Automatic Control', 2, 6, ['MTH121'], ['MTE325'], 'program');
+export const MTE325 = c('MTE325', 'Automatic Control Lab', 1, 6, [], ['MTE324'], 'program');

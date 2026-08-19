@@ -13,6 +13,9 @@ import {
 import { CSE_CATALOG, CSE_ELECTIVE_POOL } from './seedCseCatalog';
 import { MIE_CATALOG, MIE_ELECTIVE_POOL } from './seedMieCatalog';
 import { EPE_CATALOG, EPE_ELECTIVE_POOL } from './seedEpeCatalog';
+import { MTE_CATALOG, MTE_ELECTIVE_POOL } from './seedMteCatalog';
+import { MSE_CATALOG, MSE_ELECTIVE_POOL } from './seedMseCatalog';
+import { IME_CATALOG, IME_ELECTIVE_POOL } from './seedImeCatalog';
 
 export const ECE_CATALOG: Course[] = [
   ...SHARED_SEM_1_3,
@@ -33,8 +36,11 @@ export const ECE_CATALOG: Course[] = [
   c('ECE318', 'Electronic Devices Lab', 1, 5, [], ['ECE317'], 'program'),
   c('ECE319', 'Seminar on ECE', 2, 5, ['EPE221', 'ECE221'], [], 'program'),
 
-  // ---- Semester 6 ----
+  // ---- Semester 6 (handbook places MTE324/325 in ECE's own semester 8 —
+  // kept here at semester 6 instead, per seedFoeSharedCourses.ts's
+  // earliest-adopter-wins rule) ----
   LRA102, LRAE3,
+  MTE324, MTE325,
   c('ECE321', 'Project Based Learning on ECE', 2, 6, ['ECE310'], [], 'program'),
   c('ECE322', 'Electronic Circuits', 2, 6, ['ECE211'], ['ECE323'], 'program'),
   c('ECE323', 'Electronic Circuits Lab', 1, 6, [], ['ECE322'], 'program'),
@@ -57,7 +63,6 @@ export const ECE_CATALOG: Course[] = [
 
   // ---- Semester 8 ----
   LRA201,
-  MTE324, MTE325,
   c('ECE421', 'Principles of Information Theory and Coding', 2, 8, ['ECE413'], ['ECE422'], 'program'),
   c('ECE422', 'Principles of Information Theory and Coding Lab', 1, 8, [], ['ECE421'], 'program'),
   c('ECEEL4', 'Program Elective 4', 3, 8, [], [], 'program_elective'),
@@ -106,6 +111,9 @@ export const CATALOG_BY_DEPARTMENT: Record<string, Course[]> = {
   CSE: CSE_CATALOG,
   MIE: MIE_CATALOG,
   EPE: EPE_CATALOG,
+  MTE: MTE_CATALOG,
+  MSE: MSE_CATALOG,
+  IME: IME_CATALOG,
 };
 
 function dedupeByCode(courses: Course[]): Course[] {
@@ -136,4 +144,7 @@ export const ELECTIVE_POOL_BY_DEPARTMENT: Record<string, typeof ECE_ELECTIVE_POO
   CSE: CSE_ELECTIVE_POOL,
   MIE: MIE_ELECTIVE_POOL,
   EPE: EPE_ELECTIVE_POOL,
+  MTE: MTE_ELECTIVE_POOL,
+  MSE: MSE_ELECTIVE_POOL,
+  IME: IME_ELECTIVE_POOL,
 };

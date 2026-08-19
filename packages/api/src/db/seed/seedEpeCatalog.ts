@@ -14,9 +14,7 @@ export const EPE_CATALOG: Course[] = [
   // ---- Semester 4 (identical to ECE's own semester 4) ----
   LRA202, LRA103, LRAE1, BIO121, EPE221, EPE222, CSE213, IME221, ECE221, ECE222,
 
-  // ---- Semester 5 (handbook also places MTE324/325 here — kept at
-  // semester 8 instead, per seedFoeSharedCourses.ts's documented
-  // one-semester-per-code simplification) ----
+  // ---- Semester 5 ----
   LRAE2,
   c('EPE310', 'Seminar on EPE', 2, 5, [], [], 'program'),
   c('ECE312', 'Electric Circuits', 2, 5, ['EPE121'], ['ECE313'], 'program'),
@@ -25,10 +23,11 @@ export const EPE_CATALOG: Course[] = [
   c('ECE315', 'Signals and Systems Lab', 1, 5, [], ['ECE314'], 'program'),
   c('ECE316', 'Engineering Mathematics', 3, 5, ['MTH121'], [], 'program'),
 
-  // ---- Semester 6 (handbook places ECE328/329 in EPE's own semester 5 —
-  // kept at semester 6 instead, matching ECE's own already-established
-  // placement, per seedFoeSharedCourses.ts's one-semester-per-code rule) ----
+  // ---- Semester 6 (handbook places ECE328/329 in EPE's own semester 5,
+  // and MTE324/325 in EPE's own semester 5 too — both kept at semester 6
+  // instead, per seedFoeSharedCourses.ts's earliest-adopter-wins rule) ----
   LRA102, LRAE3,
+  MTE324, MTE325,
   c('ECE328', 'Engineering Electromagnetics', 2, 6, ['ECE316'], ['ECE329'], 'program'),
   c('ECE329', 'Engineering Electromagnetics Lab', 1, 6, [], ['ECE328'], 'program'),
   c('EPE320', 'Project Based Learning on EPE', 2, 6, ['EPE121'], [], 'program'),
@@ -56,7 +55,6 @@ export const EPE_CATALOG: Course[] = [
   c('EPE421', 'Energy Conversion and Utilization', 3, 8, ['EPE321'], [], 'program'),
   c('EPE422', 'Switch Gear and Protection Systems', 2, 8, ['EPE421'], ['EPE423'], 'program'),
   c('EPE423', 'Switch Gear and Protection Systems Lab', 1, 8, [], ['EPE422'], 'program'),
-  MTE324, MTE325,
   c('EPEEL4', 'Program Elective 4', 3, 8, [], [], 'program_elective'),
   c('EPEEL5', 'Program Elective 5', 3, 8, [], [], 'program_elective'),
   c('EPE420', 'Graduation Project (1)', 3, 8, [], [], 'special'),
