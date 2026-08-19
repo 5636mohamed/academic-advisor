@@ -24,6 +24,11 @@ export const ADVISORS: Advisor[] = [
   { id: 'advisor-mostafa', name: 'Prof. Mostafa Hegazy', facultyId: 'ENG', departmentId: 'MTE' },
   { id: 'advisor-dina', name: 'Prof. Dina Farouk', facultyId: 'ENG', departmentId: 'MSE' },
   { id: 'advisor-ayman', name: 'Prof. Ayman Nabil', facultyId: 'ENG', departmentId: 'IME' },
+
+  // ---- EECE school ----
+  { id: 'advisor-khaled', name: 'Prof. Khaled Ramzy', facultyId: 'ENG', departmentId: 'ERE' },
+  { id: 'advisor-nagwa', name: 'Prof. Nagwa Fahmy', facultyId: 'ENG', departmentId: 'ENV' },
+  { id: 'advisor-amr', name: 'Prof. Amr Shawky', facultyId: 'ENG', departmentId: 'CPE' },
 ];
 
 /** Which of the hand-authored named personas belongs to which advisor —

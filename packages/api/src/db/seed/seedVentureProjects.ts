@@ -71,6 +71,9 @@ export const PROFESSORS: ProfessorProfile[] = [
   { id: 'advisor-mostafa', facultyId: 'ENG', departmentId: 'MTE', name: 'Prof. Mostafa Hegazy', researchTags: [], acceptingUndergrads: true },
   { id: 'advisor-dina', facultyId: 'ENG', departmentId: 'MSE', name: 'Prof. Dina Farouk', researchTags: [], acceptingUndergrads: true },
   { id: 'advisor-ayman', facultyId: 'ENG', departmentId: 'IME', name: 'Prof. Ayman Nabil', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-khaled', facultyId: 'ENG', departmentId: 'ERE', name: 'Prof. Khaled Ramzy', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-nagwa', facultyId: 'ENG', departmentId: 'ENV', name: 'Prof. Nagwa Fahmy', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-amr', facultyId: 'ENG', departmentId: 'CPE', name: 'Prof. Amr Shawky', researchTags: [], acceptingUndergrads: true },
   // VP epic — the same attribution-anchor pattern the advisors used to all
   // share, kept for the VP specifically (a genuine singleton role, unlike
   // the 5 advisors) — projects the Vice President posts directly (their

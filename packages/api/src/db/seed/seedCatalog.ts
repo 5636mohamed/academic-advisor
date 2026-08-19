@@ -16,6 +16,9 @@ import { EPE_CATALOG, EPE_ELECTIVE_POOL } from './seedEpeCatalog';
 import { MTE_CATALOG, MTE_ELECTIVE_POOL } from './seedMteCatalog';
 import { MSE_CATALOG, MSE_ELECTIVE_POOL } from './seedMseCatalog';
 import { IME_CATALOG, IME_ELECTIVE_POOL } from './seedImeCatalog';
+import { ERE_CATALOG, ERE_ELECTIVE_POOL } from './seedEreCatalog';
+import { ENV_CATALOG, ENV_ELECTIVE_POOL } from './seedEnvCatalog';
+import { CPE_CATALOG, CPE_ELECTIVE_POOL } from './seedCpeCatalog';
 
 export const ECE_CATALOG: Course[] = [
   ...SHARED_SEM_1_3,
@@ -114,6 +117,9 @@ export const CATALOG_BY_DEPARTMENT: Record<string, Course[]> = {
   MTE: MTE_CATALOG,
   MSE: MSE_CATALOG,
   IME: IME_CATALOG,
+  ERE: ERE_CATALOG,
+  ENV: ENV_CATALOG,
+  CPE: CPE_CATALOG,
 };
 
 function dedupeByCode(courses: Course[]): Course[] {
@@ -147,4 +153,7 @@ export const ELECTIVE_POOL_BY_DEPARTMENT: Record<string, typeof ECE_ELECTIVE_POO
   MTE: MTE_ELECTIVE_POOL,
   MSE: MSE_ELECTIVE_POOL,
   IME: IME_ELECTIVE_POOL,
+  ERE: ERE_ELECTIVE_POOL,
+  ENV: ENV_ELECTIVE_POOL,
+  CPE: CPE_ELECTIVE_POOL,
 };
