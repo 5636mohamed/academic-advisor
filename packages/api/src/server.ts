@@ -913,7 +913,19 @@ app.get('/api/advisors/:advisorId/friction-overview', async (req, res) => {
     const plan = await buildScoredPlan(s.id, 'fast');
     const timeline = buildFrictionTimeline(courseCodesInPlan(plan), MILESTONES_BY_COURSE, courseCreditsFor);
     const peak = timeline.readings.reduce((max, r) => (r.frictionScore > max.frictionScore ? r : max), timeline.readings[0]);
-    return { studentId: s.id, studentName: s.name, peakWeek: peak.weekNumber, peakFrictionScore: peak.frictionScore, anyBurnoutRisk: timeline.readings.some(r => r.burnoutRisk), trend: timeline.trend };
+    const weeksOverThreshold = timeline.readings.filter(r => r.burnoutRisk).length;
+    // A single bad week out of 14 is common enough (a normal course load's
+    // own finals-period clustering routinely does it — see
+    // frictionScore.service.ts's burnoutThreshold derivation) that flagging
+    // on ANY single week made this triage view nearly useless: ~24 of 25
+    // real students on a real roster hit it, which stops meaning anything.
+    // "Sustained" (>=2 weeks) is the actually-discriminating signal for
+    // "reach out to this student," while weeksOverThreshold itself still
+    // ships so the UI can show the milder single-week case too, not hide it.
+    return {
+      studentId: s.id, studentName: s.name, peakWeek: peak.weekNumber, peakFrictionScore: peak.frictionScore,
+      weeksOverThreshold, sustainedBurnoutRisk: weeksOverThreshold >= 2, trend: timeline.trend,
+    };
   }));
   overview.sort((a, b) => b.peakFrictionScore - a.peakFrictionScore);
   res.json(overview);

@@ -25,13 +25,17 @@ export function AdvisorFrictionOverview() {
 
   if (!rows) return <Loading label="Projecting workload across your roster…" />;
 
-  const atRisk = rows.filter(r => r.anyBurnoutRisk).length;
+  // Sustained (>=2 weeks over threshold) is the actually-discriminating
+  // triage signal — a single bad week is common enough on a normal course
+  // load (finals-period clustering routinely does it on its own) that
+  // flagging on any one week isn't useful for "who needs a check-in."
+  const sustained = rows.filter(r => r.sustainedBurnoutRisk).length;
 
   return (
     <Section
       eyebrow="Cognitive Load"
       title="Roster workload overview"
-      subtitle={`${atRisk} of ${rows.length} student${rows.length === 1 ? '' : 's'} have at least one week over the burnout-risk threshold in their recommended plan, sorted worst-first.`}
+      subtitle={`${sustained} of ${rows.length} student${rows.length === 1 ? '' : 's'} have 2+ weeks over the burnout-risk threshold in their recommended plan (a single bad week is common and not flagged on its own) — sorted worst-first.`}
     >
       {rows.length === 0 ? (
         <Empty>No students on your roster yet.</Empty>
@@ -39,7 +43,7 @@ export function AdvisorFrictionOverview() {
         <div className="su-table-wrap">
           <table className="su-table">
             <thead>
-              <tr><th>Student</th><th>Peak week</th><th>Peak friction score</th><th>Trend</th><th>Status</th></tr>
+              <tr><th>Student</th><th>Peak week</th><th>Peak friction score</th><th>Weeks over threshold</th><th>Trend</th><th>Status</th></tr>
             </thead>
             <tbody>
               {rows.map(r => (
@@ -47,8 +51,17 @@ export function AdvisorFrictionOverview() {
                   <td><b>{r.studentName}</b></td>
                   <td>Week {r.peakWeek}</td>
                   <td>{r.peakFrictionScore}</td>
+                  <td>{r.weeksOverThreshold}</td>
                   <td>{TREND_LABEL[r.trend.reading]}</td>
-                  <td>{r.anyBurnoutRisk ? <span className="su-badge danger">Burnout risk</span> : <span className="su-badge ok">Clear</span>}</td>
+                  <td>
+                    {r.sustainedBurnoutRisk ? (
+                      <span className="su-badge danger">Sustained burnout risk</span>
+                    ) : r.weeksOverThreshold > 0 ? (
+                      <span className="su-badge warn">1 heavy week</span>
+                    ) : (
+                      <span className="su-badge ok">Clear</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

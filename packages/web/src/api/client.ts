@@ -288,7 +288,12 @@ export interface FrictionOverviewRowDTO {
   studentName: string;
   peakWeek: number;
   peakFrictionScore: number;
-  anyBurnoutRisk: boolean;
+  /** How many of the 14 weeks cross the burnout threshold — a single week
+   *  is common enough (a normal course load's own finals clustering
+   *  routinely does it) that it isn't very discriminating on its own; see
+   *  sustainedBurnoutRisk below for the actual triage signal. */
+  weeksOverThreshold: number;
+  sustainedBurnoutRisk: boolean;
   trend: { slope: number | null; reading: FrictionTrendReading };
 }
 export interface ColliderProjectMemberDTO extends ProjectMember {
