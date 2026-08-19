@@ -92,4 +92,24 @@ describe('student-facing course views are department-scoped, not the global 10-p
       expect(foreign, `student ${student!.id} (${advisor.departmentId}) had foreign-department eligible courses`).toEqual([]);
     }
   });
+
+  it('a student externally transferred to a department with NO seeded catalog (a BUS-faculty placeholder) never sees the full cross-department union either — real bug caught by code review, not just a hypothetical', () => {
+    // hassan-1 is the §11 Examples I/K external-transfer persona.
+    db.executeExternalTransferForStudent('hassan-1', 'BUS', 'BIS');
+    expect(db.getStudent('hassan-1')!.departmentId).toBe('BIS'); // confirm the transfer really landed here
+    expect(CATALOG_BY_DEPARTMENT['BIS']).toBeUndefined(); // confirm BIS genuinely has no real seeded catalog
+
+    const view = db.getCurriculum('hassan-1');
+    const eligible = db.getEligibleCourses('hassan-1');
+    // Neither view may include a 'program'-category course (every real
+    // department's own named required courses) — those only belong to a
+    // department with a real seeded catalog. Only shared/UR courses (and
+    // BIS's own tiny gateway-course signal) are a safe fallback.
+    for (const v of view) {
+      expect(v.course.category, `getCurriculum leaked ${v.course.code}`).not.toBe('program');
+    }
+    for (const e of eligible) {
+      expect(e.course.category, `getEligibleCourses leaked ${e.course.code}`).not.toBe('program');
+    }
+  });
 });

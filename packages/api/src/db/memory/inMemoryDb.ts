@@ -73,6 +73,24 @@ export interface StoredStudent extends Student {
 
 const courseByCode: Record<string, Course> = Object.fromEntries(CATALOG.map(c => [c.code, c]));
 
+/** Every real course belonging to a department — the single place every
+ *  department-scoped read (transcript gap-filling, curriculum display,
+ *  course eligibility) gets its course list from. Falls back to only the
+ *  university-wide shared/UR courses (never the full cross-department
+ *  union) for a department with no seeded catalog of its own — i.e. the
+ *  BUS-faculty placeholders (see deptFitEngine.ts's
+ *  OTHER_FACULTY_DEPARTMENTS), reachable in practice via an external
+ *  transfer (`executeExternalTransferForStudent` accepts any
+ *  `toDepartmentId` string, not just the 10 seeded Engineering ones). A raw
+ *  `CATALOG_BY_DEPARTMENT[id] ?? CATALOG` fallback here would silently leak
+ *  every other department's courses to that student — exactly the bug
+ *  class this whole department-scoping mechanism exists to prevent. */
+function coursesForDepartment(departmentId: string): Course[] {
+  const deptCatalog = CATALOG_BY_DEPARTMENT[departmentId];
+  if (deptCatalog) return deptCatalog;
+  return CATALOG.filter(c => c.category !== 'program');
+}
+
 // §16.1 — the gate answer and interest-form answers, re-askable each
 // planning session, same storage shape as retakePreferences/quizAnswers.
 // Declared up here (ahead of the seed-student literals below) so the
@@ -587,7 +605,7 @@ function buildCgpaSnapshots(targetPct: number, semestersClosed: number, studentI
 
 function generateFillerStudents(advisorId: string, count: number, facultyId: string, departmentId: string): SeedStudent[] {
   const out: SeedStudent[] = [];
-  const deptCatalog = CATALOG_BY_DEPARTMENT[departmentId] ?? CATALOG;
+  const deptCatalog = coursesForDepartment(departmentId);
   for (let i = 0; i < count; i++) {
     const id = `${advisorId}-gen-${i + 1}`;
     const bucket: StandingBucket = STANDING_CYCLE[fillerHash(`${id}:bucket`) % STANDING_CYCLE.length];
@@ -662,10 +680,10 @@ function completeTranscript(s: SeedStudent): SeedStudent {
 
   // Gap-fill from the student's OWN department's real catalog, not the
   // global 10-program union — otherwise an ECE student could get silently
-  // filled in with a CPE-only course. Falls back to the full CATALOG for a
-  // departmentId with no seeded catalog (defensive — every real department
-  // has one by the time this runs).
-  const deptCatalog = CATALOG_BY_DEPARTMENT[s.departmentId] ?? CATALOG;
+  // filled in with a CPE-only course. Falls back to only the shared/UR
+  // courses (never the full cross-department union) for a departmentId
+  // with no seeded catalog of its own — see coursesForDepartment.
+  const deptCatalog = coursesForDepartment(s.departmentId);
   const missing = deptCatalog.filter(c => c.semesterOrdinal <= maxOrdinal && !existingCodes.has(c.code)).sort(
     (a, b) => a.semesterOrdinal - b.semesterOrdinal || a.code.localeCompare(b.code)
   );
@@ -1037,8 +1055,14 @@ export function getEligibleCourses(id: string): Array<{ course: Course; isRetake
   // student would see (and the advising cycle could recommend) courses
   // from every other seeded department too, since this fed straight off
   // the global 10-program CATALOG before real per-department catalogs
-  // existed to scope it against.
-  const deptCatalog = CATALOG_BY_DEPARTMENT[student.departmentId] ?? CATALOG;
+  // existed to scope it against. Uses the SAFE fallback (shared/UR courses
+  // only, never the full union) for a department with no seeded catalog of
+  // its own — see coursesForDepartment's doc comment for why the naive
+  // `?? CATALOG` version of this line was itself a real, live-reachable
+  // instance of the exact bug this scoping exists to prevent (a student
+  // externally transferred to a Business-faculty department, whose
+  // departmentId has no CATALOG_BY_DEPARTMENT entry).
+  const deptCatalog = coursesForDepartment(student.departmentId);
   for (const course of deptCatalog) {
     const rec = transcript[course.code];
     if (rec && ['D', 'D+', 'F'].includes(rec.letter)) {
@@ -1145,10 +1169,10 @@ export function getCurriculum(id: string): CurriculumCourseView[] {
       .map(r => r.courseCode)
   );
 
-  // Same department-scoping as getEligibleCourses above — the Curriculum
-  // tab should show this student's own program's real course list, not
-  // every seeded department's combined 300+ courses.
-  const deptCatalog = CATALOG_BY_DEPARTMENT[student.departmentId] ?? CATALOG;
+  // Same department-scoping (and same safe fallback) as getEligibleCourses
+  // above — the Curriculum tab should show this student's own program's
+  // real course list, not every seeded department's combined 300+ courses.
+  const deptCatalog = coursesForDepartment(student.departmentId);
   return deptCatalog.map((course): CurriculumCourseView => {
     const rec = transcript[course.code];
     if (rec) {
@@ -1256,11 +1280,10 @@ export function hasInternalTransfer(studentId: string): boolean {
  *  catalog of its own (the BUS-faculty placeholders — see
  *  OTHER_FACULTY_DEPARTMENTS — which remain documented-synthetic). */
 function courseCodesForDepartment(departmentId: string): Set<string> {
-  const deptCatalog = CATALOG_BY_DEPARTMENT[departmentId];
-  if (deptCatalog) return new Set(deptCatalog.map(c => c.code));
+  const codes = coursesForDepartment(departmentId).map(c => c.code);
+  if (CATALOG_BY_DEPARTMENT[departmentId]) return new Set(codes); // a real catalog exists — nothing more to add
   const dept = [...DEPARTMENTS, ...OTHER_FACULTY_DEPARTMENTS].find(d => d.id === departmentId);
-  const shared = CATALOG.filter(c => c.category !== 'program').map(c => c.code);
-  return new Set([...shared, ...(dept?.gatewayCourseCodes ?? [])]);
+  return new Set([...codes, ...(dept?.gatewayCourseCodes ?? [])]);
 }
 
 /** §7.1 — commits an internal (intra-faculty) department transfer. */
