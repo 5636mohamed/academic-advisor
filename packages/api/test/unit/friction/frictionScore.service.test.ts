@@ -4,13 +4,13 @@ import { SyllabusMilestone } from '@advisor/shared';
 
 const milestonesByCourse: Record<string, SyllabusMilestone[]> = {
   A: [
-    { courseCode: 'A', weekNumber: 3, type: 'quiz', title: 'A quiz' },
-    { courseCode: 'A', weekNumber: 7, type: 'midterm', title: 'A midterm' },
-    { courseCode: 'A', weekNumber: 14, type: 'final', title: 'A final' },
+    { id: 'A::3::quiz', courseCode: 'A', weekNumber: 3, type: 'quiz', title: 'A quiz' },
+    { id: 'A::7::midterm', courseCode: 'A', weekNumber: 7, type: 'midterm', title: 'A midterm' },
+    { id: 'A::14::final', courseCode: 'A', weekNumber: 14, type: 'final', title: 'A final' },
   ],
   B: [
-    { courseCode: 'B', weekNumber: 7, type: 'midterm', title: 'B midterm' }, // same week as A's midterm
-    { courseCode: 'B', weekNumber: 14, type: 'final', title: 'B final' },
+    { id: 'B::7::midterm', courseCode: 'B', weekNumber: 7, type: 'midterm', title: 'B midterm' }, // same week as A's midterm
+    { id: 'B::14::final', courseCode: 'B', weekNumber: 14, type: 'final', title: 'B final' },
   ],
 };
 const credits = (code: string) => (code === 'A' ? 3 : 2);
@@ -53,6 +53,48 @@ describe('weeklyFriction — §1.7', () => {
   it('unknown course codes contribute nothing rather than throwing', () => {
     const readings = weeklyFriction(['DOES-NOT-EXIST'], milestonesByCourse, credits);
     expect(readings.every(r => r.frictionScore === 0)).toBe(true);
+  });
+
+  describe('doneIds — "mark done" recalculation', () => {
+    it('a done milestone drops its weight from the score entirely', () => {
+      const readings = weeklyFriction(['A'], milestonesByCourse, credits, new Set(['A::3::quiz']));
+      const week3 = readings.find(r => r.weekNumber === 3)!;
+      expect(week3.frictionScore).toBe(0);
+    });
+
+    it('a done milestone still appears in contributingMilestones, marked done', () => {
+      const readings = weeklyFriction(['A'], milestonesByCourse, credits, new Set(['A::3::quiz']));
+      const week3 = readings.find(r => r.weekNumber === 3)!;
+      expect(week3.contributingMilestones).toHaveLength(1);
+      expect(week3.contributingMilestones[0]).toMatchObject({ id: 'A::3::quiz', done: true });
+    });
+
+    it('a not-done milestone in the SAME response is marked done: false', () => {
+      const readings = weeklyFriction(['A'], milestonesByCourse, credits, new Set(['A::3::quiz']));
+      const week7 = readings.find(r => r.weekNumber === 7)!;
+      expect(week7.contributingMilestones[0].done).toBe(false);
+    });
+
+    it('marking ONE of two clustered milestones done also recalculates the overlap penalty (drops toward the solo score of the remaining one)', () => {
+      const bothPending = weeklyFriction(['A', 'B'], milestonesByCourse, credits);
+      const week7Both = bothPending.find(r => r.weekNumber === 7)!;
+
+      const oneDone = weeklyFriction(['A', 'B'], milestonesByCourse, credits, new Set(['B::7::midterm']));
+      const week7OneDone = oneDone.find(r => r.weekNumber === 7)!;
+
+      const aSolo = weeklyFriction(['A'], milestonesByCourse, credits).find(r => r.weekNumber === 7)!;
+
+      expect(week7OneDone.frictionScore).toBeLessThan(week7Both.frictionScore);
+      expect(week7OneDone.frictionScore).toBe(aSolo.frictionScore); // no more overlap penalty — B's milestone no longer collides
+    });
+
+    it('marking every milestone in a week done drops that week to 0 and clears burnoutRisk', () => {
+      const readings = weeklyFriction(['A', 'B'], milestonesByCourse, credits, new Set(['A::7::midterm', 'B::7::midterm']));
+      const week7 = readings.find(r => r.weekNumber === 7)!;
+      expect(week7.frictionScore).toBe(0);
+      expect(week7.burnoutRisk).toBe(false);
+      expect(week7.contributingMilestones.every(m => m.done)).toBe(true);
+    });
   });
 });
 

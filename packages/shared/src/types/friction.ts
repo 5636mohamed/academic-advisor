@@ -18,6 +18,14 @@
 export type MilestoneType = 'assignment' | 'lab_report' | 'quiz' | 'midterm' | 'final' | 'project_deadline';
 
 export interface SyllabusMilestone {
+  /** Deterministic `${courseCode}::${weekNumber}::${type}` — stable across
+   *  requests/sessions (not re-derived per read) so a student's "done"
+   *  state, keyed by this id, survives a reload. Unique per course given
+   *  the generator's own non-overlapping week ranges per milestone slot
+   *  (seedSyllabusMilestones.ts) — verified, not assumed: see that file's
+   *  header for why two same-type milestones in one course never land on
+   *  the same week. */
+  id: string;
   courseCode: string;
   weekNumber: number; // 1-based, within a generic 14-week semester template
   type: MilestoneType;
@@ -28,11 +36,17 @@ export interface SyllabusMilestone {
  *  analogue of the blueprint's original FrictionLog row. */
 export interface FrictionReading {
   weekNumber: number;
+  /** Sum of NOT-YET-DONE milestones' weighted contribution only — a task
+   *  the student has checked off no longer counts toward how heavy the
+   *  week feels, by design (see frictionScore.service.ts's weeklyFriction
+   *  doc comment for exactly how "done" milestones are excluded from both
+   *  the weight sum and the deadline-clustering overlap penalty). */
   frictionScore: number;
   burnoutRisk: boolean;
-  /** Which courses contributed a milestone this week, and what — lets the
-   *  UI explain WHY a week is red, not just that it is. */
-  contributingMilestones: { courseCode: string; type: MilestoneType; title: string }[];
+  /** Every milestone landing this week, done or not — `done` lets the UI
+   *  show the full task list (including what's already been checked off)
+   *  even though completed items no longer affect frictionScore above. */
+  contributingMilestones: { id: string; courseCode: string; type: MilestoneType; title: string; done: boolean }[];
 }
 
 export type FrictionTrendReading = 'worsening' | 'flat' | 'improving' | 'insufficient_history';

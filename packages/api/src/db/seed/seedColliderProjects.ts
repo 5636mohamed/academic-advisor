@@ -59,7 +59,7 @@ export const COLLIDER_PROJECTS: Project[] = [
     members: [eceMember('omar-1'), eceMember('mona-2'), collaboratorMember('collab-mce-2')],
     stage: 'active',
     advisorId: 'advisor-mervat',
-    fundingAllocations: [{ amount: 3000, note: 'Sensor + solar prototype BOM', allocatedAt: '2026-04-01T09:00:00.000Z' }],
+    fundingAllocations: [{ amount: 3000, note: 'Sensor + solar prototype BOM', allocatedAt: '2026-04-01T09:00:00.000Z', source: 'university' }],
     createdAt: '2026-01-20T09:00:00.000Z',
   },
   {
@@ -83,7 +83,7 @@ export const COLLIDER_PROJECTS: Project[] = [
     members: [eceMember('laila-4'), collaboratorMember('collab-cse-3'), collaboratorMember('collab-mkt-2')],
     stage: 'matched_externally',
     advisorId: 'advisor-tarek',
-    fundingAllocations: [{ amount: 1500, note: 'Hosting + initial marketing push', allocatedAt: '2026-03-15T09:00:00.000Z' }],
+    fundingAllocations: [{ amount: 1500, note: 'Hosting + initial marketing push', allocatedAt: '2026-03-15T09:00:00.000Z', source: 'university' }],
     createdAt: '2026-01-05T09:00:00.000Z',
   },
   {
@@ -107,7 +107,7 @@ export const COLLIDER_PROJECTS: Project[] = [
     members: [eceMember('hassan-1'), collaboratorMember('collab-mce-1'), collaboratorMember('collab-bis-1')],
     stage: 'active',
     advisorId: 'advisor-hoda',
-    fundingAllocations: [{ amount: 4000, note: 'Actuator + motor-driver prototype run', allocatedAt: '2026-03-28T09:00:00.000Z' }],
+    fundingAllocations: [{ amount: 4000, note: 'Actuator + motor-driver prototype run', allocatedAt: '2026-03-28T09:00:00.000Z', source: 'external_grant', grantName: 'Egyptian Academy of Scientific Research — Assistive Robotics Grant' }],
     createdAt: '2026-02-01T09:00:00.000Z',
   },
   {

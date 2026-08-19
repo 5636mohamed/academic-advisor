@@ -1,15 +1,24 @@
 // AI Features Blueprint §1.7 — the Friction Score formula.
 //
-//   frictionScore(week) = sum over milestones that week, across the given
-//     course codes, of: baseWeight(type) x courseCreditHours x overlapPenalty
+//   frictionScore(week) = sum over NOT-YET-DONE milestones that week, across
+//     the given course codes, of: baseWeight(type) x courseCreditHours x overlapPenalty
 //
-//   overlapPenalty = 1 + overlapPenaltyPerExtraMilestone x (milestonesInWeek - 1)
+//   overlapPenalty = 1 + overlapPenaltyPerExtraMilestone x (remainingMilestonesInWeek - 1)
 //
 // Deadline CLUSTERING is the actual burnout driver, not raw milestone count
 // in isolation — two exams in two different weeks is fine, two exams in the
 // SAME week is the problem. That's why this multiplies by a penalty that
 // only kicks in once a week has more than one milestone, rather than just
 // summing weights.
+//
+// "Recalculate week heaviness" (the task-checkbox feature): a milestone the
+// student has marked done is excluded from BOTH the weight sum and the
+// overlap-penalty count — it no longer contributes to how heavy the week
+// feels, and it no longer counts as one of the colliding deadlines driving
+// the clustering penalty either (a done task can't collide with anything
+// anymore). It's still returned in `contributingMilestones` (with
+// `done: true`) so the UI can show the full task list, including what's
+// already checked off — only the score itself treats it as gone.
 import { MilestoneType, SyllabusMilestone, FrictionReading, FrictionTimeline, FrictionTrendReading } from '@advisor/shared';
 import { ols, project, recencyWeights, clamp } from '../prediction/linearRegression';
 import weights from '../../config/predictionWeights.json';
@@ -23,11 +32,14 @@ export interface CourseCreditLookup {
  *  courses, scored from the milestone template. Courses with no seeded
  *  template (shouldn't happen for anything in CATALOG, but defensive
  *  against a bad/unknown code) simply contribute nothing that week rather
- *  than throwing. */
+ *  than throwing. `doneIds` (default empty) excludes those milestones from
+ *  the score/overlap-penalty math while still listing them, marked done —
+ *  see this file's header for why. */
 export function weeklyFriction(
   courseCodes: string[],
   milestonesByCourse: Record<string, SyllabusMilestone[]>,
-  creditsFor: CourseCreditLookup
+  creditsFor: CourseCreditLookup,
+  doneIds: ReadonlySet<string> = new Set()
 ): FrictionReading[] {
   const milestoneWeights = weights.friction.milestoneWeights as Record<MilestoneType, number>;
   const readings: FrictionReading[] = [];
@@ -36,9 +48,10 @@ export function weeklyFriction(
     const thisWeek = courseCodes.flatMap(code =>
       (milestonesByCourse[code] ?? []).filter(m => m.weekNumber === week).map(m => ({ ...m, courseCode: code }))
     );
-    const overlapPenalty = thisWeek.length > 0 ? 1 + weights.friction.overlapPenaltyPerExtraMilestone * (thisWeek.length - 1) : 1;
+    const remaining = thisWeek.filter(m => !doneIds.has(m.id));
+    const overlapPenalty = remaining.length > 0 ? 1 + weights.friction.overlapPenaltyPerExtraMilestone * (remaining.length - 1) : 1;
 
-    const frictionScore = thisWeek.reduce((sum, m) => {
+    const frictionScore = remaining.reduce((sum, m) => {
       const base = milestoneWeights[m.type] ?? 0;
       const credits = creditsFor(m.courseCode) ?? 1;
       return sum + base * credits * overlapPenalty;
@@ -48,7 +61,7 @@ export function weeklyFriction(
       weekNumber: week,
       frictionScore: Math.round(frictionScore * 10) / 10,
       burnoutRisk: frictionScore > weights.friction.burnoutThreshold,
-      contributingMilestones: thisWeek.map(m => ({ courseCode: m.courseCode, type: m.type, title: m.title })),
+      contributingMilestones: thisWeek.map(m => ({ id: m.id, courseCode: m.courseCode, type: m.type, title: m.title, done: doneIds.has(m.id) })),
     });
   }
 
@@ -80,9 +93,10 @@ export function frictionTrend(readings: FrictionReading[]): { slope: number | nu
 export function buildFrictionTimeline(
   courseCodes: string[],
   milestonesByCourse: Record<string, SyllabusMilestone[]>,
-  creditsFor: CourseCreditLookup
+  creditsFor: CourseCreditLookup,
+  doneIds: ReadonlySet<string> = new Set()
 ): FrictionTimeline {
-  const readings = weeklyFriction(courseCodes, milestonesByCourse, creditsFor);
+  const readings = weeklyFriction(courseCodes, milestonesByCourse, creditsFor, doneIds);
   return { readings, trend: frictionTrend(readings) };
 }
 

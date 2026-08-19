@@ -5,10 +5,11 @@
 // sits on the topography aren't two separate navigations).
 import { useEffect, useState } from 'react';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
-import { api, ColliderProjectDTO } from '../api/client';
+import { api, ColliderProjectDTO, AdvisorDTO } from '../api/client';
 import { TopographyCell } from '@advisor/shared';
 import { Loading, Section, Empty, useToast } from '../portal/ui/Primitives';
 import { useChartTokens } from '../portal/ui/chartTheme';
+import { downloadInnovationTopographyPdf } from '../lib/pdfReport';
 
 function TopographyChart({ cells }: { cells: TopographyCell[] }) {
   const tokens = useChartTokens();
@@ -57,6 +58,8 @@ function TopographyChart({ cells }: { cells: TopographyCell[] }) {
 function FundForm({ project, onFunded }: { project: ColliderProjectDTO; onFunded: (p: ColliderProjectDTO) => void }) {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [source, setSource] = useState<'university' | 'external_grant'>('university');
+  const [grantName, setGrantName] = useState('');
   const [busy, setBusy] = useState(false);
   const { show, node } = useToast();
 
@@ -65,9 +68,9 @@ function FundForm({ project, onFunded }: { project: ColliderProjectDTO; onFunded
     if (!Number.isFinite(n) || n <= 0) return;
     setBusy(true);
     try {
-      const updated = await api.vpFundColliderProject(project.id, n, note);
+      const updated = await api.vpFundColliderProject(project.id, n, note, source, source === 'external_grant' ? grantName : undefined);
       onFunded(updated);
-      setAmount(''); setNote('');
+      setAmount(''); setNote(''); setGrantName('');
       show('Funding allocated.');
     } finally {
       setBusy(false);
@@ -75,10 +78,34 @@ function FundForm({ project, onFunded }: { project: ColliderProjectDTO; onFunded
   };
 
   return (
-    <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-      <input className="su-input" style={{ maxWidth: 120 }} type="number" min={1} placeholder="Amount (EGP)" value={amount} onChange={e => setAmount(e.target.value)} />
-      <input className="su-input" style={{ maxWidth: 220 }} placeholder="Note (what it's for)" value={note} onChange={e => setNote(e.target.value)} />
-      <button type="button" className="su-btn" disabled={busy || !amount} onClick={submit}>{busy ? 'Allocating…' : 'Allocate funding'}</button>
+    <div className="su-flex" style={{ flexDirection: 'column', gap: 8, marginTop: 8 }}>
+      {project.fundingAllocations.length > 0 && (
+        <div className="su-flex" style={{ flexDirection: 'column', gap: 4, marginBottom: 4 }}>
+          {project.fundingAllocations.map((f, i) => (
+            <div key={i} className="su-flex su-justify-between su-items-center" style={{ fontSize: 12 }}>
+              <span>
+                {f.amount.toLocaleString()} EGP — {f.note || 'no note'}
+                {f.grantName && <span className="su-muted"> ({f.grantName})</span>}
+              </span>
+              <span className={`su-badge ${f.source === 'external_grant' ? 'accent' : 'neutral'}`}>
+                {f.source === 'external_grant' ? 'External grant' : 'University'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+        <input className="su-input" style={{ maxWidth: 120 }} type="number" min={1} placeholder="Amount (EGP)" value={amount} onChange={e => setAmount(e.target.value)} />
+        <select className="su-input" style={{ maxWidth: 160 }} value={source} onChange={e => setSource(e.target.value as 'university' | 'external_grant')}>
+          <option value="university">University funding</option>
+          <option value="external_grant">External grant/award</option>
+        </select>
+        {source === 'external_grant' && (
+          <input className="su-input" style={{ maxWidth: 200 }} placeholder="Grant/award name" value={grantName} onChange={e => setGrantName(e.target.value)} />
+        )}
+        <input className="su-input" style={{ maxWidth: 220 }} placeholder="Note (what it's for)" value={note} onChange={e => setNote(e.target.value)} />
+        <button type="button" className="su-btn" disabled={busy || !amount} onClick={submit}>{busy ? 'Allocating…' : 'Allocate funding'}</button>
+      </div>
       {node}
     </div>
   );
@@ -87,6 +114,8 @@ function FundForm({ project, onFunded }: { project: ColliderProjectDTO; onFunded
 export function VpInnovationTopography() {
   const [cells, setCells] = useState<TopographyCell[] | null>(null);
   const [projects, setProjects] = useState<ColliderProjectDTO[] | null>(null);
+  const [advisors, setAdvisors] = useState<AdvisorDTO[] | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     api.vpInnovationTopography().then(setCells);
@@ -94,13 +123,27 @@ export function VpInnovationTopography() {
     // design — see server.ts) — the VP's cross-advisor view fetches each
     // advisor's projects and flattens them, same shape as vp/advisors-summary
     // building its own cross-advisor picture from per-advisor data.
-    api.advisors().then(async advisors => {
-      const perAdvisor = await Promise.all(advisors.map(a => api.advisorColliderProjects(a.id)));
+    api.advisors().then(async list => {
+      setAdvisors(list);
+      const perAdvisor = await Promise.all(list.map(a => api.advisorColliderProjects(a.id)));
       setProjects(perAdvisor.flat());
     });
   }, []);
 
-  if (!cells || !projects) return <Loading label="Loading the innovation topography…" />;
+  if (!cells || !projects || !advisors) return <Loading label="Loading the innovation topography…" />;
+
+  const advisorNameFor = (advisorId: string) => advisors.find(a => a.id === advisorId)?.name ?? 'Unknown advisor';
+
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      await downloadInnovationTopographyPdf({
+        projects: projects.map(p => ({ ...p, advisorName: advisorNameFor(p.advisorId) })),
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <>
@@ -108,19 +151,20 @@ export function VpInnovationTopography() {
         eyebrow="Project Collider"
         title="Innovation Topography"
         subtitle="Active project skill clusters by faculty — bubble size is project count, blue marks a genuinely cross-faculty cluster."
+        right={<button type="button" className="su-btn su-btn-secondary" disabled={downloading || projects.length === 0} onClick={downloadPdf}>{downloading ? 'Generating…' : 'Download PDF report'}</button>}
         className="su-mt-16"
       >
         {cells.length === 0 ? <Empty>No active projects to chart yet.</Empty> : <TopographyChart cells={cells} />}
       </Section>
 
-      <Section eyebrow="Project Collider" title="Micro-funding allocation" subtitle="Allocate a small grant to any active project, across any advisor's roster." className="su-mt-16">
+      <Section eyebrow="Project Collider" title="Micro-funding allocation" subtitle="Allocate university funding or record an external grant/award against any active project, across any advisor's roster." className="su-mt-16">
         <div className="su-flex" style={{ flexDirection: 'column', gap: 14 }}>
           {projects.map(p => (
             <div key={p.id} className="su-card" style={{ padding: 14 }}>
               <div className="su-flex su-justify-between su-items-center" style={{ flexWrap: 'wrap', gap: 8 }}>
                 <div>
                   <b>{p.title}</b>
-                  <div className="su-muted" style={{ fontSize: 12 }}>{p.skills.join(', ')}</div>
+                  <div className="su-muted" style={{ fontSize: 12 }}>{p.skills.join(', ')} — advised by {advisorNameFor(p.advisorId)}</div>
                 </div>
                 <div className="su-muted" style={{ fontSize: 12 }}>
                   Total funded: {p.fundingAllocations.reduce((s, f) => s + f.amount, 0).toLocaleString()} EGP

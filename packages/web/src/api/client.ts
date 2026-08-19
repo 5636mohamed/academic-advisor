@@ -507,6 +507,14 @@ export const api = {
 
   // AI Features Blueprint — Cognitive Load Heatmap
   frictionTimeline: (studentId: string) => request<FrictionTimelineDTO>(`/students/${studentId}/friction-timeline`),
+  /** Returns the FULLY RECALCULATED timeline in the same response — the
+   *  "recalculate week heaviness" checkbox behavior — not just an ack the
+   *  caller has to separately re-fetch for. */
+  toggleFrictionMilestone: (studentId: string, milestoneId: string) =>
+    request<FrictionTimelineDTO>(`/students/${studentId}/friction-timeline/toggle-milestone`, {
+      method: 'POST',
+      body: JSON.stringify({ milestoneId }),
+    }),
   advisorFrictionOverview: (advisorId: string) => request<FrictionOverviewRowDTO[]>(`/advisors/${advisorId}/friction-overview`),
   vpInstitutionalBottlenecks: () => request<InstitutionalFrictionCell[]>('/vp/friction/institutional-bottlenecks'),
 
@@ -514,8 +522,8 @@ export const api = {
   advisorColliderProjects: (advisorId: string) => request<ColliderProjectDTO[]>(`/advisors/${advisorId}/collider/projects`),
   colliderOpportunityMatches: (projectId: string) => request<OpportunityMatch[]>(`/collider/projects/${projectId}/opportunity-matches`),
   vpInnovationTopography: () => request<TopographyCell[]>('/vp/collider/topography'),
-  vpFundColliderProject: (projectId: string, amount: number, note: string) =>
-    request<ColliderProjectDTO>(`/vp/collider/projects/${projectId}/fund`, { method: 'POST', body: JSON.stringify({ amount, note }) }),
+  vpFundColliderProject: (projectId: string, amount: number, note: string, source: 'university' | 'external_grant', grantName?: string) =>
+    request<ColliderProjectDTO>(`/vp/collider/projects/${projectId}/fund`, { method: 'POST', body: JSON.stringify({ amount, note, source, grantName }) }),
 
   predictionWeights: () => request<Record<string, unknown>>('/admin/prediction-weights'),
   updatePredictionWeights: (patch: Record<string, unknown>) =>

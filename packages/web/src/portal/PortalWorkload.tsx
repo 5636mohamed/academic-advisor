@@ -15,6 +15,6 @@ export function PortalWorkload() {
     if (id) api.frictionTimeline(id).then(setTimeline);
   }, [id]);
 
-  if (!timeline) return <Loading label="Projecting your weekly workload…" />;
-  return <FrictionTimeline timeline={timeline} />;
+  if (!timeline || !id) return <Loading label="Projecting your weekly workload…" />;
+  return <FrictionTimeline timeline={timeline} studentId={id} onTimelineChange={setTimeline} />;
 }

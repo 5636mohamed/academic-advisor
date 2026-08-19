@@ -35,9 +35,9 @@ import weights from './config/predictionWeights.json';
 import { buildFrictionTimeline } from './modules/friction/frictionScore.service';
 import { computeInstitutionalBottlenecks, StudentForBottleneck } from './modules/friction/institutionalBottleneck.service';
 import { matchOpportunitiesForProject } from './modules/collider/colliderOpportunityMatch.service';
+import { getAllOpportunities } from './modules/collider/externalOpportunitiesLive.service';
 import { buildTopography } from './modules/collider/innovationTopography.service';
 import { MILESTONES_BY_COURSE } from './db/seed/seedSyllabusMilestones';
-import { EXTERNAL_OPPORTUNITIES } from './db/seed/seedExternalOpportunities';
 import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
 
 const app = express();
@@ -892,9 +892,31 @@ function courseCodesInPlan(plan: PackPlanResult): string[] {
  *  a student see burnout risk BEFORE committing to a plan, not just after. */
 app.get('/api/students/:id/friction-timeline', blockIfDismissed, async (req, res) => {
   try {
-    const plan = await buildScoredPlan(paramStr(req, 'id'), 'fast');
+    const studentId = paramStr(req, 'id');
+    const plan = await buildScoredPlan(studentId, 'fast');
     const courseCodes = courseCodesInPlan(plan);
-    res.json({ courseCodes, ...buildFrictionTimeline(courseCodes, MILESTONES_BY_COURSE, courseCreditsFor) });
+    const doneIds = new Set(db.getCompletedMilestoneIds(studentId));
+    res.json({ courseCodes, ...buildFrictionTimeline(courseCodes, MILESTONES_BY_COURSE, courseCreditsFor, doneIds) });
+  } catch (err) {
+    const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// "Mark done" checkbox — toggles one syllabus milestone for this student
+// and returns the FULLY RECALCULATED timeline in the same round trip (the
+// "recalculate week heaviness" behavior), not just an ack the client has
+// to separately re-fetch for.
+app.post('/api/students/:id/friction-timeline/toggle-milestone', blockIfDismissed, async (req, res) => {
+  try {
+    const studentId = paramStr(req, 'id');
+    const { milestoneId } = req.body ?? {};
+    if (typeof milestoneId !== 'string') return res.status(400).json({ error: 'expected { milestoneId: string }' });
+    db.toggleCompletedMilestone(studentId, milestoneId);
+    const plan = await buildScoredPlan(studentId, 'fast');
+    const courseCodes = courseCodesInPlan(plan);
+    const doneIds = new Set(db.getCompletedMilestoneIds(studentId));
+    res.json({ courseCodes, ...buildFrictionTimeline(courseCodes, MILESTONES_BY_COURSE, courseCreditsFor, doneIds) });
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
@@ -971,10 +993,14 @@ app.get('/api/advisors/:advisorId/collider/projects', (req, res) => {
   res.json(db.listColliderProjectsForAdvisor(advisorId).map(withMemberNames));
 });
 
-app.get('/api/collider/projects/:id/opportunity-matches', (req, res) => {
+// Matches against the REAL live opportunity table (RemoteOK internships +
+// Grants.gov grants, both with a curated fallback — see
+// externalOpportunitiesLive.service.ts), not just the static seed.
+app.get('/api/collider/projects/:id/opportunity-matches', async (req, res) => {
   const project = db.getColliderProject(paramStr(req, 'id'));
   if (!project) return res.status(404).json({ error: 'project not found' });
-  res.json(matchOpportunitiesForProject(project, EXTERNAL_OPPORTUNITIES));
+  const opportunities = await getAllOpportunities();
+  res.json(matchOpportunitiesForProject(project, opportunities));
 });
 
 app.get('/api/vp/collider/topography', (_req, res) => {
@@ -982,10 +1008,15 @@ app.get('/api/vp/collider/topography', (_req, res) => {
 });
 
 app.post('/api/vp/collider/projects/:id/fund', (req, res) => {
-  const { amount, note } = req.body ?? {};
-  if (typeof amount !== 'number') return res.status(400).json({ error: 'expected { amount: number, note?: string }' });
+  const { amount, note, source, grantName } = req.body ?? {};
+  if (typeof amount !== 'number') return res.status(400).json({ error: 'expected { amount: number, note?: string, source: "university"|"external_grant", grantName?: string }' });
+  if (source !== 'university' && source !== 'external_grant') {
+    return res.status(400).json({ error: 'expected source to be "university" or "external_grant"' });
+  }
   try {
-    res.json(withMemberNames(db.fundColliderProject(paramStr(req, 'id'), amount, typeof note === 'string' ? note : '')));
+    res.json(withMemberNames(db.fundColliderProject(
+      paramStr(req, 'id'), amount, typeof note === 'string' ? note : '', source, typeof grantName === 'string' ? grantName : undefined
+    )));
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });

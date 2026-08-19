@@ -2,7 +2,7 @@
 // backend runtime dependency) from GET /api/advisor/report.
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { AdvisorReportRowDTO, AdvisorResponsibilityDetailDTO, VpAdvisorSummaryDTO } from '../api/client';
+import { AdvisorReportRowDTO, AdvisorResponsibilityDetailDTO, VpAdvisorSummaryDTO, ColliderProjectDTO } from '../api/client';
 import { drawHeaderLogo, drawSeal, drawWatermark, getPdfBrandKit } from './pdfBrandKit';
 
 // AEGIS rebrand — every PDF below is a white-page document, so the black-
@@ -337,4 +337,104 @@ export async function downloadUnofficialTranscriptPdf(input: UnofficialTranscrip
   drawSeal(doc, brand, (cols[2].x1 + cols[2].x2) / 2, footerY + 22, 10);
 
   doc.save(`unofficial-transcript-${input.studentName.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+}
+
+const STAGE_LABEL: Record<string, string> = { idea: 'Idea', forming_team: 'Forming team', active: 'Active', matched_externally: 'Matched externally', archived: 'Archived' };
+const TYPE_LABEL: Record<string, string> = { academic_research: 'Academic research', commercial_spinoff: 'Commercial spin-off', graduation_project: 'Graduation project' };
+
+/** AI Features Blueprint — the VP's Innovation Topography PDF export:
+ *  every active-or-idea project, who's on it (advisor + every member,
+ *  real advisee or cross-faculty collaborator, named), and every funding
+ *  allocation with its source spelled out explicitly (university money
+ *  vs. an external grant/award, never left ambiguous) — the three things
+ *  asked for. Three separate autoTables (summary / team roster / funding
+ *  detail) rather than one freeform per-project block: autoTable already
+ *  handles pagination and repeated headers correctly across page breaks,
+ *  which hand-tracked freeform text cursors do not (see this file's own
+ *  header-comment history — didDrawPage/Y-cursor collisions were a real,
+ *  previously-shipped bug in the VP advisor report before it was fixed to
+ *  use exactly this kind of table-first approach). */
+export async function downloadInnovationTopographyPdf(input: { projects: (ColliderProjectDTO & { advisorName: string })[] }): Promise<void> {
+  const { projects } = input;
+  const doc = new jsPDF();
+  const brand = await getPdfBrandKit();
+  const textLeft = drawHeaderLogo(doc, brand);
+  doc.setFontSize(16);
+  doc.text('Innovation Topography — Project Collider Report', textLeft, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
+
+  const totalFundedFor = (p: ColliderProjectDTO) => p.fundingAllocations.reduce((s, f) => s + f.amount, 0);
+
+  autoTable(doc, {
+    startY: 32,
+    head: [['Project', 'Type', 'Stage', 'Advisor', 'Skills', 'Members', 'Total funded (EGP)']],
+    body: projects.map(p => [
+      p.title,
+      TYPE_LABEL[p.type] ?? p.type,
+      STAGE_LABEL[p.stage] ?? p.stage,
+      p.advisorName,
+      p.skills.join(', '),
+      String(p.members.length),
+      totalFundedFor(p).toLocaleString(),
+    ]),
+    headStyles: { fillColor: [35, 32, 23] },
+    styles: { fontSize: 8.5 },
+    willDrawPage: () => drawWatermark(doc, brand),
+  });
+
+  const afterSummary = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
+  doc.setFontSize(12);
+  doc.setTextColor(20);
+  doc.text('Project Teams', 14, afterSummary);
+  autoTable(doc, {
+    startY: afterSummary + 4,
+    head: [['Project', 'Member', 'Role', 'Faculty / Department']],
+    body: projects.flatMap(p =>
+      p.members.map(m => [p.title, m.name, m.isCollaborator ? 'Cross-faculty collaborator' : 'Student (this advisor\'s roster)', `${m.facultyId}/${m.departmentId}`])
+    ),
+    headStyles: { fillColor: [35, 32, 23] },
+    styles: { fontSize: 8.5 },
+    willDrawPage: () => drawWatermark(doc, brand),
+  });
+
+  const projectsWithFunding = projects.filter(p => p.fundingAllocations.length > 0);
+  if (projectsWithFunding.length > 0) {
+    const afterTeams = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
+    doc.setFontSize(12);
+    doc.setTextColor(20);
+    doc.text('Funding Allocations', 14, afterTeams);
+    autoTable(doc, {
+      startY: afterTeams + 4,
+      head: [['Project', 'Amount (EGP)', 'Source', 'Grant / Award Name', 'Note', 'Date']],
+      body: projectsWithFunding.flatMap(p =>
+        p.fundingAllocations.map(f => [
+          p.title,
+          f.amount.toLocaleString(),
+          f.source === 'external_grant' ? 'External grant/award' : 'University funding',
+          f.grantName ?? '—',
+          f.note || '—',
+          new Date(f.allocatedAt).toLocaleDateString(),
+        ])
+      ),
+      headStyles: { fillColor: [35, 32, 23] },
+      styles: { fontSize: 8.5 },
+      // External-grant rows get the same highlight tone the rest of this
+      // file already uses for "worth a second look" rows — the university-
+      // vs-external distinction is the one thing this report exists to
+      // make impossible to miss, not just a column value scanned past.
+      didParseCell: data => {
+        if (data.section === 'body') {
+          const row = projectsWithFunding.flatMap(p => p.fundingAllocations.map(f => ({ p, f })))[data.row.index];
+          if (row?.f.source === 'external_grant') data.cell.styles.fillColor = RESPONSIBILITY_HIGHLIGHT_RGB;
+        }
+      },
+      willDrawPage: () => drawWatermark(doc, brand),
+    });
+    drawHighlightLegend(doc, 'Highlighted rows: funding sourced from an external grant/award, not the university\'s own funds.');
+  }
+
+  drawVerificationFooter(doc, brand);
+  doc.save(`innovation-topography-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

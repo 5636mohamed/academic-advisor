@@ -1,11 +1,15 @@
-// AI Features Blueprint §1.2/§1.4 — curated internships/grants/research
-// fairs an advisor's Collider Board matches organic projects against. Same
-// "curated, not live-scraped" honesty as seedVentureProjects.ts's own
-// professor-posted openings — a real scraped feed is an explicit v1.2+
-// item (see the blueprint's §5), not implied here.
+// AI Features Blueprint §1.2/§1.4 — curated fallback opportunities an
+// advisor's Collider Board matches organic projects against. Internships
+// and grants are now genuinely LIVE-fetched from real external APIs (see
+// externalOpportunitiesLive.service.ts — RemoteOK for internships,
+// Grants.gov for grants) — this file is what's used when that live fetch
+// fails or comes back with nothing skill-matchable that day, plus research
+// fairs, which stay curated always (no good free public API exists for
+// those). Every entry here is explicitly source: 'curated' so the UI never
+// silently claims a fallback is live data.
 import { ExternalOpportunity } from '@advisor/shared';
 
-export const EXTERNAL_OPPORTUNITIES: ExternalOpportunity[] = [
+const CURATED: Omit<ExternalOpportunity, 'source'>[] = [
   {
     id: 'ext-1',
     title: 'IoT Systems Internship',
@@ -79,5 +83,7 @@ export const EXTERNAL_OPPORTUNITIES: ExternalOpportunity[] = [
     url: null,
   },
 ];
+
+export const EXTERNAL_OPPORTUNITIES: ExternalOpportunity[] = CURATED.map(o => ({ ...o, source: 'curated' as const }));
 
 export const OPPORTUNITIES_BY_ID: Record<string, ExternalOpportunity> = Object.fromEntries(EXTERNAL_OPPORTUNITIES.map(o => [o.id, o]));

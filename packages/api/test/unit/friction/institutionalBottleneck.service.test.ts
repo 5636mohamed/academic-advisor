@@ -3,9 +3,9 @@ import { computeInstitutionalBottlenecks, StudentForBottleneck } from '../../../
 import { SyllabusMilestone } from '@advisor/shared';
 
 const milestonesByCourse: Record<string, SyllabusMilestone[]> = {
-  X: [{ courseCode: 'X', weekNumber: 8, type: 'midterm', title: 'X midterm' }],
-  Y: [{ courseCode: 'Y', weekNumber: 8, type: 'final', title: 'Y final' }], // clusters with X in week 8, every semester
-  Z: [{ courseCode: 'Z', weekNumber: 2, type: 'quiz', title: 'Z quiz' }],
+  X: [{ id: 'X::8::midterm', courseCode: 'X', weekNumber: 8, type: 'midterm', title: 'X midterm' }],
+  Y: [{ id: 'Y::8::final', courseCode: 'Y', weekNumber: 8, type: 'final', title: 'Y final' }], // clusters with X in week 8, every semester
+  Z: [{ id: 'Z::2::quiz', courseCode: 'Z', weekNumber: 2, type: 'quiz', title: 'Z quiz' }],
 };
 const credits = () => 3;
 

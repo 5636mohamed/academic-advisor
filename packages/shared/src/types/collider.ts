@@ -36,6 +36,22 @@ export interface ProjectMember {
   departmentId: string;
 }
 
+export interface FundingAllocation {
+  amount: number;
+  note: string;
+  allocatedAt: string;
+  /** Whether this allocation is the university's own money or an external
+   *  grant/award being recorded against the project (e.g. one of the
+   *  live-fetched Grants.gov matches actually being won) — the VP PDF
+   *  export (§ Innovation Topography report) needs this distinction
+   *  spelled out per allocation, not just a total. */
+  source: 'university' | 'external_grant';
+  /** Only meaningful when source is 'external_grant' — the awarding body
+   *  (e.g. "NSF", "Grants.gov: NIOSH Robotics..."). Optional even then —
+   *  a VP recording a grant win by hand isn't forced to fill it in. */
+  grantName?: string;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -48,7 +64,7 @@ export interface Project {
    *  advisor, for AdvisorColliderBoard.tsx's scoping (same ?advisorId=
    *  shape as everywhere else in this app). */
   advisorId: string;
-  fundingAllocations: { amount: number; note: string; allocatedAt: string }[];
+  fundingAllocations: FundingAllocation[];
   createdAt: string;
 }
 
@@ -60,11 +76,20 @@ export interface ExternalOpportunity {
   organization: string;
   deadline: string | null;
   url: string | null;
+  /** 'live' = fetched just now from a real external API (RemoteOK for
+   *  internships, Grants.gov for grants — see
+   *  externalOpportunitiesLive.service.ts); 'curated' = this app's own
+   *  hand-picked seed (research fairs always are — no good free public API
+   *  exists for those; internships/grants fall back here too if the live
+   *  fetch fails or that day's feed has nothing skill-matchable). Shown in
+   *  the UI so "live" isn't silently claimed when it's actually a
+   *  fallback. */
+  source: 'live' | 'curated';
 }
 
 export interface OpportunityMatch {
   opportunity: ExternalOpportunity;
-  matchScore: number; // cosine similarity, project.skills vs. opportunity.requiredSkills
+  matchScore: number; // Jaccard similarity (intersection/union) of the two skill-tag sets
 }
 
 export interface TopographyCell {

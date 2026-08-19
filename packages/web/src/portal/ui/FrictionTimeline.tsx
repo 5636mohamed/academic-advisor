@@ -5,7 +5,18 @@
 // monitoring. Same tone tokens CgpaLegend already trained the user's eye
 // on: green = fine, amber = building up, red = burnout risk — no new
 // legend to learn.
-import { FrictionTimelineDTO } from '../../api/client';
+//
+// Clicking a week opens its task window (tasks/deadlines/exams for that
+// week) with a "done" checkbox per task — checking one calls the toggle
+// API, which returns the FULLY RECALCULATED timeline (the checked task's
+// weight — and, if it was one of several colliding that week, its share of
+// the deadline-clustering overlap penalty too — drops out of the score),
+// and that recalculated timeline replaces the parent's state via
+// onTimelineChange so the whole chart (bars, burnout banner, trend line)
+// updates live, not just the open task window.
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { api, FrictionTimelineDTO } from '../../api/client';
 import { Section, Empty } from './Primitives';
 
 function severityTone(score: number, burnoutThreshold: number): 'good' | 'warn' | 'danger' {
@@ -21,16 +32,49 @@ const TREND_COPY: Record<string, string> = {
   insufficient_history: 'Not enough weeks with milestones yet to read a trend.',
 };
 
-export function FrictionTimeline({ timeline, burnoutThreshold = 80 }: { timeline: FrictionTimelineDTO; burnoutThreshold?: number }) {
+const TYPE_LABEL: Record<string, string> = {
+  assignment: 'Assignment', lab_report: 'Lab report', quiz: 'Quiz', midterm: 'Midterm', final: 'Final exam', project_deadline: 'Project deadline',
+};
+
+export function FrictionTimeline({
+  timeline,
+  studentId,
+  onTimelineChange,
+  burnoutThreshold = 80,
+}: {
+  timeline: FrictionTimelineDTO;
+  /** Omit to render a read-only strip (no click-to-open task window, no
+   *  checkboxes) — e.g. for a future non-interactive embed. Both provided
+   *  together is what PortalWorkload.tsx actually uses. */
+  studentId?: string;
+  onTimelineChange?: (t: FrictionTimelineDTO) => void;
+  burnoutThreshold?: number;
+}) {
   const { readings, trend, courseCodes } = timeline;
   const anyBurnout = readings.some(r => r.burnoutRisk);
   const maxScore = Math.max(1, ...readings.map(r => r.frictionScore));
+  const [openWeek, setOpenWeek] = useState<number | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const interactive = Boolean(studentId && onTimelineChange);
+
+  const openReading = openWeek != null ? readings.find(r => r.weekNumber === openWeek) : null;
+
+  const toggle = async (milestoneId: string) => {
+    if (!studentId || !onTimelineChange) return;
+    setTogglingId(milestoneId);
+    try {
+      const updated = await api.toggleFrictionMilestone(studentId, milestoneId);
+      onTimelineChange(updated);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   return (
     <Section
       eyebrow="Cognitive Load"
       title="Weekly friction across your recommended plan"
-      subtitle={courseCodes.length > 0 ? `Based on ${courseCodes.length} planned course${courseCodes.length === 1 ? '' : 's'}: ${courseCodes.join(', ')}` : 'No recommended courses to project a load from yet.'}
+      subtitle={courseCodes.length > 0 ? `Based on ${courseCodes.length} planned course${courseCodes.length === 1 ? '' : 's'}: ${courseCodes.join(', ')}${interactive ? ' — click a week to see its tasks.' : ''}` : 'No recommended courses to project a load from yet.'}
     >
       {readings.length === 0 ? (
         <Empty>No syllabus data available.</Empty>
@@ -38,17 +82,27 @@ export function FrictionTimeline({ timeline, burnoutThreshold = 80 }: { timeline
         <>
           {anyBurnout && (
             <div className="su-note danger" style={{ marginBottom: 14 }}>
-              At least one week crosses the burnout-risk threshold — several deadlines are landing in the same week. Consider spacing this plan out if possible.
+              At least one week crosses the burnout-risk threshold — several deadlines are landing in the same week. Consider spacing this plan out if possible{interactive ? ', or check off anything you\'ve already finished — done tasks no longer count toward the score.' : '.'}
             </div>
           )}
           <div className="su-flex su-gap-8" style={{ alignItems: 'flex-end', height: 140 }}>
             {readings.map(r => {
               const tone = severityTone(r.frictionScore, burnoutThreshold);
               const heightPct = Math.max(4, (r.frictionScore / maxScore) * 100);
+              const remainingCount = r.contributingMilestones.filter(m => !m.done).length;
               return (
-                <div key={r.weekNumber} className="su-flex" style={{ flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end' }} title={r.contributingMilestones.map(m => `${m.courseCode}: ${m.title}`).join('\n') || 'No milestones this week'}>
+                <div
+                  key={r.weekNumber}
+                  className="su-flex"
+                  style={{ flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end', cursor: 'pointer' }}
+                  title={r.contributingMilestones.map(m => `${m.done ? '✓ ' : ''}${m.courseCode}: ${m.title}`).join('\n') || 'No milestones this week'}
+                  onClick={() => setOpenWeek(r.weekNumber)}
+                >
                   <div style={{ width: '100%', maxWidth: 22, height: `${heightPct}%`, background: `var(--su-${tone})`, borderRadius: 4, transition: 'height 0.3s var(--su-ease)' }} />
-                  <div className="su-muted" style={{ fontSize: 10.5, marginTop: 4 }}>W{r.weekNumber}</div>
+                  <div className="su-muted" style={{ fontSize: 10.5, marginTop: 4 }}>
+                    W{r.weekNumber}
+                    {remainingCount > 0 && <span style={{ marginLeft: 3 }}>({remainingCount})</span>}
+                  </div>
                 </div>
               );
             })}
@@ -63,6 +117,42 @@ export function FrictionTimeline({ timeline, burnoutThreshold = 80 }: { timeline
           </div>
           <div className="su-subtitle" style={{ marginTop: 10 }}>{TREND_COPY[trend.reading]}</div>
         </>
+      )}
+
+      {openReading && createPortal(
+        <div className="su">
+          <div className="su-modal-overlay" role="dialog" onMouseDown={e => e.target === e.currentTarget && setOpenWeek(null)}>
+            <div className="su-card su-modal su-pop">
+              <div className="su-title">Week {openReading.weekNumber} tasks</div>
+              <div className="su-subtitle">
+                {openReading.contributingMilestones.length === 0
+                  ? 'No tasks, deadlines, or exams land in this week.'
+                  : `Friction score this week: ${openReading.frictionScore}${openReading.burnoutRisk ? ' — burnout risk' : ''}.`}
+              </div>
+              {openReading.contributingMilestones.length > 0 && (
+                <div className="su-flex" style={{ flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                  {openReading.contributingMilestones.map(m => (
+                    <label key={m.id} className="su-flex su-gap-10 su-items-center" style={{ cursor: interactive ? 'pointer' : 'default', opacity: m.done ? 0.6 : 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={m.done}
+                        disabled={!interactive || togglingId === m.id}
+                        onChange={() => toggle(m.id)}
+                      />
+                      <span style={{ flex: 1 }}>
+                        <span style={{ textDecoration: m.done ? 'line-through' : 'none' }}>{m.title}</span>
+                        <span className="su-muted" style={{ marginLeft: 6, fontSize: 11.5 }}>{m.courseCode} · {TYPE_LABEL[m.type] ?? m.type}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {!interactive && <div className="su-muted su-mt-16" style={{ fontSize: 11.5 }}>Read-only view.</div>}
+              <button type="button" className="su-btn su-mt-16" onClick={() => setOpenWeek(null)}>Close</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </Section>
   );

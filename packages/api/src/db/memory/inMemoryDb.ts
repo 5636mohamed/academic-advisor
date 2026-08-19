@@ -844,6 +844,7 @@ export function __resetForTests(): void {
   transferRequests.length = 0;
   colliderProjects.length = 0;
   colliderProjects.push(...COLLIDER_PROJECTS.map(p => ({ ...p, members: [...p.members], fundingAllocations: [...p.fundingAllocations] })));
+  completedFrictionMilestones.clear();
 }
 
 // ---------------------------------------------------------------------
@@ -1988,12 +1989,48 @@ export function listColliderProjectsForAdvisor(advisorId: string): Project[] {
   return colliderProjects.filter(p => p.advisorId === advisorId);
 }
 
-export function fundColliderProject(id: string, amount: number, note: string): Project {
+export function fundColliderProject(
+  id: string,
+  amount: number,
+  note: string,
+  source: 'university' | 'external_grant',
+  grantName?: string
+): Project {
   const project = colliderProjects.find(p => p.id === id);
   if (!project) throw Object.assign(new Error(`no such collider project ${id}`), { httpStatus: 404 });
   if (!Number.isFinite(amount) || amount <= 0) throw Object.assign(new Error('amount must be a positive number'), { httpStatus: 400 });
-  project.fundingAllocations.push({ amount, note, allocatedAt: new Date().toISOString() });
+  if (source !== 'university' && source !== 'external_grant') {
+    throw Object.assign(new Error("source must be 'university' or 'external_grant'"), { httpStatus: 400 });
+  }
+  project.fundingAllocations.push({ amount, note, allocatedAt: new Date().toISOString(), source, grantName: grantName || undefined });
   return project;
+}
+
+// ---------------------------------------------------------------------
+// Cognitive Load Heatmap — "mark a task done" state. A student checking
+// off a syllabus milestone doesn't touch their real transcript/proposals
+// at all (this is a self-reported to-do check, not a grade) — just this
+// one small per-student set, mirroring the existing ventureGateAnswers/
+// retakePreferences Maps' own "one small piece of session state per
+// student" shape.
+// ---------------------------------------------------------------------
+const completedFrictionMilestones = new Map<string, Set<string>>();
+
+export function getCompletedMilestoneIds(studentId: string): string[] {
+  return [...(completedFrictionMilestones.get(studentId) ?? [])];
+}
+
+/** Toggles one milestone id for one student, returns the updated full set.
+ *  Doesn't validate the id against the real milestone template — this
+ *  module doesn't import seedSyllabusMilestones.ts (kept a one-way
+ *  dependency, db -> seed, not the reverse) — an unknown id just sits in
+ *  the set unused, harmless. */
+export function toggleCompletedMilestone(studentId: string, milestoneId: string): string[] {
+  const set = completedFrictionMilestones.get(studentId) ?? new Set<string>();
+  if (set.has(milestoneId)) set.delete(milestoneId);
+  else set.add(milestoneId);
+  completedFrictionMilestones.set(studentId, set);
+  return [...set];
 }
 
 export { courseByCode };

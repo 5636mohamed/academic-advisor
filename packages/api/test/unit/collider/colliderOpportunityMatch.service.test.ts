@@ -20,8 +20,8 @@ describe('jaccardSimilarity', () => {
 
 describe('matchOpportunitiesForProject', () => {
   const opportunities: ExternalOpportunity[] = [
-    { id: 'o1', title: 'IoT internship', kind: 'internship', requiredSkills: ['iot', 'lora'], organization: 'X', deadline: null, url: null },
-    { id: 'o2', title: 'Finance fair', kind: 'research_fair', requiredSkills: ['finance'], organization: 'Y', deadline: null, url: null },
+    { id: 'o1', title: 'IoT internship', kind: 'internship', requiredSkills: ['iot', 'lora'], organization: 'X', deadline: null, url: null, source: 'curated' },
+    { id: 'o2', title: 'Finance fair', kind: 'research_fair', requiredSkills: ['finance'], organization: 'Y', deadline: null, url: null, source: 'curated' },
   ];
 
   it('ranks matches highest-score-first and drops zero-score matches', () => {

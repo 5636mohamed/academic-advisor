@@ -1,7 +1,10 @@
 // AI Features Blueprint §2/§3.2 — advisor-level monitoring of "organic"
 // Collider project groups on this advisor's roster, matched against a
-// curated table of internships/grants/research fairs. No student-facing
-// creation/matching UI in this cut — see seedColliderProjects.ts's header.
+// REAL live-fetched opportunity table (RemoteOK internships + Grants.gov
+// grants, both with a curated fallback — see
+// externalOpportunitiesLive.service.ts) plus curated research fairs (no
+// good free public API exists for those). No student-facing creation/
+// matching UI in this cut — see seedColliderProjects.ts's header.
 import { useEffect, useState } from 'react';
 import { api, ColliderProjectDTO } from '../api/client';
 import { OpportunityMatch } from '@advisor/shared';
@@ -14,14 +17,26 @@ const STAGE_TONE: Record<string, 'neutral' | 'warn' | 'ok' | 'info'> = { idea: '
 function OpportunityMatches({ projectId }: { projectId: string }) {
   const [matches, setMatches] = useState<OpportunityMatch[] | null>(null);
   useEffect(() => { api.colliderOpportunityMatches(projectId).then(setMatches); }, [projectId]);
-  if (!matches) return <div className="su-muted" style={{ fontSize: 12 }}>Checking opportunity matches…</div>;
+  if (!matches) return <div className="su-muted" style={{ fontSize: 12 }}>Checking opportunity matches against live internship/grant listings…</div>;
   if (matches.length === 0) return <div className="su-muted" style={{ fontSize: 12 }}>No matching internships, grants, or research fairs right now.</div>;
   return (
     <div className="su-flex" style={{ flexDirection: 'column', gap: 6, marginTop: 8 }}>
       {matches.map(m => (
         <div key={m.opportunity.id} className="su-flex su-justify-between su-items-center" style={{ fontSize: 12.5 }}>
-          <span><b>{m.opportunity.title}</b> — {m.opportunity.organization} <span className="su-muted">({m.opportunity.kind.replace('_', ' ')})</span></span>
-          <span className="su-badge info">{Math.round(m.matchScore * 100)}% match</span>
+          <span>
+            {m.opportunity.url ? (
+              <a href={m.opportunity.url} target="_blank" rel="noreferrer"><b>{m.opportunity.title}</b></a>
+            ) : (
+              <b>{m.opportunity.title}</b>
+            )}
+            {' '}— {m.opportunity.organization} <span className="su-muted">({m.opportunity.kind.replace('_', ' ')})</span>
+          </span>
+          <span className="su-flex su-gap-6 su-items-center">
+            <span className={`su-badge ${m.opportunity.source === 'live' ? 'ok' : 'neutral'}`} title={m.opportunity.source === 'live' ? 'Fetched just now from a real external listing' : 'This app\'s own curated fallback list'}>
+              {m.opportunity.source === 'live' ? 'Live' : 'Curated'}
+            </span>
+            <span className="su-badge info">{Math.round(m.matchScore * 100)}% match</span>
+          </span>
         </div>
       ))}
     </div>

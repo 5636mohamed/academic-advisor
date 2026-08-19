@@ -53,7 +53,8 @@ function jitteredWeek(courseCode: string, salt: string, lo: number, hi: number):
 
 function milestonesForCourse(course: Course): SyllabusMilestone[] {
   const out: SyllabusMilestone[] = [];
-  const push = (weekNumber: number, type: MilestoneType, title: string) => out.push({ courseCode: course.code, weekNumber, type, title });
+  const push = (weekNumber: number, type: MilestoneType, title: string) =>
+    out.push({ id: `${course.code}::${weekNumber}::${type}`, courseCode: course.code, weekNumber, type, title });
 
   if (course.category === 'special') {
     // Graduation Project (1)/(2) — milestone-driven, not exam-driven.
@@ -99,6 +100,20 @@ function milestonesForCourse(course: Course): SyllabusMilestone[] {
 }
 
 export const SYLLABUS_MILESTONES: SyllabusMilestone[] = CATALOG.flatMap(milestonesForCourse);
+
+// Verified, not assumed (see this file's header): a milestone's id needs
+// to be genuinely unique for the "mark done" feature to toggle the right
+// one. Fails loudly at import time — the moment a future edit to the
+// generator above ever violates the non-overlapping-week-ranges
+// assumption — rather than silently letting two different deadlines share
+// a checkbox.
+{
+  const seen = new Set<string>();
+  for (const m of SYLLABUS_MILESTONES) {
+    if (seen.has(m.id)) throw new Error(`seedSyllabusMilestones: duplicate milestone id ${m.id} — generator invariant broken`);
+    seen.add(m.id);
+  }
+}
 
 export const MILESTONES_BY_COURSE: Record<string, SyllabusMilestone[]> = SYLLABUS_MILESTONES.reduce(
   (acc, m) => {
