@@ -1,6 +1,6 @@
 {
   "name": "@advisor/api",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "AEGIS Academic Advisor System — the Express/TypeScript backend: predictive grading, probation/dismissal tracking, retake-gate planning, transfer execution, advisor/Vice-President oversight, and the full advising API.",
   "homepage": "https://github.com/5636mohamed/academic-advisor#readme",
@@ -15,7 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@advisor/shared": "0.1.1",
+    "@advisor/shared": "0.2.0",
     "express": "^5.2.1",
     "@prisma/client": "^5.18.0"
   },
