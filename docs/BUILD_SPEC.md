@@ -1638,6 +1638,13 @@ approves/declines).
 
 ## 17. AEGIS Rebrand, Multi-Advisor Model & Vice President Oversight
 
+> **Superseded by §18**: this section's "5 advisors, 125 ECE-only students"
+> figures describe the system as of this epic. §18's real department
+> catalog expansion later grew this to 14 advisors (one per real FoE
+> department) with a 25-35-student roster each — the mechanisms described
+> below (per-advisor scoping, VP oversight, transfer chain, responsibility
+> workflow) are unchanged, just running over more advisors/departments now.
+
 The system was rebuilt around a more realistic, hierarchical advising
 structure — a single shared advisor account became 5 real advisor
 identities, and a new Vice President role oversees all of them — plus a
@@ -1829,4 +1836,131 @@ above calls the same underlying functions those routes always called.
 
 ---
 
-*End of specification. This document, sections 1–17, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), §17 (AEGIS rebrand, multi-advisor model, Vice President oversight, advisor responsibility workflow, transfer pending chain), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13.*
+## 18. Real Department Catalog Expansion (10 real FoE programs)
+
+Every prior section describes a system whose domain model (Faculty/
+Department/Course as first-class, foreign-keyed entities), decision tree,
+grading rules, and transfer engine were always designed to support many
+departments — but until this section, exactly one department (ECE) had a
+real, populated course catalog behind it; CSE and MCE existed only as
+placeholder ids in `deptFitEngine.ts` with no real curriculum. This section
+replaces that with the real thing.
+
+### 18.1 Source of truth
+
+`FOE Handbook.pdf` (EJUST's real Faculty of Engineering student handbook,
+repo root) — specifically "Appendix A: Study Plans and Elective Courses of
+FoE Programs" (pages 24-42) — is the literal, authoritative source for
+every course code/name/credit/prerequisite transcribed into the seed data.
+Table 2 of that handbook lists 3 schools and **10 real programs**:
+
+| School | Programs |
+|---|---|
+| Electronics, Communications & Computers (ECCE) | CSE, ECE, MIE (Biomedical & Bioinformatics), EPE |
+| Innovative Design Engineering (IDE) | IME (Industrial & Manufacturing), MTE (Mechatronics), MSE (Materials Science) |
+| Energy, Environment, Chemical & Petrochemical (EECE) | ERE, ENV, CPE |
+
+Semesters 1-3 are identical across all 10 programs (already the case for
+ECE); semester 4 is mostly shared with 1-2 program-differentiating courses;
+semesters 5-9 are each program's real divergence.
+
+### 18.2 File layout
+
+- `packages/api/src/db/seed/seedFoeSharedCourses.ts` — the `c()` course-
+  builder helper plus every course reused by 2+ programs, defined exactly
+  once so a shared course's fields can never drift between the programs
+  that both take it.
+- One `seed<Program>Catalog.ts` per program (`seedCseCatalog.ts`,
+  `seedMieCatalog.ts`, …), each exporting `<PROGRAM>_CATALOG: Course[]` and
+  `<PROGRAM>_ELECTIVE_POOL` (resolving that program's own `XXXEL1..5`
+  program-elective placeholder slots, same mechanism ECE's
+  `ECE_ELECTIVE_POOL` already used).
+- `seedCatalog.ts` composes the real union: `CATALOG_BY_DEPARTMENT` (one
+  real course array per department id), `CATALOG`/`CATALOG_BY_CODE` (the
+  deduplicated global union every other module already imported), and
+  `ELECTIVE_POOL_BY_DEPARTMENT`. A `dedupeByCode` invariant check throws if
+  any two programs ever redefine the same course code with conflicting
+  fields — catches a transcription slip immediately rather than silently
+  corrupting one program's curriculum with another's field values.
+
+### 18.3 Documented simplifications
+
+Real-world curricula don't always fit a single flat, code-keyed catalog
+model cleanly — these are the specific places this expansion had to choose
+a normalization, all flagged in the source files themselves:
+
+- **A shared course can only have one `semesterOrdinal` globally.** Where
+  the handbook schedules the same cross-listed course at different points
+  in different programs' own plans (e.g. `MTE324`/`325` "Automatic
+  Control" — semester 6 for MTE/IME/ENV, semester 8 for ECE/EPE/MIE/MSE),
+  it's canonicalized at the **earliest** semester any adopter uses, never
+  the latest — the reverse direction risks a forward-referencing prereq
+  violation (a course requiring it before it's "available"), while taking
+  a prereq-satisfying course earlier than one particular program's plan
+  strictly needs is always harmless.
+- **IME's ME (Manufacturing Engineering) track isn't seeded** — only the IE
+  (Industrial Engineering) track. The handbook's two tracks diverge in
+  *required* courses from semester 6 onward, not just electives (unlike
+  MIE's Biomedical/Bioinformatics split, which only affects electives and
+  is handled by combining both tracks' elective pools into one).
+- **ENV's 8 elective slots** are individually topic-named inline in the
+  handbook (e.g. "Elective 1 (treatment of hazardous waste)") instead of
+  the generic "Elective N" pattern every other program's table uses, and
+  the handbook's own separate elective-pool page re-lists the same topics
+  (plus 4 more) with inconsistent placeholder-style codes
+  (`ENV41x`/`ENV42x`) rather than final ones. Normalized to the same
+  `ENVEL1..8`-slot pattern used everywhere else; every topic name is real,
+  only the numbering for the ones the handbook itself left uncoded was
+  made consistent (`ENV441`-`448`, continuing ENV's own real numbering).
+- **ERE's own semester 4 has no `IME221` "Project Management"** at all —
+  faithfully transcribed as such (it appears only as ERE's own elective,
+  `ERE418`, later in the plan), not an oversight.
+
+### 18.4 Cross-cutting wiring this unblocked
+
+- `completeTranscript()` and `generateFillerStudents()` (`inMemoryDb.ts`)
+  are department-aware — a student's transcript gap-filler and anchor
+  course now draw from their OWN department's real catalog
+  (`CATALOG_BY_DEPARTMENT[student.departmentId]`), not the full 10-program
+  union. Getting this wrong would have silently gap-filled, e.g., an ECE
+  student with CPE-only courses.
+- `courseCodesForDepartment()` (§7.1's internal-transfer excess-credit
+  determination) now uses each target department's real course-code set
+  directly, replacing the old placeholder-gateway-course-list workaround
+  the code had explicitly flagged as a gap before real catalogs existed.
+- `deptFitEngine.ts`'s `DEPARTMENTS` (§6) lists all 10 real programs with
+  real `gatewayCourseCodes` drawn from each program's own early
+  differentiator courses, replacing the old ECE/CSE/MCE placeholder set
+  (`MCE` never even matched the handbook's own department code — it's
+  `MTR`, program code `MTE`).
+- `seedSyllabusMilestones.ts`'s metadata-driven milestone generator
+  (§1.3/AI Features Blueprint) needed **no changes** — it's driven purely
+  by `Course.category`/`credits`/name pattern, so every new program's
+  courses get real generated milestones automatically.
+
+### 18.5 Roster scale
+
+One advisor per real department (14 total: the original 5 ECE advisors +
+1 each for CSE/MIE/EPE/MTE/MSE/IME/ERE/ENV/CPE), each with a deterministic
+**25-35-student roster** (seeded per advisor id, not a fixed 25) — see
+`seedAdvisors.ts`'s `rosterSizeFor`. The 14 hand-authored named personas
+(13 original + the cold-start trial persona) remain ECE-only; every other
+student across all 14 advisors is generated from their own department's
+real catalog.
+
+### 18.6 Other real EJUST faculties — documented, not built
+
+EJUST has two other real faculties beyond the Faculty of Engineering:
+**Faculty of Basic and Applied Sciences (BAS)** (Computer Science & IT,
+Sustainable Architecture, Pharm D, Art & Design) and **Faculty of
+International Business and Humanities (FIBH)** (business/MBA tracks) —
+confirmed against ejust.edu.eg. `deptFitEngine.ts`'s
+`OTHER_FACULTY_DEPARTMENTS` (`BUS`/`BIS`/`ACC`/`MKT`) predates this
+research and are **fictional placeholder names**, not EJUST's real other
+faculties. This section deliberately does not build BAS or FIBH — it only
+records that if they're ever seeded for real, they should use FIBH's/BAS's
+actual names, not the existing placeholders.
+
+---
+
+*End of specification. This document, sections 1–18, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), §17 (AEGIS rebrand, multi-advisor model, Vice President oversight, advisor responsibility workflow, transfer pending chain), §18 (the real 10-program FoE department catalog expansion), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13.*

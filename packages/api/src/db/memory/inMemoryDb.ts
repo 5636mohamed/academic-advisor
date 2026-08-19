@@ -743,6 +743,80 @@ function seedInitialVentureMatches(): void {
 }
 seedInitialVentureMatches();
 
+/** Real-department expansion, venture-board polish — a handful of direct
+ *  applications from generated students in the NEW (non-ECE) departments,
+ *  covering the real variety of CV-upload states a live venture board
+ *  actually sees: applied-with-a-CV, applied-with-no-CV-yet, a still-
+ *  unapplied system suggestion, and a declined application that DID have a
+ *  CV attached. Each pick is a deterministic generated filler student
+ *  (`${advisorId}-gen-N}`) genuinely Level 3+ (checked against the real
+ *  computed level, not assumed) — the Venture Gate is never even shown
+ *  below Level 3 (§16.1/§16.8), so a lower-level fixture would be
+ *  unrealistic even though nothing at the data layer strictly forbids it.
+ *  Also opts each one into the Venture Gate (YES) so they show up on the
+ *  owning advisor's real candidate list, same as the pre-seeded ECE cohort
+ *  below. */
+function seedCrossDepartmentVentureApplications(): void {
+  const SAMPLE_CV: CvAttachment = { fileName: 'cv.pdf', dataUrl: 'data:text/plain;base64,U2FtcGxlIENWIGNvbnRlbnQ=' };
+
+  const cseStudent = students.get('advisor-heba-gen-1'); // CSE, Level 3
+  if (cseStudent) {
+    setVentureGateAnswer(cseStudent.id, true);
+    cseStudent.ventureMatches.push({
+      id: 'vmatch-seed-cse-applied-with-cv',
+      studentId: cseStudent.id,
+      ventureProjectId: 'proj-edge-ml',
+      matchScore: 0.82,
+      status: 'applied',
+      createdAt: '2026-03-01T00:00:00.000Z',
+      cvFileName: SAMPLE_CV.fileName,
+      cvDataUrl: SAMPLE_CV.dataUrl,
+    });
+  }
+
+  const mteStudent = students.get('advisor-mostafa-gen-2'); // MTE, Level 3
+  if (mteStudent) {
+    setVentureGateAnswer(mteStudent.id, true);
+    mteStudent.ventureMatches.push({
+      id: 'vmatch-seed-mte-applied-no-cv',
+      studentId: mteStudent.id,
+      ventureProjectId: 'proj-lora',
+      matchScore: 0.81,
+      status: 'applied', // applied, but hasn't attached a CV yet — a real, common in-between state
+      createdAt: '2026-03-02T00:00:00.000Z',
+    });
+  }
+
+  const mseStudent = students.get('advisor-dina-gen-1'); // MSE, Level 3
+  if (mseStudent) {
+    setVentureGateAnswer(mseStudent.id, true);
+    mseStudent.ventureMatches.push({
+      id: 'vmatch-seed-mse-suggested',
+      studentId: mseStudent.id,
+      ventureProjectId: 'proj-grad-federated',
+      matchScore: 0.83,
+      status: 'suggested', // system match, not yet acted on — never carries a CV
+      createdAt: '2026-03-03T00:00:00.000Z',
+    });
+  }
+
+  const epeStudent = students.get('advisor-rania-gen-2'); // EPE, Level 4
+  if (epeStudent) {
+    setVentureGateAnswer(epeStudent.id, true);
+    epeStudent.ventureMatches.push({
+      id: 'vmatch-seed-epe-declined-with-cv',
+      studentId: epeStudent.id,
+      ventureProjectId: 'proj-edge-ml',
+      matchScore: 0.80,
+      status: 'declined', // applied with a CV, the advisor declined it
+      createdAt: '2026-03-04T00:00:00.000Z',
+      cvFileName: SAMPLE_CV.fileName,
+      cvDataUrl: SAMPLE_CV.dataUrl,
+    });
+  }
+}
+seedCrossDepartmentVentureApplications();
+
 /** Demo fixture — EVERY Level 3+, non-dismissed student gets a pre-answered
  *  Venture Gate (YES) + Interest Form, so the Venture Board (student side)
  *  and every project's candidate list (Faculty Console side) show real,
@@ -877,6 +951,7 @@ export function __resetForTests(): void {
   ventureProjects.length = 0;
   ventureProjects.push(...VENTURE_PROJECTS.map(p => ({ ...p })));
   seedInitialVentureMatches();
+  seedCrossDepartmentVentureApplications();
   seedInitialVentureOptIns();
   seedInitialRegisteredCourses();
   transferRequests.length = 0;

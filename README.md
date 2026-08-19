@@ -34,8 +34,8 @@ The real, fully working system — not a static mockup. Frontend on GitHub
 Pages, backend API live on Railway; log in with any credential from
 `docs/LOGIN_CREDENTIALS.md` — try the Vice President
 (`vice-president@aegis.edu.eg` / `AEGIS@2025`) for the full cross-advisor
-view, or any of the 5 advisors (e.g. `advisor-nabil@aegis.edu.eg` /
-`Advisor@123`) for a single 25-student roster — and click through the real
+view, or any of the 14 advisors (e.g. `nabil.fathy@aegis.edu.eg` /
+`Advisor@123`) for a single 25-35-student roster — and click through the real
 dashboard, course plans, transfer approvals, and venture board with real
 seeded data. The API's free tier can spin down after a period of
 inactivity — the very first request after a quiet stretch may take up to
@@ -355,9 +355,9 @@ npx vite                      # app on http://localhost:5173, proxies /api to :3
 
 Open `http://localhost:5173/login` and sign in with a real email + password
 (still a demo gate — client-side only, no server-side session) — one of the
-5 advisors, the Vice President, or a student. The full credential roster
+14 advisors, the Vice President, or a student. The full credential roster
 (every student/advisor email is derived straight from their real seeded
-id) is in `docs/LOGIN_CREDENTIALS.md`. The
+name) is in `docs/LOGIN_CREDENTIALS.md`. The
 demo roster includes personas for every worked example in spec §11 (a
 good-standing student, a mid-probation warning-ladder student, a
 mandatory-retake-overflow case, a dismissed student, a faculty-transfer

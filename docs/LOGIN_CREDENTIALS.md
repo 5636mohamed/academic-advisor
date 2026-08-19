@@ -16,7 +16,7 @@ the note at the bottom of this file.
 |---|---|
 | `vice-president@aegis.edu.eg` | `AEGIS@2025` |
 
-A single global account overseeing all 5 advisors — per-advisor roster
+A single global account overseeing all 14 advisors — per-advisor roster
 summaries and drill-down, a flat cross-advisor pending-approvals queue,
 per-advisor transfer-request counters, final sign-off on the transfer
 pending chain, and its own Venture Board (can post projects, attributed to
@@ -24,23 +24,41 @@ pending chain, and its own Venture Board (can post projects, attributed to
 
 ## Advisors
 
-All 5 advisors share one password: **`Advisor@123`**
+All 14 advisors share one password: **`Advisor@123`**
 
-| Name | Email | Roster |
-|---|---|---|
-| Prof. Nabil Fathy | `nabil.fathy@aegis.edu.eg` | 25 students (incl. Ahmed, Sara, Karim) |
-| Prof. Mervat Aziz | `mervat.aziz@aegis.edu.eg` | 25 students (incl. Omar, Mona, Youssef) |
-| Prof. Tarek Younis | `tarek.younis@aegis.edu.eg` | 25 students (incl. Laila, Salma, Yara) |
-| Prof. Hoda Sami | `hoda.sami@aegis.edu.eg` | 25 students (incl. Nourhan, Hassan) |
-| Prof. Waleed Kassem | `waleed.kassem@aegis.edu.eg` | 25 students (incl. Fatma, Mohamed) |
+One advisor per real seeded department — the 5 original ECE advisors, plus
+one per department in the FoE Handbook's other 9 real programs (see
+`docs/BUILD_SPEC.md`'s "Real department catalog" section for the full
+program list and sourcing). Each advisor's roster is a deterministic
+25-35-student spread (not a fixed 25) — the exact count is seeded per
+advisor id, so it's stable across restarts but genuinely varies
+advisor-to-advisor.
 
-Each advisor sees only their own 25-student roster (real server-side
-scoping — see `?advisorId=` on the `/api/students`/`/api/advisor/report`
-routes, not just what the UI happens to show) and owns their own venture
-board postings, transfer-request queue, and roster PDF report. 125 students
-total across all 5 advisors — see the table below for the 13 named/scripted
-personas; the other 112 are deterministically generated filler students
-with a realistic spread of standings.
+| Name | Email | Department | Roster |
+|---|---|---|---|
+| Prof. Nabil Fathy | `nabil.fathy@aegis.edu.eg` | ECE | 25-35 students (incl. Ahmed, Sara, Karim) |
+| Prof. Mervat Aziz | `mervat.aziz@aegis.edu.eg` | ECE | 25-35 students (incl. Omar, Mona, Youssef) |
+| Prof. Tarek Younis | `tarek.younis@aegis.edu.eg` | ECE | 25-35 students (incl. Laila, Salma, Yara) |
+| Prof. Hoda Sami | `hoda.sami@aegis.edu.eg` | ECE | 25-35 students (incl. Nourhan, Hassan) |
+| Prof. Waleed Kassem | `waleed.kassem@aegis.edu.eg` | ECE | 25-35 students (incl. Fatma, Mohamed) |
+| Prof. Heba Zaki | `heba.zaki@aegis.edu.eg` | CSE | 25-35 students, all generated |
+| Prof. Sherif Adly | `sherif.adly@aegis.edu.eg` | MIE | 25-35 students, all generated |
+| Prof. Rania Gaber | `rania.gaber@aegis.edu.eg` | EPE | 25-35 students, all generated |
+| Prof. Mostafa Hegazy | `mostafa.hegazy@aegis.edu.eg` | MTE | 25-35 students, all generated |
+| Prof. Dina Farouk | `dina.farouk@aegis.edu.eg` | MSE | 25-35 students, all generated |
+| Prof. Ayman Nabil | `ayman.nabil@aegis.edu.eg` | IME | 25-35 students, all generated |
+| Prof. Khaled Ramzy | `khaled.ramzy@aegis.edu.eg` | ERE | 25-35 students, all generated |
+| Prof. Nagwa Fahmy | `nagwa.fahmy@aegis.edu.eg` | ENV | 25-35 students, all generated |
+| Prof. Amr Shawky | `amr.shawky@aegis.edu.eg` | CPE | 25-35 students, all generated |
+
+Each advisor sees only their own roster (real server-side scoping — see
+`?advisorId=` on the `/api/students`/`/api/advisor/report` routes, not just
+what the UI happens to show) and owns their own venture board postings,
+transfer-request queue, and roster PDF report. The 14 hand-authored/scripted
+named personas (13 original + the cold-start trial persona) are all ECE —
+see the table below; every other student across all 14 advisors is
+deterministically generated with a realistic spread of standings, drawn
+from their own department's real course catalog.
 
 ## Students
 
@@ -63,10 +81,11 @@ All students share one password: **`Student@123`**
 | Mohamed Farag (venture match — Scenario N) | `mohamed.farag@aegis.edu.eg` | Prof. Waleed Kassem | §16 venture-match demo |
 | Youssef Adel (cold start — new Level 1) | `youssef.adel@aegis.edu.eg` | Prof. Waleed Kassem | Zero completed courses — cold-start G12/entrance-exam recommendation demo |
 
-The other 112 students (ids like `advisor-nabil-gen-1`) are deterministically
-generated with their own realistic first+last name (from a fixed name pool)
-and log in the same way — `firstname.lastname@aegis.edu.eg`, same shared
-password, no individual listing here.
+Every other student across all 14 advisors (ids like `advisor-nabil-gen-1`
+or `advisor-heba-gen-1`) is deterministically generated with their own
+realistic first+last name (from a fixed name pool) and logs in the same
+way — `firstname.lastname@aegis.edu.eg`, same shared password, no
+individual listing here.
 
 Every id above (`ahmed-1`, `advisor-nabil`, …) still exists and still works
 exactly as before for anything that isn't the login screen itself — API

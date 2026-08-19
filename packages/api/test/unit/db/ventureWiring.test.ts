@@ -205,3 +205,39 @@ describe('§16.4 — CV attachment flows through to the professor\'s candidate l
     expect(mohamed?.cvFileName).toBeUndefined();
   });
 });
+
+describe('real-department expansion — venture-application variety from non-ECE students', () => {
+  it('a CSE student applied with a CV attached', () => {
+    const matches = db.getVentureMatchesForStudent('advisor-heba-gen-1');
+    const row = matches.find(m => m.ventureProjectId === 'proj-edge-ml');
+    expect(row?.status).toBe('applied');
+    expect(row?.cvFileName).toBe('cv.pdf');
+  });
+
+  it('an MTE student applied but hasn\'t attached a CV yet', () => {
+    const matches = db.getVentureMatchesForStudent('advisor-mostafa-gen-2');
+    const row = matches.find(m => m.ventureProjectId === 'proj-lora');
+    expect(row?.status).toBe('applied');
+    expect(row?.cvFileName).toBeUndefined();
+  });
+
+  it('an MSE student has a system-suggested match, not yet applied — no CV', () => {
+    const matches = db.getVentureMatchesForStudent('advisor-dina-gen-1');
+    const row = matches.find(m => m.ventureProjectId === 'proj-grad-federated');
+    expect(row?.status).toBe('suggested');
+    expect(row?.cvFileName).toBeUndefined();
+  });
+
+  it('an EPE student\'s CV-attached application was declined', () => {
+    const matches = db.getVentureMatchesForStudent('advisor-rania-gen-2');
+    const row = matches.find(m => m.ventureProjectId === 'proj-edge-ml');
+    expect(row?.status).toBe('declined');
+    expect(row?.cvFileName).toBe('cv.pdf');
+  });
+
+  it('these applicants show up on the owning advisor\'s real candidate list', () => {
+    const candidates = db.getVentureProjectCandidates('proj-edge-ml');
+    const ids = candidates.map(c => c.studentId);
+    expect(ids).toEqual(expect.arrayContaining(['advisor-heba-gen-1', 'advisor-rania-gen-2']));
+  });
+});
