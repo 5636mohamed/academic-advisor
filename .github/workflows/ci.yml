@@ -30,6 +30,10 @@ jobs:
         working-directory: packages/api
         run: npm run test
 
+      - name: Backend type-check
+        working-directory: packages/api
+        run: npm run typecheck
+
       - name: Shared package type-check
         working-directory: packages/shared
         run: npm run typecheck

@@ -33,6 +33,22 @@ import weights from './config/predictionWeights.json';
 
 const app = express();
 
+/** Express 5's route params can be `string | string[]` (its updated
+ *  path-to-regexp supports repeated segments, e.g. `/files/*path`) — but
+ *  every route in this file uses a single plain `:id`-style segment, which
+ *  Express only ever populates as a string. This narrows that real
+ *  invariant explicitly instead of casting it away at each call site: if a
+ *  future route change ever DID introduce a repeated segment, this throws
+ *  a clear 400 right where the mistake would show up, rather than silently
+ *  handing an array where a lookup key was expected. */
+function paramStr(req: express.Request, name: string): string {
+  const v = req.params[name];
+  if (Array.isArray(v)) {
+    throw Object.assign(new Error(`${name} must be a single path segment, got multiple`), { httpStatus: 400 });
+  }
+  return v;
+}
+
 // Only relevant once this server is deployed somewhere separate from the
 // frontend that calls it (e.g. this API on Render, the built web app on
 // GitHub Pages — see packages/web/src/api/client.ts's VITE_API_BASE_URL).
@@ -107,7 +123,7 @@ function requireRole(role: 'admin' | 'registrar') {
  *  /transfer/*, and course registration endpoints at the API layer (403),
  *  not just hidden in the UI." */
 function blockIfDismissed(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const student = db.getStudent(req.params.id);
+  const student = db.getStudent(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
   try {
     assertNotDismissed(student.id, student.probationCounter.count);
@@ -193,7 +209,7 @@ app.post('/api/students/:id/enroll', blockIfDismissed, (req, res) => {
     return res.status(400).json({ error: 'expected { courseCode: string, pct: number, semesterOrdinal: number }' });
   }
   try {
-    const result = db.recordEnrollment(req.params.id, courseCode, pct, semesterOrdinal);
+    const result = db.recordEnrollment(paramStr(req, 'id'), courseCode, pct, semesterOrdinal);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -211,7 +227,7 @@ app.post('/api/students/:id/quiz', (req, res) => {
 // §4.2/§8 — the real orchestrator, locked out once dismissed.
 // ---------------------------------------------------------------------
 app.post('/api/students/:id/advise', blockIfDismissed, async (req, res) => {
-  const student = toStudentWithCgpa(req.params.id);
+  const student = toStudentWithCgpa(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' }); // unreachable after blockIfDismissed, kept for type-safety
   try {
     const result = await runAdvisingCycle(student, ports);
@@ -224,7 +240,7 @@ app.post('/api/students/:id/advise', blockIfDismissed, async (req, res) => {
     // (db) still exists and is still tested — this is the one place it
     // used to be wired into a response, not a claim that the underlying
     // §16.4 threshold logic itself was wrong.
-    res.json({ ...result, plan: attachBestCase(req.params.id, result.plan) }); // §15.2
+    res.json({ ...result, plan: attachBestCase(paramStr(req, 'id'), result.plan) }); // §15.2
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -336,7 +352,7 @@ app.post('/api/students/:id/transfer/internal', blockIfDismissed, (req, res) => 
   const { toDepartmentId } = req.body ?? {};
   if (typeof toDepartmentId !== 'string') return res.status(400).json({ error: 'expected { toDepartmentId: string }' });
   try {
-    const result = db.executeInternalTransferForStudent(req.params.id, toDepartmentId, `sem-transfer-${Date.now()}`);
+    const result = db.executeInternalTransferForStudent(paramStr(req, 'id'), toDepartmentId, `sem-transfer-${Date.now()}`);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -349,7 +365,7 @@ app.post('/api/students/:id/transfer/external', blockIfDismissed, (req, res) => 
     return res.status(400).json({ error: 'expected { toFacultyId: string, toDepartmentId: string }' });
   }
   try {
-    const result = db.executeExternalTransferForStudent(req.params.id, toFacultyId, toDepartmentId);
+    const result = db.executeExternalTransferForStudent(paramStr(req, 'id'), toFacultyId, toDepartmentId);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -387,7 +403,7 @@ app.post('/api/students/:id/transfer-requests', blockIfDismissed, (req, res) => 
     return res.status(400).json({ error: 'external_faculty requests also need toFacultyId' });
   }
   try {
-    res.json(db.createTransferRequestForStudent(req.params.id, type, toDepartmentId, toFacultyId));
+    res.json(db.createTransferRequestForStudent(paramStr(req, 'id'), type, toDepartmentId, toFacultyId));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -731,7 +747,7 @@ function withProfessorName<T extends { project: { professorId: string } }>(r: T)
 // §16.3/§16.5 — the Venture Board's full ranked list. Locked out once
 // dismissed, same as every other student-facing route (§16.8/§12).
 app.get('/api/students/:id/venture-matches', blockIfDismissed, (req, res) => {
-  res.json(db.getVentureMatches(req.params.id).map(withProfessorName));
+  res.json(db.getVentureMatches(paramStr(req, 'id')).map(withProfessorName));
 });
 
 // §16.4 — express interest, optionally attaching a CV in the same action.
@@ -746,7 +762,7 @@ app.post('/api/students/:id/venture-matches/:matchId/apply', blockIfDismissed, (
   }
   try {
     const cv = cvFileName && cvDataUrl ? { fileName: cvFileName, dataUrl: cvDataUrl } : undefined;
-    res.json(db.applyToVentureMatch(req.params.id, req.params.matchId, cv));
+    res.json(db.applyToVentureMatch(paramStr(req, 'id'), paramStr(req, 'matchId'), cv));
   } catch (err) {
     res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -765,7 +781,7 @@ app.post('/api/students/:id/venture-projects/:projectId/express-interest', block
   }
   try {
     const cv = cvFileName && cvDataUrl ? { fileName: cvFileName, dataUrl: cvDataUrl } : undefined;
-    res.json(db.applyToVentureProject(req.params.id, req.params.projectId, cv));
+    res.json(db.applyToVentureProject(paramStr(req, 'id'), paramStr(req, 'projectId'), cv));
   } catch (err) {
     res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
   }
