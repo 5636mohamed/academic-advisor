@@ -68,10 +68,12 @@ export interface Project {
   createdAt: string;
 }
 
+export type ExternalOpportunityKind = 'internship' | 'grant' | 'research_fair' | 'conference' | 'funding_program' | 'prototype_competition';
+
 export interface ExternalOpportunity {
   id: string;
   title: string;
-  kind: 'internship' | 'grant' | 'research_fair';
+  kind: ExternalOpportunityKind;
   requiredSkills: SkillTag[];
   organization: string;
   deadline: string | null;

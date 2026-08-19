@@ -216,11 +216,15 @@ export async function getLiveGrants(): Promise<LiveOpportunityResult> {
 
 /** The full opportunity table an advisor's Collider Board matches
  *  against: live-or-fallback internships + live-or-fallback grants +
- *  always-curated research fairs. */
+ *  always-curated everything else (research fairs, conferences, funding
+ *  programs, prototype competitions — real named Egyptian organizations
+ *  and programs, see seedExternalOpportunities.ts, but no comparable free
+ *  public API exists for any of these the way RemoteOK/Grants.gov do for
+ *  internships/grants, so they're never live-fetched). */
 export async function getAllOpportunities(): Promise<ExternalOpportunity[]> {
   const [internships, grants] = await Promise.all([getLiveInternships(), getLiveGrants()]);
-  const fairs = EXTERNAL_OPPORTUNITIES.filter(o => o.kind === 'research_fair');
-  return [...internships.opportunities, ...grants.opportunities, ...fairs];
+  const alwaysCurated = EXTERNAL_OPPORTUNITIES.filter(o => o.kind !== 'internship' && o.kind !== 'grant');
+  return [...internships.opportunities, ...grants.opportunities, ...alwaysCurated];
 }
 
 /** Test-only: clears the module-level cache so a test doesn't see a

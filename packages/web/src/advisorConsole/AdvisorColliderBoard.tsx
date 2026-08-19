@@ -59,7 +59,7 @@ export function AdvisorColliderBoard() {
     <Section
       eyebrow="Project Collider"
       title="Organic project groups on your roster"
-      subtitle="Student-formed project teams, matched against curated internships, grants, and research fairs."
+      subtitle="Student-formed project teams, matched against live internships/grants plus curated research fairs, conferences, funding programs, and prototype competitions from Egypt's innovation ecosystem."
     >
       {projects.length === 0 ? (
         <Empty>No active project groups on your roster right now.</Empty>
