@@ -8,7 +8,7 @@
 // calls later shouldn't require touching any caller (routes/ports), only
 // this file.
 import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor, Project, Notification, NotificationRole, NotificationType } from '@advisor/shared';
-import { CATALOG } from '../seed/seedCatalog';
+import { CATALOG, CATALOG_BY_DEPARTMENT } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
 import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
 import { PROFESSORS, VENTURE_PROJECTS, COURSE_SKILL_TAGS, ELECTIVE_COURSE_CODES } from '../seed/seedVentureProjects';
@@ -585,8 +585,9 @@ function buildCgpaSnapshots(targetPct: number, semestersClosed: number, studentI
   return snapshots;
 }
 
-function generateFillerStudents(advisorId: string, count: number): SeedStudent[] {
+function generateFillerStudents(advisorId: string, count: number, facultyId: string, departmentId: string): SeedStudent[] {
   const out: SeedStudent[] = [];
+  const deptCatalog = CATALOG_BY_DEPARTMENT[departmentId] ?? CATALOG;
   for (let i = 0; i < count; i++) {
     const id = `${advisorId}-gen-${i + 1}`;
     const bucket: StandingBucket = STANDING_CYCLE[fillerHash(`${id}:bucket`) % STANDING_CYCLE.length];
@@ -599,15 +600,18 @@ function generateFillerStudents(advisorId: string, count: number): SeedStudent[]
 
     // A single anchor attempt at the target percentage — completeTranscript
     // (below) uses this to compute studentAvgPct and fills in every other
-    // required course up through semestersClosed around that average.
-    const anchorCourse = CATALOG.find(c => c.semesterOrdinal === 1 && !c.isUR);
+    // required course up through semestersClosed around that average. Drawn
+    // from the student's OWN department's real catalog (every program
+    // shares an identical semester-1 block, so this is the same course
+    // object regardless of department — see seedFoeSharedCourses.ts).
+    const anchorCourse = deptCatalog.find(c => c.semesterOrdinal === 1 && !c.isUR);
     const allAttempts: EnrollmentRecord[] = anchorCourse ? [attempt(anchorCourse.code, targetPct, 1)] : [];
 
     out.push({
       id,
       name: `${firstName} ${lastName}`,
-      facultyId: 'ENG',
-      departmentId: 'ECE',
+      facultyId,
+      departmentId,
       status: 'active',
       activeBaseSnapshotId: null,
       cumulativeEarnedCredits: 0, // recomputed by completeTranscript() from the filled-in transcript
@@ -656,7 +660,13 @@ function completeTranscript(s: SeedStudent): SeedStudent {
   const maxOrdinal = snapshotOrdinals.length > 0 ? Math.max(...snapshotOrdinals) : Math.max(...s.allAttempts.map(a => a.semesterOrdinal));
   const studentAvgPct = s.allAttempts.reduce((sum, a) => sum + a.pct, 0) / s.allAttempts.length;
 
-  const missing = CATALOG.filter(c => c.semesterOrdinal <= maxOrdinal && !existingCodes.has(c.code)).sort(
+  // Gap-fill from the student's OWN department's real catalog, not the
+  // global 10-program union — otherwise an ECE student could get silently
+  // filled in with a CPE-only course. Falls back to the full CATALOG for a
+  // departmentId with no seeded catalog (defensive — every real department
+  // has one by the time this runs).
+  const deptCatalog = CATALOG_BY_DEPARTMENT[s.departmentId] ?? CATALOG;
+  const missing = deptCatalog.filter(c => c.semesterOrdinal <= maxOrdinal && !existingCodes.has(c.code)).sort(
     (a, b) => a.semesterOrdinal - b.semesterOrdinal || a.code.localeCompare(b.code)
   );
   if (missing.length === 0) return s;
@@ -709,7 +719,7 @@ function deriveStudent(s: SeedStudent): StoredStudent {
 // generated filler students bringing every advisor up to 25.
 const seedStudents: SeedStudent[] = [
   ...namedSeedStudentLiterals.map(s => ({ ...s, advisorId: NAMED_STUDENT_ADVISOR[s.id] })),
-  ...ADVISORS.flatMap(a => generateFillerStudents(a.id, fillerCountFor(a.id))),
+  ...ADVISORS.flatMap(a => generateFillerStudents(a.id, fillerCountFor(a.id), a.facultyId, a.departmentId)),
 ];
 
 const students = new Map<string, StoredStudent>(seedStudents.map(s => [s.id, deriveStudent(completeTranscript(s))]));
@@ -1154,13 +1164,15 @@ export function hasInternalTransfer(studentId: string): boolean {
 }
 
 /** Which course codes count as "mapping to a requirement slot" in a given
- *  department, for §7.1's excess-credit determination: every non-`program`
- *  category course (UR/faculty/school/special/program_elective) is shared
- *  across departments and always remaps; `program`-category courses only
- *  remap if they're in the TARGET department's own gateway-course list. This
- *  demo only has one full seeded catalog (ECE, see seedCatalog.ts) — a real
- *  system would look this up from each department's own curriculum map. */
+ *  department, for §7.1's excess-credit determination: simply every code in
+ *  that department's own real catalog (`CATALOG_BY_DEPARTMENT`, built from
+ *  the real FoE handbook — see seedCatalog.ts). Falls back to the
+ *  fit-engine's small gateway-course list for a department with no seeded
+ *  catalog of its own (the BUS-faculty placeholders — see
+ *  OTHER_FACULTY_DEPARTMENTS — which remain documented-synthetic). */
 function courseCodesForDepartment(departmentId: string): Set<string> {
+  const deptCatalog = CATALOG_BY_DEPARTMENT[departmentId];
+  if (deptCatalog) return new Set(deptCatalog.map(c => c.code));
   const dept = [...DEPARTMENTS, ...OTHER_FACULTY_DEPARTMENTS].find(d => d.id === departmentId);
   const shared = CATALOG.filter(c => c.category !== 'program').map(c => c.code);
   return new Set([...shared, ...(dept?.gatewayCourseCodes ?? [])]);

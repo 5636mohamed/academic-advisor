@@ -61,6 +61,13 @@ export const PROFESSORS: ProfessorProfile[] = [
   { id: 'advisor-tarek', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Tarek Younis', researchTags: [], acceptingUndergrads: true },
   { id: 'advisor-hoda', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Hoda Sami', researchTags: [], acceptingUndergrads: true },
   { id: 'advisor-waleed', facultyId: 'ENG', departmentId: 'ECE', name: 'Prof. Waleed Kassem', researchTags: [], acceptingUndergrads: true },
+  // Real-department expansion — one ProfessorProfile per new non-ECE
+  // advisor, same id/pattern as the 5 ECE ones above. Each starts with no
+  // seeded venture projects of their own (a real, if quieter, venture board
+  // — not every advisor has a project posted on day one).
+  { id: 'advisor-heba', facultyId: 'ENG', departmentId: 'CSE', name: 'Prof. Heba Zaki', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-sherif', facultyId: 'ENG', departmentId: 'MIE', name: 'Prof. Sherif Adly', researchTags: [], acceptingUndergrads: true },
+  { id: 'advisor-rania', facultyId: 'ENG', departmentId: 'EPE', name: 'Prof. Rania Gaber', researchTags: [], acceptingUndergrads: true },
   // VP epic — the same attribution-anchor pattern the advisors used to all
   // share, kept for the VP specifically (a genuine singleton role, unlike
   // the 5 advisors) — projects the Vice President posts directly (their
