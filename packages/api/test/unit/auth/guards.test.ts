@@ -5,7 +5,7 @@
 // directly rather than through an HTTP round-trip.
 import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
-import { authenticate, requireAuthRole, requireStudentAccess, requireAdvisorAccess, GuardPorts } from '../../../src/modules/auth/guards';
+import { authenticate, requireAuthRole, requireStudentAccess, requireAdvisorAccess, requireAdvisorOwnsStudent, GuardPorts } from '../../../src/modules/auth/guards';
 
 function fakeReq(overrides: Partial<{ headers: Record<string, string>; params: Record<string, string>; auth: { role: string; id: string | null } }> = {}) {
   const headers = overrides.headers ?? {};
@@ -137,6 +137,54 @@ describe('requireStudentAccess (real roster-ownership check — the actual gap t
     const res = fakeRes();
     const next = vi.fn();
     requireStudentAccess(ports)(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+describe('requireAdvisorOwnsStudent (advisor ACTION routes — the student themselves must never pass, unlike requireStudentAccess)', () => {
+  const ports: GuardPorts = {
+    getSession: () => null,
+    getStudentAdvisorId: (studentId: string) => (studentId === 'ahmed-1' ? 'advisor-nabil' : studentId === 'sara-1' ? 'advisor-mervat' : null),
+  };
+
+  it('the VP can act on any student', () => {
+    const req = fakeReq({ params: { id: 'ahmed-1' }, auth: { role: 'vice_president', id: null } });
+    const res = fakeRes();
+    const next = vi.fn();
+    requireAdvisorOwnsStudent(ports)(req, res, next);
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it('the owning advisor can act on their own advisee', () => {
+    const req = fakeReq({ params: { id: 'ahmed-1' }, auth: { role: 'advisor', id: 'advisor-nabil' } });
+    const res = fakeRes();
+    const next = vi.fn();
+    requireAdvisorOwnsStudent(ports)(req, res, next);
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("a non-owning advisor CANNOT act on another advisor's advisee", () => {
+    const req = fakeReq({ params: { id: 'sara-1' }, auth: { role: 'advisor', id: 'advisor-nabil' } });
+    const res = fakeRes();
+    const next = vi.fn();
+    requireAdvisorOwnsStudent(ports)(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('the STUDENT THEMSELVES cannot pass this guard — advisor actions are never self-serviceable', () => {
+    const req = fakeReq({ params: { id: 'ahmed-1' }, auth: { role: 'student', id: 'ahmed-1' } });
+    const res = fakeRes();
+    const next = vi.fn();
+    requireAdvisorOwnsStudent(ports)(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('404s when the target student does not exist', () => {
+    const req = fakeReq({ params: { id: 'ghost-1' }, auth: { role: 'advisor', id: 'advisor-nabil' } });
+    const res = fakeRes();
+    const next = vi.fn();
+    requireAdvisorOwnsStudent(ports)(req, res, next);
     expect(res.status).toHaveBeenCalledWith(404);
   });
 });

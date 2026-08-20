@@ -2,10 +2,23 @@
 // db/memory/inMemoryDb.ts's header for exactly how this differs from the
 // real Prisma/Postgres layer described in spec §9.3 — still pending). This
 // now covers every route in spec §9.2 that the in-memory store can
-// meaningfully serve, plus the static demo frontend. What's still a
-// deliberate simplification rather than a gap: auth is a single `x-role`
-// header instead of real JWT sessions (spec §9's roles are respected —
-// admin-only routes check it — but there's no login flow behind it), and
+// meaningfully serve, plus the static demo frontend.
+//
+// Real backend authentication epic — every route below is now guarded by
+// a real, server-verified session token (POST /api/auth/login issues it;
+// modules/auth/guards.ts's authenticate/requireAuthRole/
+// requireStudentAccess/requireAdvisorAccess/requireAdvisorOwnsStudent
+// enforce it per-route). Before this, "auth" was a client-only demo — a
+// plain localStorage blob, no server verification, any raw API call
+// could ask for any id's data (see .github/SECURITY.md's rewritten
+// Authentication section for the full before/after). What's STILL a
+// deliberate simplification, not a gap: the passwords themselves remain
+// shared, publicly-documented demo constants (one per role, not real
+// per-user secrets — see docs/LOGIN_CREDENTIALS.md), and `PUT /api/
+// admin/prediction-weights` still uses the older single `x-role` header
+// (no login identity exists for that role in the app at all — explicitly
+// out of scope for this epic, not silently inconsistent).
+//
 // `POST /semesters/:id/close` is exposed as `POST /students/:id/semesters/close`
 // since this store doesn't have globally-addressable Semester rows outside
 // their owning student.
@@ -45,7 +58,8 @@ import { rankBottlenecks, affectedAdvisees, StudentForBottleneckCheck } from './
 import { MILESTONES_BY_COURSE, SYLLABUS_MILESTONES, SEMESTER_WEEKS } from './db/seed/seedSyllabusMilestones';
 import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
 import { login } from './modules/auth/session.service';
-import { authenticate, requireAuthRole, requireStudentAccess, requireAdvisorAccess, GuardPorts } from './modules/auth/guards';
+import { authenticate, requireAuthRole, requireStudentAccess, requireAdvisorAccess, requireAdvisorOwnsStudent, GuardPorts } from './modules/auth/guards';
+import { AuthRole } from './db/memory/inMemoryDb';
 
 const app = express();
 
@@ -188,12 +202,22 @@ app.post('/api/auth/logout', (req, res) => {
 // Students — read
 // ---------------------------------------------------------------------
 // Multi-advisor epic: an optional ?advisorId= scopes the roster down to
-// one advisor's own 25 students — query-param-based, same demo-grade
-// rigor as the rest of this app's auth (client-checked route guards, no
-// real session), not a stronger guarantee. Unscoped (no param) still
-// returns everyone, used by the Vice President's cross-advisor views.
-app.get('/api/students', (req, res) => {
+// one advisor's own 25 students. Real backend authentication epic: this
+// used to be entirely unauthenticated (Login.tsx even called it BEFORE
+// login, to build the email-matching roster — no longer needed now that
+// POST /api/auth/login does that lookup server-side). Now: the VP may
+// call it either way (scoped or the full unscoped roster); an advisor
+// may only call it scoped to their OWN id; anyone else (including no
+// ?advisorId= at all from a non-VP session) is forbidden — closes the
+// same "any caller can dump the whole roster" gap the live incident that
+// started this epic was about.
+app.get('/api/students', requireAuth, (req, res) => {
   const { advisorId } = req.query;
+  if (req.auth!.role !== 'vice_president') {
+    if (req.auth!.role !== 'advisor' || typeof advisorId !== 'string' || advisorId !== req.auth!.id) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+  }
   let students = db.listStudents();
   if (typeof advisorId === 'string') students = students.filter(s => s.advisorId === advisorId);
   const list = students.map(s => ({
@@ -210,38 +234,38 @@ app.get('/api/students', (req, res) => {
   res.json(list);
 });
 
-app.get('/api/students/:id', (req, res) => {
-  const student = toStudentWithCgpa(req.params.id);
+app.get('/api/students/:id', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  const student = toStudentWithCgpa(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
   res.json({
     ...student,
     // §15.3.1 registered-but-ungraded courses now show as pending rows
     // alongside real graded attempts — see getTranscriptWithRegistered's
     // doc comment for why this is a read-time merge, not a stored one.
-    transcript: db.getTranscriptWithRegistered(req.params.id),
-    cgpaSnapshots: displayCgpaSnapshots(req.params.id),
-    quizAnswers: db.getStudent(req.params.id)?.quizAnswers ?? {},
-    transferRecords: db.getTransferRecords(req.params.id),
+    transcript: db.getTranscriptWithRegistered(paramStr(req, 'id')),
+    cgpaSnapshots: displayCgpaSnapshots(paramStr(req, 'id')),
+    quizAnswers: db.getStudent(paramStr(req, 'id'))?.quizAnswers ?? {},
+    transferRecords: db.getTransferRecords(paramStr(req, 'id')),
   });
 });
 
-app.get('/api/students/:id/eligible-courses', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
-  res.json(db.getEligibleCourses(req.params.id));
+app.get('/api/students/:id/eligible-courses', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
+  res.json(db.getEligibleCourses(paramStr(req, 'id')));
 });
 
 // §14/§15 — the full catalog, one row per course, annotated with this
 // student's status on it (passed/needs-retake/registered/eligible/locked).
 // Backs the per-semester Curriculum tab.
-app.get('/api/students/:id/curriculum', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
-  res.json(db.getCurriculum(req.params.id));
+app.get('/api/students/:id/curriculum', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
+  res.json(db.getCurriculum(paramStr(req, 'id')));
 });
 
 // ---------------------------------------------------------------------
 // §5 retake gate
 // ---------------------------------------------------------------------
-app.post('/api/students/:id/retake-preference', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/retake-preference', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const id = paramStr(req, 'id');
   if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   const { considerRetakes } = req.body ?? {};
@@ -254,7 +278,7 @@ app.post('/api/students/:id/retake-preference', blockIfDismissed, (req, res) => 
 // Write: record a grade attempt (a fresh course or a retake) — the
 // "registration/enrollment" endpoint, locked out once dismissed (§12).
 // ---------------------------------------------------------------------
-app.post('/api/students/:id/enroll', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/enroll', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const { courseCode, pct, semesterOrdinal } = req.body ?? {};
   if (typeof courseCode !== 'string' || typeof pct !== 'number' || typeof semesterOrdinal !== 'number') {
     return res.status(400).json({ error: 'expected { courseCode: string, pct: number, semesterOrdinal: number }' });
@@ -267,7 +291,7 @@ app.post('/api/students/:id/enroll', blockIfDismissed, (req, res) => {
   }
 });
 
-app.post('/api/students/:id/quiz', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/quiz', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const id = paramStr(req, 'id');
   if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   const answers = req.body ?? {};
@@ -278,7 +302,7 @@ app.post('/api/students/:id/quiz', blockIfDismissed, (req, res) => {
 // ---------------------------------------------------------------------
 // §4.2/§8 — the real orchestrator, locked out once dismissed.
 // ---------------------------------------------------------------------
-app.post('/api/students/:id/advise', blockIfDismissed, async (req, res) => {
+app.post('/api/students/:id/advise', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, async (req, res) => {
   const student = toStudentWithCgpa(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' }); // unreachable after blockIfDismissed, kept for type-safety
   try {
@@ -315,24 +339,24 @@ async function buildScoredPlan(studentId: string, mode: 'fast' | 'target_safe' |
   return packPlan({ mandatory: scoredMandatory, pool: scoredPool, cap, mode });
 }
 
-app.get('/api/students/:id/plan/fast', async (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.get('/api/students/:id/plan/fast', requireAuth, requireStudentAccess(guardPorts), async (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
   try {
-    res.json(attachBestCaseToPlanResult(req.params.id, await buildScoredPlan(req.params.id, 'fast')));
+    res.json(attachBestCaseToPlanResult(paramStr(req, 'id'), await buildScoredPlan(paramStr(req, 'id'), 'fast')));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-app.get('/api/students/:id/plan/target', async (req, res) => {
-  const student = toStudentWithCgpa(req.params.id);
+app.get('/api/students/:id/plan/target', requireAuth, requireStudentAccess(guardPorts), async (req, res) => {
+  const student = toStudentWithCgpa(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
   const targetCgpa = Number(req.query.cgpa);
   if (!Number.isFinite(targetCgpa)) return res.status(400).json({ error: 'expected ?cgpa=<number>' });
   // §0's baseline description: re-weighted toward "safety" (below target) or "speed" (above target).
   const mode = student.cgpa < targetCgpa ? 'target_safe' : 'target_fast';
   try {
-    res.json({ mode, targetCgpa, ...attachBestCaseToPlanResult(req.params.id, await buildScoredPlan(req.params.id, mode)) });
+    res.json({ mode, targetCgpa, ...attachBestCaseToPlanResult(paramStr(req, 'id'), await buildScoredPlan(paramStr(req, 'id'), mode)) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -341,14 +365,14 @@ app.get('/api/students/:id/plan/target', async (req, res) => {
 // ---------------------------------------------------------------------
 // §6 — department/faculty fit
 // ---------------------------------------------------------------------
-app.get('/api/students/:id/department-fit', async (req, res) => {
-  const student = toStudentWithCgpa(req.params.id);
+app.get('/api/students/:id/department-fit', requireAuth, requireStudentAccess(guardPorts), async (req, res) => {
+  const student = toStudentWithCgpa(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
   res.json(await ports.recommendDepartments(student));
 });
 
-app.get('/api/students/:id/faculty-fit', async (req, res) => {
-  const student = toStudentWithCgpa(req.params.id);
+app.get('/api/students/:id/faculty-fit', requireAuth, requireStudentAccess(guardPorts), async (req, res) => {
+  const student = toStudentWithCgpa(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
   res.json(await ports.rankFacultiesByFit(student));
 });
@@ -356,19 +380,19 @@ app.get('/api/students/:id/faculty-fit', async (req, res) => {
 // ---------------------------------------------------------------------
 // §4 — probation / dismissal audit trail
 // ---------------------------------------------------------------------
-app.get('/api/students/:id/probation', (req, res) => {
+app.get('/api/students/:id/probation', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
   try {
-    const { counter, log } = db.getProbationHistory(req.params.id);
+    const { counter, log } = db.getProbationHistory(paramStr(req, 'id'));
     res.json({ count: counter.count, armed: counter.armed, history: log });
   } catch {
     res.status(404).json({ error: 'student not found' });
   }
 });
 
-app.get('/api/students/:id/cgpa-trend', (req, res) => {
-  const student = db.getStudent(req.params.id);
+app.get('/api/students/:id/cgpa-trend', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  const student = db.getStudent(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
-  const snapshots = displayCgpaSnapshots(req.params.id);
+  const snapshots = displayCgpaSnapshots(paramStr(req, 'id'));
   const trend = projectCGPATrend(snapshots);
   res.json({ snapshots, trendSlope: trend.slope, reading: trend.reading });
 });
@@ -377,7 +401,7 @@ app.get('/api/students/:id/cgpa-trend', (req, res) => {
 // the system recommend?" `null` (not a 404) once a student has ANY real
 // completed course — this isn't a permanent profile field, it's only
 // meaningful for the exact window before real transcript data exists.
-app.get('/api/students/:id/cold-start-assessment', (req, res) => {
+app.get('/api/students/:id/cold-start-assessment', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
   const student = db.getStudent(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
   const completedCount = Object.keys(db.getTranscript(student.id)).length;
@@ -390,24 +414,24 @@ app.get('/api/students/:id/cold-start-assessment', (req, res) => {
 /** Spec's `POST /api/semesters/:id/close` — exposed here per-student since
  *  this store has no globally-addressable Semester id independent of its
  *  owning student (flagged deviation, see file header). */
-app.post('/api/students/:id/semesters/close', (req, res) => {
-  const student = db.getStudent(req.params.id);
+app.post('/api/students/:id/semesters/close', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  const student = db.getStudent(paramStr(req, 'id'));
   if (!student) return res.status(404).json({ error: 'student not found' });
   const { semesterId, isFirstSemester } = req.body ?? {};
   if (typeof semesterId !== 'string') return res.status(400).json({ error: 'expected { semesterId: string, isFirstSemester?: boolean }' });
 
-  const cgpaAtClose = db.getCurrentCgpa(req.params.id);
+  const cgpaAtClose = db.getCurrentCgpa(paramStr(req, 'id'));
   if (isFirstSemester) {
-    const result = onFirstSemesterClose({ studentId: req.params.id, semesterId, gpaAtClose: cgpaAtClose });
+    const result = onFirstSemesterClose({ studentId: paramStr(req, 'id'), semesterId, gpaAtClose: cgpaAtClose });
     res.json(result);
   } else {
     const result = onSemesterClose({
-      studentId: req.params.id,
+      studentId: paramStr(req, 'id'),
       semesterId,
       cgpaAtClose,
       counter: student.probationCounter,
     });
-    if (result.dismissed) db.updateStudentStatus(req.params.id, 'dismissed');
+    if (result.dismissed) db.updateStudentStatus(paramStr(req, 'id'), 'dismissed');
     res.json(result);
   }
 });
@@ -415,7 +439,7 @@ app.post('/api/students/:id/semesters/close', (req, res) => {
 // ---------------------------------------------------------------------
 // §7 — transfer execution, all locked out once dismissed.
 // ---------------------------------------------------------------------
-app.post('/api/students/:id/transfer/internal', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/transfer/internal', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const { toDepartmentId } = req.body ?? {};
   if (typeof toDepartmentId !== 'string') return res.status(400).json({ error: 'expected { toDepartmentId: string }' });
   try {
@@ -426,7 +450,7 @@ app.post('/api/students/:id/transfer/internal', blockIfDismissed, (req, res) => 
   }
 });
 
-app.post('/api/students/:id/transfer/external', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/transfer/external', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const { toFacultyId, toDepartmentId } = req.body ?? {};
   if (typeof toFacultyId !== 'string' || typeof toDepartmentId !== 'string') {
     return res.status(400).json({ error: 'expected { toFacultyId: string, toDepartmentId: string }' });
@@ -439,12 +463,12 @@ app.post('/api/students/:id/transfer/external', blockIfDismissed, (req, res) => 
   }
 });
 
-app.get('/api/students/:id/transfer/preview', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.get('/api/students/:id/transfer/preview', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
   const toFacultyId = String(req.query.toFacultyId ?? '');
   if (!toFacultyId) return res.status(400).json({ error: 'expected ?toFacultyId=<facultyId>' });
   try {
-    res.json(db.previewExternalTransfer(req.params.id, toFacultyId));
+    res.json(db.previewExternalTransfer(paramStr(req, 'id'), toFacultyId));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -458,7 +482,7 @@ app.get('/api/students/:id/transfer/preview', (req, res) => {
 // stay reachable directly (existing tests hit them), just no longer what
 // the student-facing "Confirm transfer" button calls.
 // ---------------------------------------------------------------------
-app.post('/api/students/:id/transfer-requests', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/transfer-requests', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const { type, toDepartmentId, toFacultyId } = req.body ?? {};
   if (type !== 'internal_department' && type !== 'external_faculty') {
     return res.status(400).json({ error: "expected { type: 'internal_department' | 'external_faculty', toDepartmentId: string, toFacultyId?: string }" });
@@ -476,13 +500,13 @@ app.post('/api/students/:id/transfer-requests', blockIfDismissed, (req, res) => 
   }
 });
 
-app.get('/api/students/:id/transfer-requests', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
-  res.json(db.listTransferRequestsForStudent(req.params.id));
+app.get('/api/students/:id/transfer-requests', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
+  res.json(db.listTransferRequestsForStudent(paramStr(req, 'id')));
 });
 
-app.get('/api/advisors/:advisorId/transfer-requests', (req, res) => {
-  res.json(db.listTransferRequestsForAdvisor(req.params.advisorId));
+app.get('/api/advisors/:advisorId/transfer-requests', requireAuth, requireAdvisorAccess(), (req, res) => {
+  res.json(db.listTransferRequestsForAdvisor(paramStr(req, 'advisorId')));
 });
 
 // Real authorization gap found by audit: neither route below checked that
@@ -491,47 +515,51 @@ app.get('/api/advisors/:advisorId/transfer-requests', (req, res) => {
 // knowing the requestId. advisorId is now required in the body and
 // checked against the request's own advisorId (db.advisorDecideTransferRequest
 // throws a 403-tagged error on mismatch).
-app.post('/api/advisor/transfer-requests/:requestId/approve', (req, res) => {
-  const { advisorId } = req.body ?? {};
-  if (typeof advisorId !== 'string' || !advisorId) return res.status(400).json({ error: 'expected { advisorId: string }' });
+// Real backend authentication epic: this used to trust a client-supplied
+// `{ advisorId }` body field as the acting advisor's identity (checked
+// against the REQUEST's real owner inside advisorDecideTransferRequest,
+// per an earlier audit fix — but nothing tied that body field to who was
+// actually making the call). Now uses the authenticated identity
+// (req.auth.id) directly instead — simpler AND closes that gap, since a
+// spoofed body value is no longer possible.
+app.post('/api/advisor/transfer-requests/:requestId/approve', requireAuth, requireAuthRole('advisor'), (req, res) => {
   try {
-    res.json(db.advisorDecideTransferRequest(paramStr(req, 'requestId'), 'approve', undefined, advisorId));
+    res.json(db.advisorDecideTransferRequest(paramStr(req, 'requestId'), 'approve', undefined, req.auth!.id!));
   } catch (err) {
     const status = (err as { httpStatus?: number })?.httpStatus ?? 400;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-app.post('/api/advisor/transfer-requests/:requestId/decline', (req, res) => {
-  const { advisorId, reason } = req.body ?? {};
-  if (typeof advisorId !== 'string' || !advisorId) return res.status(400).json({ error: 'expected { advisorId: string }' });
+app.post('/api/advisor/transfer-requests/:requestId/decline', requireAuth, requireAuthRole('advisor'), (req, res) => {
+  const { reason } = req.body ?? {};
   try {
-    res.json(db.advisorDecideTransferRequest(paramStr(req, 'requestId'), 'decline', reason, advisorId));
+    res.json(db.advisorDecideTransferRequest(paramStr(req, 'requestId'), 'decline', reason, req.auth!.id!));
   } catch (err) {
     const status = (err as { httpStatus?: number })?.httpStatus ?? 400;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-app.get('/api/vp/transfer-requests', (_req, res) => {
+app.get('/api/vp/transfer-requests', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(db.listAllTransferRequests());
 });
 
-app.get('/api/vp/transfer-requests-summary', (_req, res) => {
+app.get('/api/vp/transfer-requests-summary', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(db.getTransferCountersByAdvisor());
 });
 
-app.post('/api/vp/transfer-requests/:requestId/approve', (req, res) => {
+app.post('/api/vp/transfer-requests/:requestId/approve', requireAuth, requireAuthRole('vice_president'), (req, res) => {
   try {
-    res.json(db.vpDecideTransferRequest(req.params.requestId, 'approve'));
+    res.json(db.vpDecideTransferRequest(paramStr(req, 'requestId'), 'approve'));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-app.post('/api/vp/transfer-requests/:requestId/decline', (req, res) => {
+app.post('/api/vp/transfer-requests/:requestId/decline', requireAuth, requireAuthRole('vice_president'), (req, res) => {
   try {
-    res.json(db.vpDecideTransferRequest(req.params.requestId, 'decline', req.body?.reason));
+    res.json(db.vpDecideTransferRequest(paramStr(req, 'requestId'), 'decline', req.body?.reason));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -552,7 +580,7 @@ app.get('/api/faculties', (_req, res) => {
 });
 
 app.get('/api/faculties/:facultyId/departments', (req, res) => {
-  const depts = [...DEPARTMENTS, ...OTHER_FACULTY_DEPARTMENTS].filter(d => d.facultyId === req.params.facultyId);
+  const depts = [...DEPARTMENTS, ...OTHER_FACULTY_DEPARTMENTS].filter(d => d.facultyId === paramStr(req, 'facultyId'));
   res.json(depts.map(d => ({ id: d.id, name: d.name })));
 });
 
@@ -560,7 +588,7 @@ app.get('/api/faculties/:facultyId/departments', (req, res) => {
 // §3.3 — dependency-chain visualization data
 // ---------------------------------------------------------------------
 app.get('/api/courses/:code/chain', (req, res) => {
-  const course = CATALOG.find(c => c.code === req.params.code);
+  const course = CATALOG.find(c => c.code === paramStr(req, 'code'));
   if (!course) return res.status(404).json({ error: 'course not found' });
   const direct = CATALOG.filter(c => c.prereq.includes(course.code)).map(c => c.code);
   res.json({ courseCode: course.code, chainUnlockValue: chainUnlockValue(course.code, CATALOG), directUnlocks: direct });
@@ -637,7 +665,7 @@ function proposalsWithImpact(studentId: string) {
   return { proposals, ...impact };
 }
 
-app.post('/api/students/:id/proposals/generate', blockIfDismissed, async (req, res) => {
+app.post('/api/students/:id/proposals/generate', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, async (req, res) => {
   const id = paramStr(req, 'id');
   const student = toStudentWithCgpa(id);
   if (!student) return res.status(404).json({ error: 'student not found' });
@@ -650,14 +678,14 @@ app.post('/api/students/:id/proposals/generate', blockIfDismissed, async (req, r
   }
 });
 
-app.get('/api/students/:id/proposals', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
-  res.json(proposalsWithImpact(req.params.id));
+app.get('/api/students/:id/proposals', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
+  res.json(proposalsWithImpact(paramStr(req, 'id')));
 });
 
-app.post('/api/advisor/proposals/:proposalId/approve', (req, res) => {
+app.post('/api/advisor/proposals/:proposalId/approve', requireAuth, requireAuthRole('advisor', 'vice_president'), (req, res) => {
   try {
-    res.json(db.approveProposalById(req.params.proposalId));
+    res.json(db.approveProposalById(paramStr(req, 'proposalId')));
   } catch (err) {
     res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -666,19 +694,19 @@ app.post('/api/advisor/proposals/:proposalId/approve', (req, res) => {
 // "Approve all" — accept the system's whole plan in one click. Skips any
 // slot the advisor already replaced with their own alternate; returns the
 // same shape as GET/generate so the frontend can reuse one response handler.
-app.post('/api/advisor/students/:id/proposals/approve-all', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.post('/api/advisor/students/:id/proposals/approve-all', requireAuth, requireAdvisorOwnsStudent(guardPorts), (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
   try {
-    db.approveAllPendingSystemProposals(req.params.id);
+    db.approveAllPendingSystemProposals(paramStr(req, 'id'));
     res.json(proposalsWithImpact(paramStr(req, 'id')));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-app.post('/api/advisor/proposals/:proposalId/decline', (req, res) => {
+app.post('/api/advisor/proposals/:proposalId/decline', requireAuth, requireAuthRole('advisor', 'vice_president'), (req, res) => {
   try {
-    res.json(db.declineProposalById(req.params.proposalId));
+    res.json(db.declineProposalById(paramStr(req, 'proposalId')));
   } catch (err) {
     res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -706,13 +734,13 @@ async function scoreAlternateCandidate(studentId: string, courseCode: string) {
 // expected AND best-case grade (the frontend renders its grade-point
 // consequence against the system's originally recommended course from
 // this) BEFORE committing to proposing it. Scores live, persists nothing.
-app.post('/api/advisor/students/:id/proposals/:slotKey/alternate/preview', async (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.post('/api/advisor/students/:id/proposals/:slotKey/alternate/preview', requireAuth, requireAdvisorOwnsStudent(guardPorts), async (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
   const { courseCode } = req.body ?? {};
   if (typeof courseCode !== 'string') return res.status(400).json({ error: 'expected { courseCode: string }' });
   try {
-    const scored = await scoreAlternateCandidate(req.params.id, courseCode);
-    res.json(db.previewAdvisorAlternate(req.params.id, req.params.slotKey, courseCode, scored));
+    const scored = await scoreAlternateCandidate(paramStr(req, 'id'), courseCode);
+    res.json(db.previewAdvisorAlternate(paramStr(req, 'id'), paramStr(req, 'slotKey'), courseCode, scored));
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
@@ -722,15 +750,15 @@ app.post('/api/advisor/students/:id/proposals/:slotKey/alternate/preview', async
 // §15.3.2 step 2(b) — the advisor picks an alternate course for a slot; the
 // SAME §3.1 scoring pipeline the system used is run here, on demand, so the
 // advisor sees the real projected impact before confirming — never a guess.
-app.post('/api/advisor/students/:id/proposals/:slotKey/alternate', async (req, res) => {
+app.post('/api/advisor/students/:id/proposals/:slotKey/alternate', requireAuth, requireAdvisorOwnsStudent(guardPorts), async (req, res) => {
   const { courseCode, acknowledgedByAdvisorName } = req.body ?? {};
   if (typeof courseCode !== 'string') return res.status(400).json({ error: 'expected { courseCode: string }' });
   if (acknowledgedByAdvisorName !== undefined && typeof acknowledgedByAdvisorName !== 'string') {
     return res.status(400).json({ error: 'acknowledgedByAdvisorName must be a string if provided' });
   }
   try {
-    const scored = await scoreAlternateCandidate(req.params.id, courseCode);
-    const proposal = db.addAdvisorAlternateProposal(req.params.id, req.params.slotKey, courseCode, scored, acknowledgedByAdvisorName);
+    const scored = await scoreAlternateCandidate(paramStr(req, 'id'), courseCode);
+    const proposal = db.addAdvisorAlternateProposal(paramStr(req, 'id'), paramStr(req, 'slotKey'), courseCode, scored, acknowledgedByAdvisorName);
     res.json(proposal);
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
@@ -739,7 +767,7 @@ app.post('/api/advisor/students/:id/proposals/:slotKey/alternate', async (req, r
 });
 
 // §15.3.2 step 3 — student picks one option for a slot.
-app.post('/api/students/:id/proposals/:proposalId/choose', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/proposals/:proposalId/choose', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const id = paramStr(req, 'id');
   if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   try {
@@ -753,7 +781,7 @@ app.post('/api/students/:id/proposals/:proposalId/choose', blockIfDismissed, (re
 // "Choose all" — the student's own bulk action (see chooseAllReadyProposals's
 // doc comment). Returns the same shape GET/generate use, plus the slots that
 // still need advisor review, so the client can render one consolidated note.
-app.post('/api/students/:id/proposals/choose-all', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/proposals/choose-all', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const id = paramStr(req, 'id');
   if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   try {
@@ -764,15 +792,21 @@ app.post('/api/students/:id/proposals/choose-all', blockIfDismissed, (req, res) 
   }
 });
 
-app.get('/api/students/:id/registered-courses', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
-  res.json(db.getRegisteredCourses(req.params.id));
+app.get('/api/students/:id/registered-courses', requireAuth, requireStudentAccess(guardPorts), (req, res) => {
+  if (!db.getStudent(paramStr(req, 'id'))) return res.status(404).json({ error: 'student not found' });
+  res.json(db.getRegisteredCourses(paramStr(req, 'id')));
 });
 
 // §15.4 — the advisor's PDF report is built client-side from this aggregate.
 // Same ?advisorId= scoping as GET /api/students above.
-app.get('/api/advisor/report', (req, res) => {
+// Same VP-unscoped / advisor-own-id-only scoping rule as GET /api/students.
+app.get('/api/advisor/report', requireAuth, (req, res) => {
   const { advisorId } = req.query;
+  if (req.auth!.role !== 'vice_president') {
+    if (req.auth!.role !== 'advisor' || typeof advisorId !== 'string' || advisorId !== req.auth!.id) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+  }
   res.json(db.getAdvisorReport(typeof advisorId === 'string' ? advisorId : undefined));
 });
 
@@ -795,15 +829,15 @@ app.get('/api/venture-quiz', (_req, res) => {
 // layer" rule, but these two GETs were missed when that guard was added —
 // a dismissed student's Venture Board tab could still silently pre-fill
 // from these two reads.
-app.get('/api/students/:id/venture-gate', blockIfDismissed, (req, res) => {
+app.get('/api/students/:id/venture-gate', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   res.json({ interested: db.getVentureGateAnswer(paramStr(req, 'id')) });
 });
 
-app.get('/api/students/:id/venture-interest-form', blockIfDismissed, (req, res) => {
+app.get('/api/students/:id/venture-interest-form', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   res.json({ answers: db.getVentureInterestAnswers(paramStr(req, 'id')) });
 });
 
-app.post('/api/students/:id/venture-gate', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/venture-gate', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const id = paramStr(req, 'id');
   const student = db.getStudent(id);
   if (!student) return res.status(404).json({ error: 'student not found' });
@@ -816,7 +850,7 @@ app.post('/api/students/:id/venture-gate', blockIfDismissed, (req, res) => {
   res.json({ ok: true, interested });
 });
 
-app.post('/api/students/:id/venture-interest-form', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/venture-interest-form', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const id = paramStr(req, 'id');
   if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   const answers = req.body ?? {};
@@ -834,7 +868,7 @@ function withProfessorName<T extends { project: { professorId: string } }>(r: T)
 
 // §16.3/§16.5 — the Venture Board's full ranked list. Locked out once
 // dismissed, same as every other student-facing route (§16.8/§12).
-app.get('/api/students/:id/venture-matches', blockIfDismissed, (req, res) => {
+app.get('/api/students/:id/venture-matches', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   res.json(db.getVentureMatches(paramStr(req, 'id')).map(withProfessorName));
 });
 
@@ -843,7 +877,7 @@ app.get('/api/students/:id/venture-matches', blockIfDismissed, (req, res) => {
 // was cleared at least once) — the UI no longer calls this directly (see
 // the project-keyed route below, which also covers below-threshold
 // projects); kept for any caller that already has a concrete `matchId`.
-app.post('/api/students/:id/venture-matches/:matchId/apply', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/venture-matches/:matchId/apply', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const { cvFileName, cvDataUrl } = req.body ?? {};
   if ((cvFileName && typeof cvFileName !== 'string') || (cvDataUrl && typeof cvDataUrl !== 'string')) {
     return res.status(400).json({ error: 'expected optional { cvFileName?: string, cvDataUrl?: string }' });
@@ -862,7 +896,7 @@ app.post('/api/students/:id/venture-matches/:matchId/apply', blockIfDismissed, (
 // `projectId` instead, so a below-threshold row (matchId: null on the
 // wire) can still be applied to — a fresh `applied` row is created for it
 // on the spot.
-app.post('/api/students/:id/venture-projects/:projectId/express-interest', blockIfDismissed, (req, res) => {
+app.post('/api/students/:id/venture-projects/:projectId/express-interest', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, (req, res) => {
   const { cvFileName, cvDataUrl } = req.body ?? {};
   if ((cvFileName && typeof cvFileName !== 'string') || (cvDataUrl && typeof cvDataUrl !== 'string')) {
     return res.status(400).json({ error: 'expected optional { cvFileName?: string, cvDataUrl?: string }' });
@@ -888,12 +922,12 @@ function isPendingCandidate(c: { status: string; total: number }): boolean {
 // (see AuthContext.tsx) — prof-kamel/prof-adel still exist purely as
 // venture-attribution data (db.getProfessor, used below by
 // withProfessorName), not as a role with its own routes here. ---
-app.get('/api/advisors', (_req, res) => {
+app.get('/api/advisors', requireAuth, (_req, res) => {
   res.json(db.listAdvisors());
 });
 
-app.get('/api/advisors/:id', (req, res) => {
-  const advisor = db.getAdvisor(req.params.id);
+app.get('/api/advisors/:id', requireAuth, (req, res) => {
+  const advisor = db.getAdvisor(paramStr(req, 'id'));
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
   res.json(advisor);
 });
@@ -902,7 +936,7 @@ app.get('/api/advisors/:id', (req, res) => {
 
 // Per-advisor summary for the VP dashboard: roster size + average CGPA.
 // Not roster-scoped by design — the VP's whole point is a cross-advisor view.
-app.get('/api/vp/advisors-summary', (_req, res) => {
+app.get('/api/vp/advisors-summary', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   const summary = db.listAdvisors().map(a => {
     const roster = db.listStudents().filter(s => s.advisorId === a.id);
     const avgCgpa = roster.length > 0
@@ -923,7 +957,7 @@ app.get('/api/vp/advisors-summary', (_req, res) => {
 
 // The flat, cross-advisor pending-approvals queue (see
 // listPendingProposalsAcrossAllAdvisors's doc comment).
-app.get('/api/vp/pending-proposals', (_req, res) => {
+app.get('/api/vp/pending-proposals', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(db.listPendingProposalsAcrossAllAdvisors());
 });
 
@@ -931,7 +965,7 @@ app.get('/api/vp/pending-proposals', (_req, res) => {
 // responsibility table the VP's own PDF now renders after the advisor
 // summary table (see downloadVpAdvisorsReportPdf). See
 // listAdvisorResponsibilityDetails's own doc comment for the exact rule.
-app.get('/api/vp/responsibility-details', (_req, res) => {
+app.get('/api/vp/responsibility-details', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(db.listAdvisorResponsibilityDetails());
 });
 
@@ -941,7 +975,7 @@ app.get('/api/vp/responsibility-details', (_req, res) => {
 // silently overrules a slot the advisor already replaced with their own
 // alternate. Returns the queue as it stands afterward, so the client can
 // re-render without a second round trip.
-app.post('/api/vp/pending-proposals/approve-all', (_req, res) => {
+app.post('/api/vp/pending-proposals/approve-all', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(db.approveAllPendingProposalsAcrossAllAdvisors());
 });
 
@@ -983,7 +1017,7 @@ async function buildFullFrictionTimeline(studentId: string) {
   return { courseCodes, weekOverrides, recommendations, ...timeline };
 }
 
-app.get('/api/students/:id/friction-timeline', blockIfDismissed, async (req, res) => {
+app.get('/api/students/:id/friction-timeline', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, async (req, res) => {
   try {
     res.json(await buildFullFrictionTimeline(paramStr(req, 'id')));
   } catch (err) {
@@ -996,7 +1030,7 @@ app.get('/api/students/:id/friction-timeline', blockIfDismissed, async (req, res
 // and returns the FULLY RECALCULATED timeline in the same round trip (the
 // "recalculate week heaviness" behavior), not just an ack the client has
 // to separately re-fetch for.
-app.post('/api/students/:id/friction-timeline/toggle-milestone', blockIfDismissed, async (req, res) => {
+app.post('/api/students/:id/friction-timeline/toggle-milestone', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, async (req, res) => {
   try {
     const studentId = paramStr(req, 'id');
     const { milestoneId } = req.body ?? {};
@@ -1014,7 +1048,7 @@ app.post('/api/students/:id/friction-timeline/toggle-milestone', blockIfDismisse
 // that bound, and never for a fixed-date exam/deadline — see
 // MOVABLE_MILESTONE_TYPES). Notifies the student of the schedule change
 // in the same request, and returns the recalculated timeline.
-app.post('/api/students/:id/friction-timeline/reschedule-milestone', blockIfDismissed, async (req, res) => {
+app.post('/api/students/:id/friction-timeline/reschedule-milestone', requireAuth, requireStudentAccess(guardPorts), blockIfDismissed, async (req, res) => {
   try {
     const studentId = paramStr(req, 'id');
     const { milestoneId, newWeek } = req.body ?? {};
@@ -1047,7 +1081,7 @@ app.post('/api/students/:id/friction-timeline/reschedule-milestone', blockIfDism
 // this advisor's roster, their planned load's PEAK friction week, sorted
 // worst-first. Dismissed students are excluded (same §12 lockout as
 // everywhere else), not just hidden client-side.
-app.get('/api/advisors/:advisorId/friction-overview', async (req, res) => {
+app.get('/api/advisors/:advisorId/friction-overview', requireAuth, requireAdvisorAccess(), async (req, res) => {
   const advisorId = paramStr(req, 'advisorId');
   if (!db.getAdvisor(advisorId)) return res.status(404).json({ error: 'advisor not found' });
   const roster = db.listStudents().filter(s => s.advisorId === advisorId && s.status !== 'dismissed');
@@ -1078,7 +1112,7 @@ app.get('/api/advisors/:advisorId/friction-overview', async (req, res) => {
 // header for exactly why this is grounded in real data rather than a
 // second synthetic table, and its honest scoping note about this demo
 // only having one real department).
-app.get('/api/vp/friction/institutional-bottlenecks', (_req, res) => {
+app.get('/api/vp/friction/institutional-bottlenecks', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   const studentsData: StudentForBottleneck[] = db.listStudents().map(s => ({
     departmentId: s.departmentId,
     transcript: Object.values(db.getTranscript(s.id)).map(r => ({ courseCode: r.courseCode, semesterOrdinal: r.semesterOrdinal })),
@@ -1096,11 +1130,11 @@ app.get('/api/vp/friction/institutional-bottlenecks', (_req, res) => {
 // diagnostic view, a deliberately wider scope than the Advisor's other,
 // roster-scoped pages).
 // ---------------------------------------------------------------------
-app.get('/api/vp/curriculum-analytics/demand-forecast', (_req, res) => {
+app.get('/api/vp/curriculum-analytics/demand-forecast', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(forecastAllDepartments(CATALOG_BY_DEPARTMENT, OFFERINGS_BY_COURSE, DEPARTMENTS_BY_COURSE_CODE));
 });
 
-app.get('/api/advisors/:advisorId/curriculum-analytics/demand-forecast', (req, res) => {
+app.get('/api/advisors/:advisorId/curriculum-analytics/demand-forecast', requireAuth, requireAdvisorAccess(), (req, res) => {
   const advisorId = paramStr(req, 'advisorId');
   const advisor = db.getAdvisor(advisorId);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
@@ -1110,11 +1144,11 @@ app.get('/api/advisors/:advisorId/curriculum-analytics/demand-forecast', (req, r
 
 // Feature 2 — Curriculum Health Monitor. Same VP-wide (departmentId: null)
 // / Advisor-own-department pattern as demand-forecast just above.
-app.get('/api/vp/curriculum-analytics/health-monitor', (_req, res) => {
+app.get('/api/vp/curriculum-analytics/health-monitor', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(buildHealthMonitor(null, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE, DEPARTMENTS_BY_COURSE_CODE));
 });
 
-app.get('/api/advisors/:advisorId/curriculum-analytics/health-monitor', (req, res) => {
+app.get('/api/advisors/:advisorId/curriculum-analytics/health-monitor', requireAuth, requireAdvisorAccess(), (req, res) => {
   const advisorId = paramStr(req, 'advisorId');
   const advisor = db.getAdvisor(advisorId);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
@@ -1133,11 +1167,11 @@ function forecastedEnrolledByCode(catalog: (typeof CATALOG)): Record<string, num
   return Object.fromEntries(catalog.map(c => [c.code, forecastCourseDemand(c, OFFERINGS_BY_COURSE[c.code] ?? []).nextTermEnrolled]));
 }
 
-app.get('/api/vp/curriculum-analytics/bottlenecks', (_req, res) => {
+app.get('/api/vp/curriculum-analytics/bottlenecks', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(rankBottlenecks(CATALOG, OFFERINGS_BY_COURSE, forecastedEnrolledByCode(CATALOG), DEPARTMENTS_BY_COURSE_CODE));
 });
 
-app.get('/api/advisors/:advisorId/curriculum-analytics/bottlenecks', (req, res) => {
+app.get('/api/advisors/:advisorId/curriculum-analytics/bottlenecks', requireAuth, requireAdvisorAccess(), (req, res) => {
   const advisorId = paramStr(req, 'advisorId');
   const advisor = db.getAdvisor(advisorId);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
@@ -1183,36 +1217,59 @@ function withMemberNames(project: ReturnType<typeof db.getColliderProject>) {
 
 // ---------------------------------------------------------------------
 // Cross-cutting in-app notifications — see notification.ts's own header.
-// `role`/`recipientId` are client-supplied query params, same demo-grade
-// auth rigor as the rest of this app (no session token to derive them
-// from server-side) — every caller passes its own AuthContext identity,
-// exactly like advisorId scoping already works for /api/students.
+// `role`/`recipientId` are still client-supplied query params (the
+// `NotificationRole` shape predates this file's real session model), but
+// notificationRoleMatchesAuth (below) now checks them against the real
+// authenticated session before trusting them — a caller can no longer
+// just claim to be a different recipient. GET/read-all are covered;
+// mark-one-read (:id only, no role/recipientId to check) is a
+// documented residual gap, see its own route comment.
 // ---------------------------------------------------------------------
 function parseNotificationRole(v: unknown): 'student' | 'advisor' | 'vp' | null {
   return v === 'student' || v === 'advisor' || v === 'vp' ? v : null;
 }
 
-app.get('/api/notifications', (req, res) => {
+// NotificationRole ('student'|'advisor'|'vp') predates AuthRole
+// ('student'|'advisor'|'vice_president') and uses different string
+// values for the same three parties — this maps between them rather than
+// unifying the two types (NotificationRole is also used as a DB query
+// key elsewhere; not this epic's job to rename it).
+function notificationRoleMatchesAuth(role: 'student' | 'advisor' | 'vp', recipientId: string, auth: { role: AuthRole; id: string | null }): boolean {
+  if (auth.role === 'vice_president') return role === 'vp';
+  if (auth.role === 'advisor') return role === 'advisor' && recipientId === auth.id;
+  if (auth.role === 'student') return role === 'student' && recipientId === auth.id;
+  return false;
+}
+
+app.get('/api/notifications', requireAuth, (req, res) => {
   const role = parseNotificationRole(req.query.role);
   const recipientId = req.query.recipientId;
   if (!role || typeof recipientId !== 'string') return res.status(400).json({ error: 'expected ?role=student|advisor|vp&recipientId=...' });
+  if (!notificationRoleMatchesAuth(role, recipientId, req.auth!)) return res.status(403).json({ error: 'forbidden' });
   res.json({ notifications: db.listNotifications(role, recipientId), unreadCount: db.unreadNotificationCount(role, recipientId) });
 });
 
-app.post('/api/notifications/:id/read', (req, res) => {
+// Real backend authentication epic: marking a single notification read has
+// no role/recipientId to check ownership against at all (just an id) —
+// requireAuth (must be SOME valid session) is the most this route can
+// enforce without extending markNotificationRead itself to also verify
+// the notification belongs to the caller; documented residual gap, same
+// as the professor/admin routes' own noted exceptions.
+app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
   db.markNotificationRead(paramStr(req, 'id'));
   res.json({ ok: true });
 });
 
-app.post('/api/notifications/read-all', (req, res) => {
+app.post('/api/notifications/read-all', requireAuth, (req, res) => {
   const { role, recipientId } = req.body ?? {};
   const parsedRole = parseNotificationRole(role);
   if (!parsedRole || typeof recipientId !== 'string') return res.status(400).json({ error: 'expected { role: "student"|"advisor"|"vp", recipientId: string }' });
+  if (!notificationRoleMatchesAuth(parsedRole, recipientId, req.auth!)) return res.status(403).json({ error: 'forbidden' });
   db.markAllNotificationsRead(parsedRole, recipientId);
   res.json({ ok: true });
 });
 
-app.get('/api/advisors/:advisorId/collider/projects', (req, res) => {
+app.get('/api/advisors/:advisorId/collider/projects', requireAuth, requireAdvisorAccess(), (req, res) => {
   const advisorId = paramStr(req, 'advisorId');
   if (!db.getAdvisor(advisorId)) return res.status(404).json({ error: 'advisor not found' });
   res.json(db.listColliderProjectsForAdvisor(advisorId).map(withMemberNames));
@@ -1221,18 +1278,18 @@ app.get('/api/advisors/:advisorId/collider/projects', (req, res) => {
 // Matches against the REAL live opportunity table (RemoteOK internships +
 // Grants.gov grants, both with a curated fallback — see
 // externalOpportunitiesLive.service.ts), not just the static seed.
-app.get('/api/collider/projects/:id/opportunity-matches', async (req, res) => {
+app.get('/api/collider/projects/:id/opportunity-matches', requireAuth, requireAuthRole('advisor', 'vice_president'), async (req, res) => {
   const project = db.getColliderProject(paramStr(req, 'id'));
   if (!project) return res.status(404).json({ error: 'project not found' });
   const opportunities = await getAllOpportunities();
   res.json(matchOpportunitiesForProject(project, opportunities));
 });
 
-app.get('/api/vp/collider/topography', (_req, res) => {
+app.get('/api/vp/collider/topography', requireAuth, requireAuthRole('vice_president'), (_req, res) => {
   res.json(buildTopography(db.listColliderProjects()));
 });
 
-app.post('/api/vp/collider/projects/:id/fund', (req, res) => {
+app.post('/api/vp/collider/projects/:id/fund', requireAuth, requireAuthRole('vice_president'), (req, res) => {
   const { amount, note, source, grantName } = req.body ?? {};
   if (typeof amount !== 'number') return res.status(400).json({ error: 'expected { amount: number, note?: string, source: "university"|"external_grant", grantName?: string }' });
   if (source !== 'university' && source !== 'external_grant') {
@@ -1261,8 +1318,14 @@ app.post('/api/vp/collider/projects/:id/fund', (req, res) => {
 // this to that one advisor's own postings only; omitted (the VP's own
 // board calls it this way) still returns everything, since cross-advisor
 // oversight is the VP's whole point everywhere else in this app too.
-app.get('/api/advisor/venture-projects', (req, res) => {
+// Same VP-unscoped / advisor-own-id-only scoping rule as GET /api/students.
+app.get('/api/advisor/venture-projects', requireAuth, (req, res) => {
   const { advisorId } = req.query;
+  if (req.auth!.role !== 'vice_president') {
+    if (req.auth!.role !== 'advisor' || typeof advisorId !== 'string' || advisorId !== req.auth!.id) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+  }
   let projects = db.listVentureProjects();
   if (typeof advisorId === 'string') projects = projects.filter(p => p.professorId === advisorId);
   const rows = projects.map(project => {
@@ -1284,8 +1347,8 @@ app.get('/api/advisor/venture-projects', (req, res) => {
   res.json(rows);
 });
 
-app.post('/api/professors/:id/venture-projects', (req, res) => {
-  if (!db.getProfessor(req.params.id)) return res.status(404).json({ error: 'professor not found' });
+app.post('/api/professors/:id/venture-projects', requireAuth, requireAuthRole('advisor', 'vice_president'), (req, res) => {
+  if (!db.getProfessor(paramStr(req, 'id'))) return res.status(404).json({ error: 'professor not found' });
   const {
     title, description, type, requiredCourseCodes, preferredSkills, capacity, isActive,
     // VP epic — "research portal": optional published-research fields any
@@ -1301,7 +1364,7 @@ app.post('/api/professors/:id/venture-projects', (req, res) => {
   }
   try {
     const project = db.createVentureProject({
-      professorId: req.params.id,
+      professorId: paramStr(req, 'id'),
       title,
       description,
       type,
@@ -1324,12 +1387,12 @@ app.post('/api/professors/:id/venture-projects', (req, res) => {
   }
 });
 
-app.put('/api/professors/:id/venture-projects/:projectId', (req, res) => {
-  const project = db.getVentureProject(req.params.projectId);
+app.put('/api/professors/:id/venture-projects/:projectId', requireAuth, requireAuthRole('advisor', 'vice_president'), (req, res) => {
+  const project = db.getVentureProject(paramStr(req, 'projectId'));
   if (!project) return res.status(404).json({ error: 'venture project not found' });
-  if (project.professorId !== req.params.id) return res.status(403).json({ error: "not this professor's project" });
+  if (project.professorId !== paramStr(req, 'id')) return res.status(403).json({ error: "not this professor's project" });
   try {
-    res.json(db.updateVentureProject(req.params.projectId, req.body ?? {}));
+    res.json(db.updateVentureProject(paramStr(req, 'projectId'), req.body ?? {}));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -1338,7 +1401,7 @@ app.put('/api/professors/:id/venture-projects/:projectId', (req, res) => {
 // An advisor requesting funding on one of THEIR OWN ventures — allowed
 // regardless of the project's current isActive status (see
 // requestGrantForVentureProject's own doc comment). Notifies the VP.
-app.post('/api/professors/:id/venture-projects/:projectId/grant-request', (req, res) => {
+app.post('/api/professors/:id/venture-projects/:projectId/grant-request', requireAuth, requireAuthRole('advisor', 'vice_president'), (req, res) => {
   const { amount, note, timelinePlanFileName, timelinePlanDataUrl } = req.body ?? {};
   if (typeof amount !== 'number') return res.status(400).json({ error: 'expected { amount: number, note?: string }' });
   try {
@@ -1354,7 +1417,7 @@ app.post('/api/professors/:id/venture-projects/:projectId/grant-request', (req, 
 });
 
 // VP decides a pending grant request. Notifies the requesting advisor.
-app.post('/api/vp/venture-projects/:projectId/grant-request/decide', (req, res) => {
+app.post('/api/vp/venture-projects/:projectId/grant-request/decide', requireAuth, requireAuthRole('vice_president'), (req, res) => {
   const { decision, decisionNote } = req.body ?? {};
   if (decision !== 'approved' && decision !== 'declined') return res.status(400).json({ error: 'expected { decision: "approved"|"declined", decisionNote?: string }' });
   try {
@@ -1365,11 +1428,11 @@ app.post('/api/vp/venture-projects/:projectId/grant-request/decide', (req, res) 
   }
 });
 
-app.patch('/api/venture-matches/:matchId', (req, res) => {
+app.patch('/api/venture-matches/:matchId', requireAuth, requireAuthRole('advisor', 'vice_president'), (req, res) => {
   const { status } = req.body ?? {};
   if (status !== 'accepted' && status !== 'declined') return res.status(400).json({ error: 'expected { status: "accepted" | "declined" }' });
   try {
-    res.json(db.setVentureMatchStatusByProfessor(req.params.matchId, status));
+    res.json(db.setVentureMatchStatusByProfessor(paramStr(req, 'matchId'), status));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }

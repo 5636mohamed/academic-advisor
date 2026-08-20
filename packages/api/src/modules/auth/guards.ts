@@ -90,6 +90,32 @@ export function requireStudentAccess(ports: GuardPorts, paramName = 'id') {
   };
 }
 
+/** For advisor ACTION routes on a student (approve/decline a proposal,
+ *  pick an alternate) — VP: always. Advisor: only when they own the
+ *  student's roster. Student: NEVER (unlike requireStudentAccess, which
+ *  intentionally also allows the student themselves for read routes — an
+ *  advisor's own approve/decline action is not something the student it's
+ *  performed on should be able to trigger for themselves). 404 when the
+ *  student doesn't exist, same convention as requireStudentAccess. */
+export function requireAdvisorOwnsStudent(ports: GuardPorts, paramName = 'id') {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const targetId = req.params[paramName] as string | undefined;
+    if (!targetId) return res.status(400).json({ error: `missing :${paramName}` });
+    if (!req.auth) return res.status(401).json({ error: 'Not authenticated' });
+
+    if (req.auth.role === 'vice_president') return next();
+
+    if (req.auth.role === 'advisor') {
+      const ownerAdvisorId = ports.getStudentAdvisorId(targetId);
+      if (ownerAdvisorId === null) return res.status(404).json({ error: 'student not found' });
+      if (ownerAdvisorId === req.auth.id) return next();
+      return res.status(403).json({ error: 'forbidden' });
+    }
+
+    return res.status(403).json({ error: 'forbidden' });
+  };
+}
+
 /** VP: always allowed. Advisor: only their own id. Student: never. */
 export function requireAdvisorAccess(paramName = 'advisorId') {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
