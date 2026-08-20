@@ -1,11 +1,12 @@
-// Spec §15.1 — the student portal's own layout, now rebuilt to match
-// /UI Design Student/*.pdf's topbar (logo + "Student" role tag + centered
-// nav + name/ID/avatar) instead of the advisor console's sidebar shell.
-// Same access-control note as before still applies: no roster-of-all-
-// students sidebar, no identity switcher — RequireStudent (auth/RequireRole)
-// has already confirmed this session is signed in as exactly this student;
-// the only way out is "Log out." Theme toggle + logout are kept as compact
-// icon buttons next to the avatar since the mockups don't show them (they
+// Spec §15.1 — the student portal's own layout. Topbar keeps the brand
+// mark + "Student" role tag + name/ID/avatar; navigation itself now lives
+// in the persistent left Sidebar (see Sidebar.tsx's own header comment for
+// why every portal moved off the old centered topbar pill-row). Same
+// access-control note as before still applies: no roster-of-all-students
+// sidebar tab, no identity switcher — RequireStudent (auth/RequireRole) has
+// already confirmed this session is signed in as exactly this student; the
+// only way out is "Log out." Theme toggle + logout are kept as compact icon
+// buttons next to the avatar since the mockups don't show them (they
 // weren't designing the auth chrome) but the feature has to stay reachable.
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from './ui/Icons';
 import { BrandMark } from './ui/BrandMark';
+import { Sidebar } from './ui/Sidebar';
 import { TopbarNav } from './ui/TopbarNav';
 import { NotificationBell } from './ui/NotificationBell';
 import './student-theme.css';
@@ -49,51 +51,54 @@ export function PortalLayout() {
   return (
     <div className="su">
       <div className="su-shell">
-        <header className="su-topbar">
-          <div className="su-brand">
-            <span className="su-brand-mark"><BrandMark /></span>
-            <div className="su-brand-text">
-              <div className="su-brand-name">AEGIS</div>
-              <div className="su-brand-sub">Academic Advisor System</div>
-            </div>
-          </div>
-          <div className="su-brand-divider" />
-          <div className="su-role-tag"><span className="su-role-tag-full">Student</span><span className="su-role-tag-short">Student</span></div>
-
-          <TopbarNav tabs={tabs} />
-
-          <div className="su-topbar-user">
-            <NotificationBell role="student" recipientId={id} basePath={`/portal/${id}`} />
-            <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
-              {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
-            </button>
-            <button
-              type="button"
-              className="su-icon-btn danger"
-              aria-label="Log out"
-              title="Log out"
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-            >
-              <IconLogout width={17} height={17} />
-            </button>
-            {student && (
-              <div className="su-user-meta">
-                <div className="su-user-name">{student.name}</div>
-                <div className="su-user-id">ID: {student.id}</div>
+        <Sidebar tabs={tabs} />
+        <div className="su-main">
+          <header className="su-topbar">
+            <div className="su-brand">
+              <span className="su-brand-mark"><BrandMark /></span>
+              <div className="su-brand-text">
+                <div className="su-brand-name">AEGIS</div>
+                <div className="su-brand-sub">Academic Advisor System</div>
               </div>
-            )}
-            <div className="su-avatar">{student ? initials(student.name) : '…'}</div>
-          </div>
-        </header>
+            </div>
+            <div className="su-brand-divider" />
+            <div className="su-role-tag"><span className="su-role-tag-full">Student</span><span className="su-role-tag-short">Student</span></div>
 
-        <main className="su-body">
-          <div className="su-inner su-page" key={location.pathname}>
-            <Outlet />
-          </div>
-        </main>
+            <TopbarNav tabs={tabs} />
+
+            <div className="su-topbar-user">
+              <NotificationBell role="student" recipientId={id} basePath={`/portal/${id}`} />
+              <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+                {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
+              </button>
+              <button
+                type="button"
+                className="su-icon-btn danger"
+                aria-label="Log out"
+                title="Log out"
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+              >
+                <IconLogout width={17} height={17} />
+              </button>
+              {student && (
+                <div className="su-user-meta">
+                  <div className="su-user-name">{student.name}</div>
+                  <div className="su-user-id">ID: {student.id}</div>
+                </div>
+              )}
+              <div className="su-avatar">{student ? initials(student.name) : '…'}</div>
+            </div>
+          </header>
+
+          <main className="su-body">
+            <div className="su-inner su-page" key={location.pathname}>
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

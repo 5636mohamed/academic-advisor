@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from '../portal/ui/Icons';
 import { BrandMark } from '../portal/ui/BrandMark';
+import { Sidebar } from '../portal/ui/Sidebar';
 import { TopbarNav } from '../portal/ui/TopbarNav';
 import { NotificationBell } from '../portal/ui/NotificationBell';
 import '../portal/student-theme.css';
@@ -26,7 +27,7 @@ export function VpLayout() {
     { to: '/vp/venture-board', label: 'Venture board' },
     { to: '/vp/innovation-topography', label: 'Innovation topography' },
     { to: '/vp/institutional-friction', label: 'Institutional friction' },
-    { to: '/vp/demand-forecast', label: 'Demand forecast' },
+    { to: '/vp/demand-forecast', label: 'Demand forecast', sectionLabel: 'Curriculum Analytics' },
     { to: '/vp/curriculum-health', label: 'Curriculum health' },
     { to: '/vp/bottleneck-analyzer', label: 'Bottleneck analyzer' },
   ];
@@ -34,54 +35,57 @@ export function VpLayout() {
   return (
     <div className="su">
       <div className="su-shell">
-        <header className="su-topbar">
-          <div className="su-brand">
-            <span className="su-brand-mark"><BrandMark /></span>
-            <div className="su-brand-text">
-              <div className="su-brand-name">AEGIS</div>
-              <div className="su-brand-sub">Academic Advisor System</div>
+        <Sidebar tabs={tabs} />
+        <div className="su-main">
+          <header className="su-topbar">
+            <div className="su-brand">
+              <span className="su-brand-mark"><BrandMark /></span>
+              <div className="su-brand-text">
+                <div className="su-brand-name">AEGIS</div>
+                <div className="su-brand-sub">Academic Advisor System</div>
+              </div>
             </div>
-          </div>
-          <div className="su-brand-divider" />
-          {/* "Vice President" is long enough to overflow the topbar on a
-              narrow phone once the nav row hides (found via an actual
-              375px screenshot) — "VP" below (matching the avatar's own
-              abbreviation) only ever shows at that same breakpoint, via
-              CSS, same hide/show pattern .su-brand-sub already uses. */}
-          <div className="su-role-tag"><span className="su-role-tag-full">Vice President</span><span className="su-role-tag-short">VP</span></div>
+            <div className="su-brand-divider" />
+            {/* "Vice President" is long enough to overflow the topbar on a
+                narrow phone once the sidebar hides (found via an actual
+                375px screenshot) — "VP" below (matching the avatar's own
+                abbreviation) only ever shows at that same breakpoint, via
+                CSS, same hide/show pattern .su-brand-sub already uses. */}
+            <div className="su-role-tag"><span className="su-role-tag-full">Vice President</span><span className="su-role-tag-short">VP</span></div>
 
-          <TopbarNav tabs={tabs} />
+            <TopbarNav tabs={tabs} />
 
-          <div className="su-topbar-user">
-            <NotificationBell role="vp" recipientId="vp" basePath="/vp" />
-            <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
-              {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
-            </button>
-            <button
-              type="button"
-              className="su-icon-btn danger"
-              aria-label="Log out"
-              title="Log out"
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-            >
-              <IconLogout width={17} height={17} />
-            </button>
-            <div className="su-user-meta">
-              <div className="su-user-name">Vice President</div>
-              <div className="su-user-id">All advisors &amp; ventures</div>
+            <div className="su-topbar-user">
+              <NotificationBell role="vp" recipientId="vp" basePath="/vp" />
+              <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+                {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
+              </button>
+              <button
+                type="button"
+                className="su-icon-btn danger"
+                aria-label="Log out"
+                title="Log out"
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+              >
+                <IconLogout width={17} height={17} />
+              </button>
+              <div className="su-user-meta">
+                <div className="su-user-name">Vice President</div>
+                <div className="su-user-id">All advisors &amp; ventures</div>
+              </div>
+              <div className="su-avatar">VP</div>
             </div>
-            <div className="su-avatar">VP</div>
-          </div>
-        </header>
+          </header>
 
-        <main className="su-body">
-          <div className="su-inner su-page" key={location.pathname}>
-            <Outlet />
-          </div>
-        </main>
+          <main className="su-body">
+            <div className="su-inner su-page" key={location.pathname}>
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

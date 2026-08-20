@@ -1,12 +1,11 @@
-// Shared topbar navigation — used by all three shell layouts (PortalLayout,
-// AdvisorLayout, VpLayout), which otherwise each duplicated the exact same
-// `<nav className="su-topbar-nav">{tabs.map(...)}</nav>` block. Desktop
-// keeps the existing centered pill-row nav unchanged; below the shell's
-// 860px breakpoint that row used to become its own horizontally-scrolling
-// strip (cramped, and the reason a tab like "Transfer requests" could end
-// up scrolled out of sight with only a sliver showing) — it's now a
-// hamburger button that opens a full-screen stacked menu instead, one tab
-// per full-width row, closing itself the moment the route actually changes.
+// Mobile nav trigger — used by all three shell layouts (PortalLayout,
+// AdvisorLayout, VpLayout) alongside Sidebar.tsx, which otherwise each
+// duplicated the exact same hamburger/full-screen-menu block. Desktop nav
+// now lives entirely in the persistent Sidebar (student-theme.css's
+// `.su-sidebar`, hidden below 860px); this component is the mobile
+// equivalent, unchanged from before that split — a hamburger button that
+// opens a full-screen stacked menu, one tab per full-width row, closing
+// itself the moment the route actually changes.
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { IconClose, IconMenu } from './Icons';
@@ -37,14 +36,6 @@ export function TopbarNav({ tabs }: { tabs: TopbarTab[] }) {
 
   return (
     <>
-      <nav className="su-topbar-nav su-topbar-nav-desktop">
-        {tabs.map(t => (
-          <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-            {t.label}
-          </NavLink>
-        ))}
-      </nav>
-
       <button
         type="button"
         className="su-icon-btn su-topbar-menu-btn"

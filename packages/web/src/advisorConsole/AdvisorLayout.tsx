@@ -20,6 +20,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { IconLogout, IconMoon, IconSun } from '../portal/ui/Icons';
 import { BrandMark } from '../portal/ui/BrandMark';
+import { Sidebar } from '../portal/ui/Sidebar';
 import { TopbarNav } from '../portal/ui/TopbarNav';
 import { NotificationBell } from '../portal/ui/NotificationBell';
 import '../portal/student-theme.css';
@@ -57,7 +58,7 @@ export function AdvisorLayout() {
     { to: '/transfer-requests', label: 'Transfer requests' },
     { to: '/workload-overview', label: 'Workload' },
     { to: '/collider-board', label: 'Collider board' },
-    { to: '/demand-forecast', label: 'Demand forecast' },
+    { to: '/demand-forecast', label: 'Demand forecast', sectionLabel: 'Curriculum Analytics' },
     { to: '/curriculum-health', label: 'Curriculum health' },
     { to: '/bottleneck-analyzer', label: 'Bottleneck analyzer' },
   ];
@@ -65,51 +66,54 @@ export function AdvisorLayout() {
   return (
     <div className="su">
       <div className="su-shell">
-        <header className="su-topbar">
-          <div className="su-brand">
-            <span className="su-brand-mark"><BrandMark /></span>
-            <div className="su-brand-text">
-              <div className="su-brand-name">AEGIS</div>
-              <div className="su-brand-sub">Academic Advisor System</div>
-            </div>
-          </div>
-          <div className="su-brand-divider" />
-          <div className="su-role-tag"><span className="su-role-tag-full">Advisor</span><span className="su-role-tag-short">Advisor</span></div>
-
-          <TopbarNav tabs={tabs} />
-
-          <div className="su-topbar-user">
-            <NotificationBell role="advisor" recipientId={advisorId} basePath="" />
-            <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
-              {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
-            </button>
-            <button
-              type="button"
-              className="su-icon-btn danger"
-              aria-label="Log out"
-              title="Log out"
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-            >
-              <IconLogout width={17} height={17} />
-            </button>
-            {advisor && (
-              <div className="su-user-meta">
-                <div className="su-user-name">{advisor.name}</div>
-                <div className="su-user-id">{advisor.facultyId}/{advisor.departmentId} · {studentCount ?? '…'} students</div>
+        <Sidebar tabs={tabs} />
+        <div className="su-main">
+          <header className="su-topbar">
+            <div className="su-brand">
+              <span className="su-brand-mark"><BrandMark /></span>
+              <div className="su-brand-text">
+                <div className="su-brand-name">AEGIS</div>
+                <div className="su-brand-sub">Academic Advisor System</div>
               </div>
-            )}
-            <div className="su-avatar">{advisor ? initials(advisor.name) : 'A'}</div>
-          </div>
-        </header>
+            </div>
+            <div className="su-brand-divider" />
+            <div className="su-role-tag"><span className="su-role-tag-full">Advisor</span><span className="su-role-tag-short">Advisor</span></div>
 
-        <main className="su-body">
-          <div className="su-inner su-page" key={location.pathname}>
-            <Outlet />
-          </div>
-        </main>
+            <TopbarNav tabs={tabs} />
+
+            <div className="su-topbar-user">
+              <NotificationBell role="advisor" recipientId={advisorId} basePath="" />
+              <button type="button" className="su-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+                {theme === 'dark' ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
+              </button>
+              <button
+                type="button"
+                className="su-icon-btn danger"
+                aria-label="Log out"
+                title="Log out"
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+              >
+                <IconLogout width={17} height={17} />
+              </button>
+              {advisor && (
+                <div className="su-user-meta">
+                  <div className="su-user-name">{advisor.name}</div>
+                  <div className="su-user-id">{advisor.facultyId}/{advisor.departmentId} · {studentCount ?? '…'} students</div>
+                </div>
+              )}
+              <div className="su-avatar">{advisor ? initials(advisor.name) : 'A'}</div>
+            </div>
+          </header>
+
+          <main className="su-body">
+            <div className="su-inner su-page" key={location.pathname}>
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

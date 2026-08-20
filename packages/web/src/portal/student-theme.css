@@ -260,9 +260,67 @@
 }
 
 /* ---------------------------------------------------------------------- *
- * Shell / Topbar
+ * Shell / Sidebar / Topbar
+ *
+ * The shell is a row: a persistent left Sidebar.tsx (desktop only, hidden
+ * below 860px — see the responsiveness block further down) + `.su-main`,
+ * a column wrapping the topbar and page body exactly like `.su-shell`
+ * itself used to. Nav lives ONLY in the sidebar on desktop now — the old
+ * `.su-topbar-nav`/`.su-topbar-nav-desktop` pill row is gone; below 860px
+ * TopbarNav.tsx's hamburger + full-screen menu is still the mobile nav,
+ * unchanged.
  * ---------------------------------------------------------------------- */
-.su-shell { display: flex; flex-direction: column; min-height: 100%; background: var(--su-bg); }
+.su-shell { display: flex; flex-direction: row; min-height: 100%; background: var(--su-bg); }
+.su-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+
+.su-sidebar {
+  width: 234px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 12px;
+  background: var(--su-topbar-bg);
+  border-right: 1px solid var(--su-topbar-border);
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
+}
+.su-sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+.su-sidebar-nav a {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--su-topbar-text);
+  border: 1px solid transparent;
+}
+.su-sidebar-nav a:hover { color: var(--su-text); background: rgba(0,0,0,0.05); }
+:root[data-theme='dark'] .su-sidebar-nav a:hover { background: rgba(255,255,255,0.07); }
+.su-sidebar-nav a.active {
+  background: var(--su-surface);
+  color: var(--su-accent);
+  border-color: var(--su-accent-soft-strong);
+  box-shadow: var(--su-shadow-sm);
+}
+/* A later-added group of tabs (e.g. Curriculum Analytics, bolted onto an
+   already-established Dashboard/roster/venture list) reads as a rushed
+   afterthought without SOME visual break — this is the one-line fix: a
+   rule + small uppercase label, not a redesign of the list itself. */
+.su-sidebar-section {
+  margin: 14px 14px 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--su-topbar-border);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--su-text-muted);
+}
+.su-sidebar-nav > div:first-child .su-sidebar-section { margin-top: 0; padding-top: 0; border-top: none; }
 
 .su-topbar {
   display: flex;
@@ -296,26 +354,7 @@
 .su-brand-divider { width: 1px; height: 26px; background: var(--su-topbar-border); flex-shrink: 0; }
 .su-role-tag { font-weight: 700; color: var(--su-accent); font-size: 14px; flex-shrink: 0; white-space: nowrap; }
 
-.su-topbar-nav { display: flex; align-items: center; gap: 4px; flex: 1; justify-content: center; flex-wrap: wrap; }
-.su-topbar-nav a {
-  padding: 7px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--su-text-muted);
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-.su-topbar-nav a:hover { color: var(--su-text); background: rgba(0,0,0,0.045); }
-:root[data-theme='dark'] .su-topbar-nav a:hover { background: rgba(255,255,255,0.06); }
-.su-topbar-nav a.active {
-  background: var(--su-surface);
-  color: var(--su-accent);
-  border-color: var(--su-accent-soft-strong);
-  box-shadow: var(--su-shadow-sm);
-}
-
-.su-topbar-user { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.su-topbar-user { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-left: auto; }
 .su-topbar-user .su-user-meta { text-align: right; line-height: 1.25; }
 .su-topbar-user .su-user-name { font-size: 13px; font-weight: 700; }
 .su-topbar-user .su-user-id { font-size: 11px; color: var(--su-text-muted); }
@@ -356,8 +395,8 @@
 .su-body { flex: 1; padding: 26px 30px 60px; min-width: 0; }
 .su-inner { max-width: 1180px; margin: 0 auto; }
 
-/* TopbarNav.tsx's hamburger button — hidden on desktop, where the plain
-   pill-row nav (.su-topbar-nav-desktop) is already visible and has room. */
+/* TopbarNav.tsx's hamburger button — hidden on desktop, where the
+   persistent Sidebar (.su-sidebar) is already visible and has room. */
 .su-topbar-menu-btn { display: none; }
 
 /* TopbarNav.tsx's mobile menu — a genuine full-screen takeover (not just
@@ -397,13 +436,14 @@
  * Responsiveness — every portal in the system shares this shell
  * (PortalLayout, AdvisorLayout, VpLayout), so these rules cover all
  * three, no exception. The topbar was the one genuinely fixed-width
- * assumption: brand + role tag + nav + user block all fighting for one
- * row works fine at desktop widths but has nowhere to go on a phone. Below
- * 860px the pill-row nav gives way to TopbarNav's hamburger button/full-
- * screen menu above, and the name/ID text next to the avatar hides — the
- * avatar and icon buttons alone are enough to orient a signed-in session
- * on a small screen. Below 520px, tightened further for phones
- * specifically.
+ * assumption: brand + role tag + user block all fighting for one row
+ * works fine at desktop widths but has nowhere to go on a phone. Below
+ * 860px the persistent Sidebar hides entirely (there's no room for a
+ * fixed-width column alongside real content on a phone) and gives way to
+ * TopbarNav's hamburger button/full-screen menu instead, and the name/ID
+ * text next to the avatar hides — the avatar and icon buttons alone are
+ * enough to orient a signed-in session on a small screen. Below 520px,
+ * tightened further for phones specifically.
  * ---------------------------------------------------------------------- */
 /* Base (desktop) state for the role-tag short/full swap below — MUST come
  * before the @media block that overrides it: at equal specificity, CSS
@@ -414,15 +454,17 @@
 .su-role-tag-short { display: none; }
 @media (max-width: 860px) {
   .su-topbar { padding: 10px 16px; }
-  .su-topbar-nav-desktop { display: none; }
-  .su-topbar-menu-btn { display: flex; order: 2; }
+  .su-sidebar { display: none; }
+  .su-topbar-menu-btn { display: flex; }
   .su-topbar-user .su-user-meta { display: none; }
   .su-body { padding: 18px 16px 40px; }
   .su-stat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-  /* Once .su-topbar-nav-desktop (the row's one flex:1 child) disappears
-   * above, every other topbar child is flex-shrink:0 — their widths just
-   * sum, with nothing left to absorb overflow. That sum fits under the
-   * narrowest supported viewport for "Student"/"Advisor", but "Vice
+  /* Once the Sidebar disappears above, every topbar child is
+   * flex-shrink:0 — their widths just sum, with nothing left to absorb
+   * overflow (`.su-topbar-user`'s margin-left:auto only pushes it right
+   * when there IS spare room; it doesn't shrink anything by itself).
+   * That sum fits under the narrowest supported viewport for
+   * "Student"/"Advisor", but "Vice
    * President" is long enough to push the hamburger button (and the
    * whole row) past the edge — a real horizontal-overflow bug found via
    * an actual 375px-viewport screenshot, not assumed. A flex-shrink+
@@ -451,8 +493,8 @@
    * pushing the hamburger menu button off-screen again at 375px even for
    * the SHORT role labels this time — a 375px screenshot caught it
    * (~43px overflow), not assumed. Tightening the icon-button cluster's
-   * own size/gaps here (phones only — .su-topbar-nav-desktop is already
-   * gone by 860px, so this never affects tablet/desktop) reclaims more
+   * own size/gaps here (phones only — the Sidebar is already gone by
+   * 860px, so this never affects tablet/desktop) reclaims more
    * than enough width without touching anything the 860px fix already
    * covers correctly. */
   .su-icon-btn { width: 30px; height: 30px; }
