@@ -269,6 +269,54 @@ Verified by direct repo-wide search before this epic was designed, not assumed:
 - **No real `Section`/`Instructor`/seat-capacity entity.** `CourseOffering.enrolled` is a whole-cohort headcount, not a per-section seat count, and no such entity exists anywhere in `packages/shared/src/types/*.ts` or the DB layer. Demand Forecasting's `forecastedSections`/`forecastedSeatsNeeded`/`forecastedInstructorLoad` are **derived estimates** (forecasted enrollment ÷ `CATEGORY_BASELINE[category].classSize`, 1:1 section-to-instructor) — explicitly labeled as such in the UI ("Derived estimate — see note below") and never presented as if real staffing/timetabling data exists behind them.
 - **No course-offering-cadence/availability modeling.** The seed generates a Fall+Spring offering for every course, every year, uniformly — there is no "this course only runs once a year" flag anywhere. "Availability pressure" (`demandPressure`, and the `retakeWaitTermsFor` interpolation it feeds) is derived from forecasted demand relative to a course's typical historical class size, not from a true scheduling gap.
 - **No Department-Head login role.** "Department" audience is a scope on the existing Advisor/VP roles (see §3), not a new `AuthState` value.
-- **Any porting to `ejust-academic-advisor`.** Explicitly excluded from this epic per instruction — a deliberate, separate pass later, same as the standing repo-boundary note already on file for `AI_FEATURES_BLUEPRINT.md`'s still-unbuilt work.
+- **Any porting to `ejust-academic-advisor`.** Explicitly excluded from this epic per instruction — a deliberate, separate pass later, same as the standing repo-boundary note already on file for `AI_FEATURES_BLUEPRINT.md`'s still-unbuilt work. Still true as of this epic's post-release refinements below — `ejust-academic-advisor` has not received any of §6, either.
+
+---
+
+## 6. Post-release refinement: level categorization + confirmed roster scoping
+
+Direct product-owner follow-up, live report: *"In bottleneck analyzer for
+advisor make them categorized by level and showing only his students who
+is assigned as their advisor only."* Two real changes, plus one
+confirmation:
+
+- **Course level, everywhere a course row already appears.** `CourseCategoryTags` (shared type consumed by all three features) gained
+  `courseLevel: number`, populated from the course's real `Course.level`
+  in both `courseRiskScore.service.ts` and `resourceForecast.service.ts`.
+  `CourseFilterBar.tsx` — the one shared filter component all three
+  features' course tables already render through — gained a Level
+  dropdown alongside Department/Category, so this one addition
+  automatically propagates to all six pages (advisor + VP × 3 features)
+  with no per-page wiring.
+- **Student level, on the Bottleneck Analyzer's advisee table
+  specifically** — the one feature with a roster-scoped, per-student
+  table (§3's "Advisors" framing). `AffectedStudentRow` gained
+  `studentLevel: number`, threaded through
+  `bottleneckDependencyAnalyzer.service.ts`'s `affectedAdvisees` and the
+  `rosterForCheck` construction in `server.ts`. `AdvisorBottleneckAnalyzer.tsx`
+  gets its own, separate Level filter for this table (independent of the
+  course-level filter on the ranking table below it), shown only when the
+  advisor's own roster actually spans more than one level. The advisor's
+  PDF export (`pdfReport.ts`'s `downloadBottleneckAnalyzerPdf`) gained a
+  matching Level column so the printed report and the on-screen table
+  never diverge.
+- **Roster scoping — confirmed, not changed.** The live report also
+  asked to confirm advisors only see "his students who is assigned as
+  their advisor only." This was already true (`affectedAdvisees` has
+  taken a pre-filtered `roster` parameter since §3 shipped, and
+  `bottleneckDependencyAnalyzer.service.test.ts` already had an explicit
+  roster-ownership-scoping test for it) — re-verified against the real
+  route (`GET /api/advisors/:advisorId/curriculum-analytics/bottlenecks`
+  builds its roster from `db.listStudents().filter(s => s.advisorId ===
+  advisorId ...)`, not a client-supplied list) rather than silently
+  assumed correct. No code change was needed for this half of the ask;
+  documenting the confirmation here so it isn't mistaken for an
+  unaddressed item later.
+
+This same live report also asked for a rebuilt `expectedPct` grade-
+prediction formula (student/cohort mean+mode+trend, replacing the old
+regression-projected blend) — that change is prediction-engine-wide, not
+Curriculum-Analytics-specific, so it's specified in `docs/BUILD_SPEC.md`
+§3.1 rather than duplicated here.
 
 None of the above is a blocker to a real, honest v1.2.0 — each is a documented simplification with an explicit "how to close this gap for real" path, matching how `CourseOffering` itself has been treated in this codebase since it was first seeded.

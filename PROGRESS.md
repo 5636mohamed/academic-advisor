@@ -5,7 +5,82 @@ Read this **before** touching code — it tells you exactly what's implemented,
 what's verified, and what to do next, mapped to section numbers in
 `docs/BUILD_SPEC.md` (the full specification).
 
-## ✅ SESSION 13 NOTE — READ FIRST (Venture Board for the whole cohort; night mode)
+## ✅ SESSION 14 NOTE — READ FIRST (Curriculum Analytics epic v1.2.0; sidebar nav; real backend auth v1.3.0; prediction engine rebuild; bottleneck level categorization)
+
+The biggest session yet — six distinct pieces of work, each independently
+tested/typechecked/verified live before moving to the next, in this order:
+
+1. **Curriculum Analytics epic (v1.2.0)** — three new department/VP-facing
+   modules, all reasoning over real historical enrollment and prerequisite
+   data: **Academic Resource Demand Forecasting** (recency-weighted
+   regression, same primitive grade/CGPA trend already used), **Curriculum
+   Health Monitor** (every course scored 0-100 from real failure rate,
+   downstream prereq-chain impact, demand pressure, expected graduation
+   delay), and **Course Bottleneck & Dependency Analyzer** (institution-
+   wide ranking by cascading-delay impact, plus — advisor-scoped — which
+   of an advisor's own advisees are genuinely affected right now). One
+   shared risk-scoring primitive (`courseRiskScore.service.ts`), a
+   Department/Category filter bar reused across all 6 new pages. Full
+   spec: `docs/CURRICULUM_ANALYTICS_BLUEPRINT.md`.
+2. **Persistent sidebar navigation** — live UX complaint that the
+   horizontal tab bar started wrapping to two lines as new tabs shipped;
+   replaced with a persistent left sidebar (all 3 portals), topbar now
+   mobile-only. `docs/BUILD_SPEC.md` §19.8.
+3. **Deploy-lag defensive crash fix** — live production crash
+   (`Cannot read properties of undefined (reading 'length')` on VP
+   login), root-caused to GitHub Pages/Railway's non-atomic deploy lag;
+   fixed by making the affected frontend code defensive against a
+   temporarily-stale API response shape instead of assuming atomic
+   deploys. `docs/BUILD_SPEC.md` §19.9.
+4. **Real backend authentication (v1.3.0)** — the big one: replaced the
+   client-only demo login (a `localStorage` blob, no server round-trip)
+   with real server-verified sessions. `POST /api/auth/login` hashes/
+   verifies the password (Node's built-in `crypto.scrypt`, no new
+   dependency) and issues a bearer token; all ~83 API routes now run
+   behind a guard middleware family instead of trusting a client-supplied
+   id — closing a real, previously-open gap where any advisor session
+   could reach any student's record, not just their own roster. Demo
+   passwords are unchanged and still public/documented — this is real
+   verification/enforcement, not a claim of production-grade secrecy.
+   Full spec: `docs/BUILD_SPEC.md` §20; threat model: `.github/SECURITY.md`.
+5. **Prediction engine rebuild** — live report: a student with a strong
+   recent record (90.5% last semester) could still be predicted a D
+   purely because a historically hard course's own class average was
+   low. `expectedPct` rebuilt around exactly what was asked for: the
+   student's own real mean + modal grade, the course's own real 3-year
+   mean + modal grade (deterministically modeled per-letter distribution,
+   compared by density to fix a real band-width bias — a wide F band
+   could otherwise "win" over a narrower D/D+ band even when the true
+   mean sat in D/D+ range), plus an explicit rising/declining/consistent/
+   inconsistent trend adjustment. `docs/BUILD_SPEC.md` §3.1 (rewritten).
+6. **Bottleneck Analyzer: level categorization + confirmed roster
+   scoping** — direct follow-up to #1: every course table across all 3
+   Curriculum Analytics features gained a Level filter (via the shared
+   `CourseFilterBar`); the advisor's affected-advisees table gained its
+   own Level column/filter and a PDF export column; roster scoping (an
+   advisor only ever sees their own real advisees) was re-verified
+   against the live route, not just assumed. `docs/
+   CURRICULUM_ANALYTICS_BLUEPRINT.md` §6.
+
+Also shipped this session, requested alongside #4-6: a **live production
+deployment of the `ejust-academic-advisor` fork** (GitHub Pages + its own
+Railway project) — see that repo's own `PROGRESS.md`/`README.md`.
+`ejust-academic-advisor` did **not** receive #1-6 above (auth,
+Curriculum Analytics, the prediction rebuild, and level categorization
+are all `academic-advisor`-only by explicit scope) — see `docs/
+COMPARISON.md` in that repo for the current, real feature divergence.
+
+**Verified, not just written:** full backend test suite green after every
+batch of #1 and #4 (`npm run test -w packages/api`), `tsc --noEmit` clean
+across all three packages after every change, and every piece live-
+verified against a real running app (not just unit tests) — including,
+for #4, a full cross-role access-denial sweep against the deployed
+production app (one role's token can't reach another's data) and a
+session-survives-refresh check.
+
+---
+
+## ✅ SESSION 13 NOTE (Venture Board for the whole cohort; night mode)
 
 Direct product-owner follow-up to session 12, two requests:
 

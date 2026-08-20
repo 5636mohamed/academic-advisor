@@ -178,9 +178,18 @@ student/advisor/Vice-President access separation):
   cascading-delay impact and shows exactly which other courses it directly
   blocks, plus — the one feature scoped to advisors, not just departments
   — which of an advisor's own advisees are genuinely affected by a real
-  bottleneck right now. All three share one new risk-scoring primitive
-  (`courseRiskScore.service.ts`) rather than duplicating the math, and
-  ship with their own advisor/VP page pairs and nav tabs.
+  bottleneck right now, **categorized by level**, and confirmed
+  server-scoped to only that advisor's own real roster. All three share
+  one new risk-scoring primitive (`courseRiskScore.service.ts`) rather
+  than duplicating the math, ship with their own advisor/VP page pairs
+  and nav tabs, and every course table across all three features (both
+  roles) now filters by Department, Category, **and Level** — see
+  `docs/CURRICULUM_ANALYTICS_BLUEPRINT.md` §6.
+- **Persistent sidebar navigation** — the horizontal tab bar (all 3
+  portals) was replaced with a persistent left sidebar after it started
+  wrapping to two lines as more tabs shipped; the old topbar now only
+  appears on mobile. Purely a navigation-chrome change, no route or page
+  content moved.
 - **§17 Multi-advisor model & Vice President oversight** — a single shared
   advisor account became 14 real advisor identities, each with their own
   25-student roster — a real, deterministic random mix across all 10
@@ -289,16 +298,24 @@ course catalog was built, see the
 [![Linear Regression](https://img.shields.io/badge/Linear_Regression-OLS-4B8BBE)](packages/api/src/modules/prediction/linearRegression.ts)
 [![Statistical Modeling](https://img.shields.io/badge/Grade_%26_CGPA_Trend-Statistical_Model-4B8BBE)](packages/api/src/modules/prediction/cgpaTrendProjection.ts)
 
-Every trend projection in the system — cohort grade trends, an individual
-student's own ability trend, and CGPA trajectory — is driven by a small,
-dependency-free **Ordinary Least Squares linear regression** implementation
-(`packages/api/src/modules/prediction/linearRegression.ts`'s `ols()`,
-fitting `y = a + b·x` over a student's or cohort's own history, then
-projecting the next term). No ML library — just the real math, unit-tested
-directly (`test/unit/prediction/linearRegression.test.ts`) and reused by
-every one of `cgpaTrendProjection.ts`, `cohortTrend.ts`, and
-`studentTrend.ts` so cohort, individual, and CGPA trends can never compute
-a trend line differently from one another.
+A per-course expected grade is now a real **mean + mode + trend** blend,
+rebuilt after a live report that a strong student (e.g. 90.5% last
+semester) could still be predicted a D purely because a historically hard
+course's own class average was low. `studentStats.ts` computes the
+student's own real mean and modal (most-frequently-earned) grade;
+`cohortTrend.ts` computes the course's own real 3-year enrollment-weighted
+mean, its real modal grade (`gradeDistribution.ts`'s deterministic
+per-letter modeling, compared by density so a wide grade band can't win
+purely by being wide), and an explicit rising/declining/consistent/
+inconsistent trend classification — see `docs/BUILD_SPEC.md` §3.1 for the
+full formula. The dependency-free **Ordinary Least Squares linear
+regression** implementation (`linearRegression.ts`'s `ols()`, fitting
+`y = a + b·x`) is still what every trend *projection* in the system runs
+on — CGPA trajectory (`cgpaTrendProjection.ts`) and curriculum-analytics
+demand forecasting both project a value forward with it; `cohortTrend.ts`
+now uses it only to classify a *direction* (the slope), not to project a
+number. No ML library anywhere — just the real math, unit-tested directly
+(`test/unit/prediction/linearRegression.test.ts`).
 
 ### Testing & tooling
 

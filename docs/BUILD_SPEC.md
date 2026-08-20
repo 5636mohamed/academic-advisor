@@ -117,37 +117,107 @@ This mirrors the prototype's `expectedNewPct = avgPct + trendDelta*0.5` and `sco
 
 ### 3.1 Per-course expected score: `expectedPct(course, student)`
 
-Two regression-derived signals are blended with the weighted sum:
+> **Rebuilt, live-reported bug fix (post-v1.3.0).** The original design
+> below (a regression-*projected* cohort mean blended almost as heavily
+> as the student's own regression trend, plus a flat difficulty nudge)
+> shipped and worked, but produced a real, reported failure mode: a
+> student with a genuinely strong recent record (e.g. a 90.5% last-semester
+> average) could still be predicted a D in a course purely because that
+> course's own historical cohort mean was low — the cohort signal was
+> weighted almost as heavily as the student's own trend, so a hard
+> course's low class average could drag a strong student's number down
+> with it. The engine was rebuilt around exactly what was asked for
+> instead: **the student's own mean AND modal (most-frequently-earned)
+> grade**, **the subject's own real 3-year mean AND modal grade**, plus an
+> explicit **rising / declining / consistent / inconsistent trend
+> adjustment** for the subject — replacing the old regression-projected
+> cohort number and the flat difficulty-tier nudge, neither of which
+> looked at direction. `courseDifficultyAdjustment`/`DifficultyTier` are
+> now dead code, removed. The two OLS-regression building blocks
+> described in this section's intro are still used elsewhere (§3.4's CGPA
+> trend, curriculum-analytics demand forecasting) — §3.1 itself no longer
+> projects a value via regression, only classifies a *direction* from one
+> (see (b) below).
 
-**(a) Cohort trend (peer regression)** — fit a simple linear regression of the course's mean score against the last *N* (≥6, configurable) offerings:
+**(a) Student mean + mode** (`studentStats.ts`'s `studentMeanAndMode`) —
+the student's own real percentage average, and their own real modal
+(most commonly earned) letter grade, across their last comparable graded
+attempts (same `program`/`faculty` vs. `ur_*` category scoping as before,
+so an easy LRA run never dilutes a hard core-course prediction). Needs
+≥3 comparable attempts to trust the comparable-only pool; below that it
+falls back to the student's whole graded history (some real signal beats
+none), and with zero graded history at all, falls back to the cohort
+mean at blend time (see (c)).
 
 ```
-CourseOffering rows for `code`, ordered by term →  points (x = term index 0..N-1, y = meanPct)
-b = Σ((x-x̄)(y-ȳ)) / Σ((x-x̄)²)          # slope
-a = ȳ - b·x̄                              # intercept
-cohortProjectedPct = a + b·(N)            # project one term ahead
-cohortProjectedPct = clamp(cohortProjectedPct, 0, 100)
+comparable = student's graded attempts in the same category (program/faculty vs ur_*) as the target course
+pool = comparable.length >= 3 ? comparable : student's whole graded history
+studentMean = mean(pool.pct)
+studentModeLetter = the letter earned most often in pool (raw headcount — pool is small and discrete, no band-width bias)
+studentModePct = studentModeLetter's grade-band minimum, or studentMean if there's no clear mode
 ```
-Falls back to the prototype's synthetic `HISTORY[code]` generator (seeded RNG + tier bell curve) only in demo/seed mode when `CourseOffering` history has < 3 data points.
 
-**(b) Student ability regression (personal trend)** — fit a linear regression of the *student's own* percentage marks across their last *M* (≥3) completed courses, ordered by the semester they were taken, restricted to courses in the same category (`program`/`faculty` vs `ur_*`) as the target course, to avoid mixing easy LRA marks with hard core-course marks:
+**(b) Cohort mean + mode + trend** (`cohortTrend.ts`'s `cohortMeanModeTrend`) —
+the *course's own* real, enrollment-weighted mean across its last 3 years
+of `CourseOffering` history, its real modal letter grade, and an explicit
+trend classification:
 
 ```
-studentTrendPct = a_s + b_s·(nextIndex)   # same OLS mechanics, on the student's own history
+cohortMean = Σ(offering.meanPct × offering.enrolled) / Σ(offering.enrolled)   # enrollment-weighted, not a flat average
+
+# Modal letter: each CourseOffering carries a per-letter gradeDistribution
+# (deterministically discretized from its own meanPct/stdDevPct — no
+# individual per-student records exist in the seed data, so this is a
+# modeled, not fabricated, distribution — see gradeDistribution.ts).
+# Compared by DENSITY (headcount ÷ grade-band width), not raw headcount —
+# a real bug caught and fixed before shipping: grade bands are wildly
+# unequal width (F spans 60 points, D spans 5), so a raw-count comparison
+# always favored the wide F band even when the course's real mean sat
+# comfortably in the D/D+ range.
+cohortModeLetter = modalLetterByDensity(combined per-letter distribution across all offerings)
+cohortModePct = cohortModeLetter's grade-band minimum, or cohortMean if there's no clear mode
+
+# Trend: recency-weighted OLS regression of meanPct across the last ≥3
+# offerings — but only the SLOPE is used, to classify a direction, not
+# project a number:
+slope, _ = OLS(x = offering index, y = offering.meanPct, weights = recencyWeights(...))
+avgStdDev = mean(offering.stdDevPct across the history)
+trend = slope ≥ +threshold ? 'rising'
+      : slope ≤ -threshold ? 'declining'
+      : avgStdDev ≥ inconsistencyThreshold ? 'inconsistent'   # noisy but not clearly trending either way
+      : 'consistent'
+# declining/rising take priority over inconsistent when a course is both
+# drifting and noisy — a clear direction is more actionable than "it's
+# noisy," and only one label applies at a time.
+trendAdjustment = trend == 'rising' ? +risingBonus
+                : trend == 'declining' ? -decliningPenalty
+                : trend == 'inconsistent' ? -inconsistencyPenalty
+                : 0
 ```
-If the student has fewer than 3 comparable graded courses (new/transfer student), fall back to their overall percentage average, and if that's empty too, fall back to the course's cohort mean.
 
 **(c) Weighted-sum blend:**
 
 ```
 expectedPct(course, student) =
-      0.45 * cohortProjectedPct        # what most students tend to score, trend-adjusted
-    + 0.40 * studentTrendPct           # this student's own trajectory
-    + 0.15 * courseDifficultyAdjustment(course, student)
+      0.35 * studentMean          # this student's own real average — now the single heaviest signal
+    + 0.25 * studentModePct       # what this student most often actually earns
+    + 0.25 * cohortMean           # the subject's own real 3-year mean
+    + 0.15 * cohortModePct        # what most students most often earn in it
+    + trendAdjustment             # ±3 rising/declining, -2 inconsistent, 0 consistent
 ```
-`courseDifficultyAdjustment` nudges the blend down for `historically tough` tier courses (bottom pass-rate tercile) and up for `low-risk` tier, capped at ±5 points — this replaces the prototype's `tierFor()` bucket used only for synthetic generation; in the real system it is measured directly from `CourseOffering.passed/enrolled`.
+Either signal being briefly unavailable (a brand-new course with no
+offering history, or a brand-new/transfer student with no graded
+history) falls back to the *other* real signal rather than collapsing to
+a flat neutral default — only a student AND course with genuinely zero
+history on both sides falls back to `neutralFallback`.
 
-Weights (0.45 / 0.40 / 0.15) are configuration, not hard-coded constants — expose them in `config/predictionWeights.json` so an academic committee can retune without a redeploy.
+All weights, bonuses/penalties, and thresholds (`studentMeanWeight`:
+0.35, `studentModeWeight`: 0.25, `cohortMeanWeight`: 0.25,
+`cohortModeWeight`: 0.15, `risingBonus`/`decliningPenalty`: 3,
+`inconsistencyPenalty`: 2, `trendSlopePerTermThreshold`: 1.5,
+`inconsistencyStdDevThreshold`: 10) are configuration, not hard-coded
+constants — `config/predictionWeights.json`'s `expectedPct` block, so an
+academic committee can retune without a redeploy.
 
 ### 3.2 Course candidate score: `scoreCandidate(candidate, mode)` — weighted sum (unchanged structurally, extended)
 
@@ -633,9 +703,10 @@ academic-advisor/
 │   │   │   │   │
 │   │   │   │   ├── prediction/                        # §3 — the math core, framework-agnostic, unit-testable
 │   │   │   │   │   ├── linearRegression.ts             # generic OLS(x[], y[]) → {a, b}
-│   │   │   │   │   ├── cohortTrend.ts                  # §3.1(a)
-│   │   │   │   │   ├── studentTrend.ts                 # §3.1(b)
-│   │   │   │   │   ├── expectedPct.ts                  # §3.1(c) blend
+│   │   │   │   │   ├── gradeDistribution.ts             # deterministic per-letter distribution + density-normalized mode, §3.1(b)
+│   │   │   │   │   ├── cohortTrend.ts                  # §3.1(b) — real mean/mode/trend, rebuilt post-v1.3.0
+│   │   │   │   │   ├── studentStats.ts                  # §3.1(a) — real mean/mode, replaces the old studentTrend.ts
+│   │   │   │   │   ├── expectedPct.ts                  # §3.1(c) blend, rebuilt post-v1.3.0
 │   │   │   │   │   ├── chainUnlockValue.ts              # §3.3, memoized per catalog version
 │   │   │   │   │   ├── candidateScore.ts                # §3.2 scoreCandidate
 │   │   │   │   │   ├── planPacker.ts                    # §3.2/§5 knapsack + mandatory-bucket reservation
@@ -2224,6 +2295,90 @@ agreement, curriculum cross-department leakage, missing letter/pct on any
 venture-matches fetch. Zero problems found on the fixed code, across every
 check, for every student.
 
+### 19.8 Persistent sidebar navigation (replaces the horizontal tab bar)
+
+Live UX complaint: as more tabs shipped (Curriculum Analytics' three new
+pages on top of everything already there), the horizontal topbar tab strip
+started wrapping to two lines on ordinary desktop widths, and a newly
+added tab was easy to miss entirely above the fold. Replaced with a
+persistent left `Sidebar.tsx` (all 3 portals — student, advisor, VP),
+matching AEGIS's existing red/white theme; `TopbarNav.tsx` is now
+mobile-only (collapses to a hamburger below the sidebar's breakpoint
+instead of ever wrapping). No route or page content changed — purely a
+navigation-chrome fix.
+
+### 19.9 Deploy-lag defensive crash — VP portal `Cannot read properties of undefined (reading 'length')`
+
+Live production crash report, verbatim: *"Unexpected Application Error!
+Cannot read properties of undefined (reading 'length') ... I got this
+when I got into VP account."* Root cause: GitHub Pages and Railway deploy
+independently and **not atomically** — Pages redeploys in ~30 seconds,
+Railway can lag several minutes to ~20 minutes behind it — so a client
+already on the newer frontend build can briefly hit the still-old API
+mid-deploy, whose responses don't yet carry a field the new frontend code
+assumes is always present (here, a `departments`/`courseLevel`-shaped
+array the VP's Curriculum Analytics pages iterate over unconditionally).
+Fixed defensively rather than by trying to force atomic deploys (not
+realistic across two independently-hosted free-tier platforms):
+`departmentsCell.ts` and `CourseFilterBar.tsx`'s `filterCourses` now treat
+every such field as possibly-missing (`?? []` / `?? false`) and degrade to
+"no info yet" instead of throwing, for exactly the length of that window
+— this is the general shape of defensive coding this deploy topology
+requires going forward for any new field added to an existing response.
+
 ---
 
-*End of specification. This document, sections 1–19, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), §17 (AEGIS rebrand, multi-advisor model, Vice President oversight, advisor responsibility workflow, transfer pending chain), §18 (the real 10-program FoE department catalog expansion), §19 (post-launch live-bug-report fixes — notifications, venture board rescoping, course-plan safety, data integrity), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13.*
+## 20. Real Backend Authentication (v1.3.0)
+
+> Live incident that triggered this section: a raw API URL was shown to a
+> user as a "quick sanity check" and returned full, unformatted student
+> JSON directly in the browser — investigating confirmed there was no
+> real authentication anywhere in the app, for any role (§1–19's "demo
+> gate" login was a client-side-only credential check against a public,
+> documented password; the API itself trusted whatever id a caller put in
+> the URL). Given the choice between a cosmetic fix and a real one, the
+> product owner chose to build real authentication.
+
+**Session model** — `POST /api/auth/login` (`{email, password}`) resolves
+the email the same way the old client-side check did (VP constant, then
+advisors, then students — `emailLocalPartFor`/`advisorEmailFor`/
+`studentEmailFor`, moved to `packages/shared/src/auth/credentials.ts` so
+frontend and backend can never derive an email differently), verifies the
+password with Node's built-in `crypto.scrypt`/`timingSafeEqual`
+(`authPassword.service.ts` — no new dependency), and on success issues an
+opaque `crypto.randomUUID()` session token (24h TTL, `inMemoryDb.ts`'s
+`sessions` map — same in-memory-store convention as everything else in
+this system, resets on redeploy like every other collection here).
+`POST /api/auth/logout` invalidates it. Every subsequent request carries
+`Authorization: Bearer <token>`.
+
+**Guard middleware** (`packages/api/src/modules/auth/guards.ts`), applied
+across all ~83 routes:
+
+```
+authenticate            401s if the token is missing/expired; else sets req.auth = {role, id}
+requireAuthRole(...roles)          403s if req.auth.role isn't one of the allowed roles
+requireStudentAccess(param)        VP: always. Advisor: only if that student's REAL advisorId === req.auth.id.
+                                    Student: only if param === req.auth.id. 404 if the student doesn't exist.
+requireAdvisorAccess(param)        VP: always. Advisor: only if param === req.auth.id.
+requireAdvisorOwnsStudent          same ownership check as requireStudentAccess, for advisor-initiated routes
+                                    keyed by a body field instead of a path param.
+```
+
+**A real, previously-open gap this closes**: before this section, any
+advisor session could reach *any* student's record by substituting a
+different id in the URL — nothing checked that the student was actually
+on that advisor's own roster. `requireStudentAccess`/
+`requireAdvisorOwnsStudent` now check the student's real `advisorId`
+against the caller's own authenticated identity on every such route, not
+just what the UI happens to link to.
+
+Demo passwords are unchanged, shared, and still publicly documented in
+`docs/LOGIN_CREDENTIALS.md` — this section is not a claim of
+production-grade secrecy, only that verification and enforcement are now
+real (server-side, per-request) instead of a client-side-only convention.
+Full threat-model writeup: `.github/SECURITY.md`.
+
+---
+
+*End of specification. This document, sections 1–20, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), §17 (AEGIS rebrand, multi-advisor model, Vice President oversight, advisor responsibility workflow, transfer pending chain), §18 (the real 10-program FoE department catalog expansion), §19 (post-launch live-bug-report fixes — notifications, venture board rescoping, course-plan safety, data integrity, navigation, deploy-lag defensiveness), §20 (real backend authentication — server-verified sessions and per-request access guards, v1.3.0), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13. The Curriculum Analytics epic (Academic Resource Demand Forecasting, Curriculum Health Monitor, Course Bottleneck & Dependency Analyzer, v1.2.0) and its post-release refinements (student mean/mode/trend-based `expectedPct`, per-level categorization) are specified separately in `docs/CURRICULUM_ANALYTICS_BLUEPRINT.md`.*

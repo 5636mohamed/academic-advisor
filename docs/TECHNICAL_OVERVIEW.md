@@ -56,34 +56,59 @@ packages/
         grading/        CGPA math, credit caps, level thresholds
         probation/      The probation-counter state machine, dismissal
         advising/       The "generate my plan" orchestration
-        prediction/     Expected-grade projection (OLS linear regression),
-                        cohort/individual trend, best-case projection,
-                        cold-start (new-student) assessment
+        prediction/     Per-course expected-grade projection — student's
+                        own mean/mode blended with the course's own real
+                        3-year mean/mode/trend (`docs/BUILD_SPEC.md` §3.1);
+                        CGPA trajectory and curriculum-analytics demand
+                        forecasting still use the shared OLS linear
+                        regression (`linearRegression.ts`); best-case
+                        projection, cold-start (new-student) assessment
         transfer/       Internal (same-faculty) and external (cross-
                         faculty) department transfer execution
         retakeGate/     The "should retakes be considered?" gate
         fitEngine/      The department/faculty best-fit quiz engine
         venture/        Venture-project matching and application lifecycle
+        proposals/      Advisor course-proposal / dual-approval workflow
         friction/       Weekly workload ("cognitive load") scoring
         collider/       External opportunity (competitions, funding,
                         internships) matching
-        notifications/  Cross-role notification wiring (student ↔ advisor
-                        ↔ Vice President)
+        curriculumAnalytics/  Demand forecasting, curriculum health
+                        scoring, and bottleneck/dependency analysis —
+                        department- and advisor-scoped (`docs/
+                        CURRICULUM_ANALYTICS_BLUEPRINT.md`)
+        auth/           Password hashing, session tokens, and the
+                        per-request access guards behind real backend
+                        login (`docs/BUILD_SPEC.md` §20) — cross-role
+                        notification wiring also lives here and inline in
+                        `server.ts`, not a dedicated module of its own
 
   web/      → @advisor/web — the frontend (Vite + React + React Router)
     src/
       portal/          The student-facing pages (dashboard, course plan,
-                        transcript, venture board, department quiz)
+                        transcript, venture board, department quiz);
+                        `portal/ui/Sidebar.tsx` is the persistent left nav
+                        shared by all 3 portals (`TopbarNav.tsx` is now
+                        mobile-only — see §19.8 of the BUILD_SPEC)
       advisorConsole/  The advisor-facing pages (roster, per-student file,
-                        venture board, transfer-request queue)
+                        venture board, transfer-request queue, Curriculum
+                        Analytics pages)
       vpConsole/       The Vice President's pages (cross-advisor dashboard,
-                        per-advisor drill-down, transfer-request review)
-      auth/            Login, session state, per-role route guards
-      api/client.ts    The one place every API call is made from
+                        per-advisor drill-down, transfer-request review,
+                        Curriculum Analytics pages)
+      auth/            Real session state (a bearer token, not just a
+                        role/id blob) and per-role route guards — backed
+                        by the API's own `auth/` module, not a client-side
+                        credential check (see "Login" below)
+      api/client.ts    The one place every API call is made from; attaches
+                        `Authorization: Bearer <token>` to every request
+                        and centralizes 401 handling
 
 docs/
   BUILD_SPEC.md          The full specification — the single source of
                           truth every business rule traces back to
+  CURRICULUM_ANALYTICS_BLUEPRINT.md  Demand Forecasting, Curriculum
+                          Health Monitor, and Bottleneck & Dependency
+                          Analyzer — specified separately from the above
   HANDBOOK_RULES.md      Every rule restated in plain language, cross-
                           referenced to the code that implements it
   DECISION_TREE.md       The course-recommendation and transfer-approval
@@ -127,10 +152,15 @@ everything (Express, Vitest, React, Vite, jsPDF, Prisma client, etc.)
 across all three workspace packages in one pass, from the repo root.
 
 Once both are running, open `http://localhost:5173/login` and sign in with
-any credential from `docs/LOGIN_CREDENTIALS.md`. Login is still a demo gate
-(client-side only, checked against seeded data — no server-side session or
-password hashing, a deliberate and documented simplification, not a hidden
-gap — see `.github/SECURITY.md`).
+any credential from `docs/LOGIN_CREDENTIALS.md`. Login is now real,
+server-verified authentication (`POST /api/auth/login`, `docs/
+BUILD_SPEC.md` §20) — the server hashes/verifies the password and issues
+a real bearer-token session, and every one of the ~83 API routes checks
+that token against a per-request access guard instead of trusting a
+client-supplied id. Passwords themselves are still the same shared,
+publicly-documented demo constants (`docs/LOGIN_CREDENTIALS.md`) — a
+deliberate, documented simplification for a demo app, not a hidden gap —
+see `.github/SECURITY.md` for the full model.
 
 ## Testing
 
@@ -183,7 +213,11 @@ the API to Render instead of Railway.
 - **`docs/BUILD_SPEC.md`** — the complete specification. Every business
   rule in the system (grading scales, probation/dismissal thresholds,
   credit caps, the transfer approval chain, venture matching, the real
-  10-program course catalog) traces back to a numbered section here.
+  10-program course catalog, real backend authentication) traces back to
+  a numbered section here.
+- **`docs/CURRICULUM_ANALYTICS_BLUEPRINT.md`** — the department/VP-facing
+  Demand Forecasting, Curriculum Health Monitor, and Bottleneck &
+  Dependency Analyzer features, specified separately from the main spec.
 - **`docs/HANDBOOK_RULES.md`** — the same rules, restated in plain
   language with a pointer to the exact file that implements each one.
 - **`docs/DECISION_TREE.md`** — the course-recommendation and transfer-
