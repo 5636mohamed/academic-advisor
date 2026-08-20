@@ -2137,16 +2137,51 @@ cap — nothing in that scoring ever *excluded* a candidate outright, so a
 course with enough chain-unlock value could still out-score a safer
 alternative despite a losing predicted grade.
 
-Fixed in `runAdvisingCycle` (`advisingCycle.service.ts`): the scored pool
-is now filtered to drop any candidate with `expectedLetter === 'F'`
-*before* it's ever handed to `packPlan`, so it can't win a slot on any
-other factor. Scoped to the optional pool only — **not** the mandatory
-F-grade retakes (§5.2): those are compulsory to graduate regardless of
-this cycle's prediction, so there's nothing to "recommend" or withhold
-there, unlike a fresh/optional-retake pick the student has a real choice
-about. `bestCasePct >= expectedPct` was already a hard invariant elsewhere
-(`bestCaseProjection.ts` clamps it explicitly) — re-verified, not
-re-fixed, across the full roster below.
+**First fix attempt was incomplete** — worth recording, since it's the
+kind of gap easy to reintroduce: the filter was first added only inside
+`runAdvisingCycle` (`advisingCycle.service.ts`), which powers `/advise`
+and `/proposals/generate`. It re-verified as fixed at the time... except
+this app has a **second, independent planner** — `server.ts`'s
+`buildScoredPlan`, behind `/plan/fast` and `/plan/target` (the Course
+Plan page's "Fastest Graduation" and "Target CGPA Focus" tabs —
+**Fastest Graduation being the default tab**, the one an advisor actually
+lands on first) — that also calls `packPlan` directly, and never had the
+filter. The bug was reported fixed, then reported live again on the same
+student because the fix simply never reached the tab being tested.
+
+**Root-fixed** by moving the filter into `packPlan` itself
+(`planPacker.ts`) — the one function both planners already call — instead
+of duplicating it at each call site: any `pool` candidate with
+`expectedLetter === 'F'` is now excluded there, once, so neither planner
+(nor any future third one) can reintroduce this gap by forgetting to
+filter its own pool first. Scoped to the optional pool only — **not** the
+mandatory F-grade retakes (§5.2): those are compulsory to graduate
+regardless of this cycle's prediction, so there's nothing to "recommend"
+or withhold there, unlike a fresh/optional-retake pick the student has a
+real choice about. When excluding F candidates leaves the pool thin, the
+knapsack simply fills remaining capacity from whatever passing candidates
+are left — including other (non-F) optional retakes already mixed into
+the same pool by `buildCandidatePool` — per explicit request, never by
+falling back to a losing course. `bestCasePct >= expectedPct` was already
+a hard invariant elsewhere (`bestCaseProjection.ts` clamps it explicitly)
+— re-verified, not re-fixed, across the full roster below.
+
+The same audit pass that caught this also found two more real
+`blockIfDismissed` gaps, the same class of bug §19.1 already fixed 7
+instances of: `GET /students/:id/venture-gate` and
+`GET .../venture-interest-form` were never locked out for a dismissed
+student, unlike their own `POST` siblings right below them and unlike
+`venture-matches`/`friction-timeline` a few lines further down the same
+file — a dismissed student's Venture Board tab could still silently
+pre-fill from these two reads. Both now guarded.
+
+**Full-roster verification, this time actually covering every surface**:
+a live script hit all FOUR plan-producing endpoints (`/advise`,
+`/proposals/generate`, `/plan/fast`, `/plan/target`) plus every other
+safe per-student GET endpoint, for all 350 students. Zero F-predicted
+optional recommendations anywhere, zero 5xx errors, zero dismissal-lockout
+gaps — and the earlier curriculum-leak/missing-grade/bestCase/dismissal-
+status checks (§19.7) re-confirmed clean on the same pass.
 
 ### 19.7 Data integrity — dismissal status/counter sync ("phantom dismissed" students)
 
