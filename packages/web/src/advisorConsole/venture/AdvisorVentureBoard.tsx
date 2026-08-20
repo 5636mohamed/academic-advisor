@@ -26,6 +26,7 @@ import { Loading, ScoreRow, SearchBox } from '../../portal/ui/Primitives';
 import { IconLayers, IconPeople, IconPlus } from '../../portal/ui/Icons';
 import { ResearchDetails } from '../../portal/venture/VentureProjectCard';
 import { useAuth } from '../../auth/AuthContext';
+import { readFileAsDataUrl } from '../../lib/readFileAsDataUrl';
 
 /** Mirrors server.ts's isPendingCandidate (§16.2: a qualifying match only
  *  gets a real, actionable row once the student visits their own Venture
@@ -483,6 +484,7 @@ function GrantRequestPanel({ row, onChanged }: { row: AdvisorVentureProjectRowDT
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [timelineFile, setTimelineFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = row.project.grantRequest;
@@ -493,8 +495,9 @@ function GrantRequestPanel({ row, onChanged }: { row: AdvisorVentureProjectRowDT
     setBusy(true);
     setError(null);
     try {
-      await api.requestVentureGrant(row.project.professorId, row.project.id, n, note);
-      setAmount(''); setNote(''); setOpen(false);
+      const timelinePlan = timelineFile ? { fileName: timelineFile.name, dataUrl: await readFileAsDataUrl(timelineFile) } : undefined;
+      await api.requestVentureGrant(row.project.professorId, row.project.id, n, note, timelinePlan);
+      setAmount(''); setNote(''); setTimelineFile(null); setOpen(false);
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -507,6 +510,7 @@ function GrantRequestPanel({ row, onChanged }: { row: AdvisorVentureProjectRowDT
     return (
       <div className="su-note warn su-mt-16" style={{ fontSize: 12 }}>
         <div><b>Grant requested:</b> {request.amount.toLocaleString()} EGP{request.note ? ` — ${request.note}` : ''}</div>
+        {request.timelinePlanFileName && <div className="su-muted" style={{ marginTop: 2 }}>Timeline plan attached — {request.timelinePlanFileName}</div>}
         <div className="su-muted su-mt-16">Awaiting the Vice President's decision (Innovation Topography).</div>
       </div>
     );
@@ -525,6 +529,10 @@ function GrantRequestPanel({ row, onChanged }: { row: AdvisorVentureProjectRowDT
         <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
           <input className="su-input" style={{ maxWidth: 110 }} type="number" min={1} placeholder="Amount (EGP)" value={amount} onChange={e => setAmount(e.target.value)} />
           <input className="su-input" style={{ maxWidth: 200 }} placeholder="What it's for" value={note} onChange={e => setNote(e.target.value)} />
+          <label className="su-flex su-items-center su-gap-8" style={{ fontSize: 11.5 }} title="Optional — a PDF timeline plan for the funded work, reviewable by the VP inline">
+            <span className="su-muted">Timeline plan (PDF, optional):</span>
+            <input type="file" accept=".pdf" onChange={e => setTimelineFile(e.target.files?.[0] ?? null)} style={{ maxWidth: 170, fontSize: 12 }} />
+          </label>
           <button type="button" className="su-btn su-btn-sm" disabled={busy || !amount} onClick={submitRequest}>{busy ? 'Requesting…' : 'Send request'}</button>
           <button type="button" className="su-btn su-btn-sm su-btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
         </div>

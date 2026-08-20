@@ -1221,10 +1221,14 @@ app.put('/api/professors/:id/venture-projects/:projectId', (req, res) => {
 // regardless of the project's current isActive status (see
 // requestGrantForVentureProject's own doc comment). Notifies the VP.
 app.post('/api/professors/:id/venture-projects/:projectId/grant-request', (req, res) => {
-  const { amount, note } = req.body ?? {};
+  const { amount, note, timelinePlanFileName, timelinePlanDataUrl } = req.body ?? {};
   if (typeof amount !== 'number') return res.status(400).json({ error: 'expected { amount: number, note?: string }' });
   try {
-    res.json(db.requestGrantForVentureProject(paramStr(req, 'id'), paramStr(req, 'projectId'), amount, typeof note === 'string' ? note : ''));
+    res.json(db.requestGrantForVentureProject(
+      paramStr(req, 'id'), paramStr(req, 'projectId'), amount, typeof note === 'string' ? note : '',
+      typeof timelinePlanFileName === 'string' ? timelinePlanFileName : undefined,
+      typeof timelinePlanDataUrl === 'string' ? timelinePlanDataUrl : undefined
+    ));
   } catch (err) {
     const status = (err as { httpStatus?: number }).httpStatus ?? 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });

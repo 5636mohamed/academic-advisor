@@ -34,6 +34,17 @@ describe('requestGrantForVentureProject', () => {
     db.requestGrantForVentureProject('advisor-waleed', 'proj-lora', 5000, 'first ask');
     expect(() => db.requestGrantForVentureProject('advisor-waleed', 'proj-lora', 3000, 'second ask')).toThrow(/already pending/);
   });
+
+  it('accepts an optional timeline plan attachment and stores it on the request', () => {
+    const updated = db.requestGrantForVentureProject('advisor-waleed', 'proj-lora', 5000, 'ask', 'plan.pdf', 'data:application/pdf;base64,AAAA');
+    expect(updated.grantRequest).toMatchObject({ timelinePlanFileName: 'plan.pdf', timelinePlanDataUrl: 'data:application/pdf;base64,AAAA' });
+  });
+
+  it('real bug fixed: the VP notification links to Innovation Topography (where the decision UI actually lives), not Venture Board', () => {
+    db.requestGrantForVentureProject('advisor-waleed', 'proj-lora', 5000, 'ask');
+    const notif = db.listNotifications('vp', 'vp').find(n => n.type === 'grant_requested');
+    expect(notif?.link).toBe('innovation-topography');
+  });
 });
 
 describe('decideVentureGrantRequest', () => {
@@ -62,6 +73,20 @@ describe('decideVentureGrantRequest', () => {
     db.decideVentureGrantRequest('proj-lora', 'declined', 'not this time');
     const second = db.requestGrantForVentureProject('advisor-waleed', 'proj-lora', 3000, 'second, smaller ask');
     expect(second.grantRequest).toMatchObject({ amount: 3000, status: 'pending' });
+  });
+
+  it('real bug fixed: deciding a VP-owned project\'s own grant request notifies role vp (not the nonexistent role:advisor/recipientId:vp-owned pair), linking to Innovation Topography', () => {
+    const vpProject = db.createVentureProject({
+      professorId: 'vp-owned', title: 'VP Test Venture', description: 'desc', type: 'academic_research',
+      requiredCourseCodes: [], preferredSkills: [], capacity: 3, isActive: true,
+    });
+    db.requestGrantForVentureProject('vp-owned', vpProject.id, 5000, 'ask');
+    db.decideVentureGrantRequest(vpProject.id, 'approved');
+    const notif = db.listNotifications('vp', 'vp').find(n => n.type === 'grant_decided');
+    expect(notif).toBeTruthy();
+    expect(notif?.link).toBe('innovation-topography');
+    // and never orphaned under role:'advisor' — nothing polls that pair
+    expect(db.listNotifications('advisor', 'vp-owned').some(n => n.type === 'grant_decided')).toBe(false);
   });
 });
 

@@ -66,6 +66,13 @@ export interface VentureGrantRequest {
   status: 'pending' | 'approved' | 'declined';
   decidedAt?: string;
   decisionNote?: string;
+  /** Optional supporting timeline plan for the funded work — same "no file
+   *  storage/CDN in this demo" stand-in as StudentVentureMatch's cvDataUrl:
+   *  read client-side into a base64 data: URL and stored directly on the
+   *  request, so the VP can review it inline (no download) alongside the
+   *  amount/note when deciding. */
+  timelinePlanFileName?: string;
+  timelinePlanDataUrl?: string;
 }
 
 export interface StudentVentureMatch {

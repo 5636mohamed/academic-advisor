@@ -2219,7 +2219,14 @@ export function updateVentureProject(id: string, patch: Partial<Omit<VentureProj
  *  blocked while an earlier request on the SAME project is still
  *  'pending', so a new ask doesn't silently clobber one already awaiting
  *  a decision. */
-export function requestGrantForVentureProject(professorId: string, projectId: string, amount: number, note: string): VentureProject {
+export function requestGrantForVentureProject(
+  professorId: string,
+  projectId: string,
+  amount: number,
+  note: string,
+  timelinePlanFileName?: string,
+  timelinePlanDataUrl?: string
+): VentureProject {
   const idx = ventureProjects.findIndex(p => p.id === projectId);
   if (idx === -1) throw Object.assign(new Error(`no such venture project ${projectId}`), { httpStatus: 404 });
   const project = ventureProjects[idx];
@@ -2228,12 +2235,20 @@ export function requestGrantForVentureProject(professorId: string, projectId: st
   if (project.grantRequest?.status === 'pending') {
     throw Object.assign(new Error('a grant request for this project is already pending a decision'), { httpStatus: 400 });
   }
-  ventureProjects[idx] = { ...project, grantRequest: { amount, note, requestedAt: new Date().toISOString(), status: 'pending' } };
+  ventureProjects[idx] = {
+    ...project,
+    grantRequest: { amount, note, requestedAt: new Date().toISOString(), status: 'pending', timelinePlanFileName, timelinePlanDataUrl },
+  };
   const advisor = getAdvisor(professorId);
   createNotification(
     'vp', 'vp', 'grant_requested', 'New grant request',
     `${advisor?.name ?? 'An advisor'} requested ${amount.toLocaleString()} EGP for "${project.title}."`,
-    'venture-board'
+    // Real bug reported live: this pointed at Venture Board, but the VP's
+    // actual approve/decline UI for grant requests lives on Innovation
+    // Topography's "Venture Grant Requests" section (moved there earlier
+    // per explicit request) — clicking the notification dropped the VP
+    // somewhere they still had to navigate away from to act on it.
+    'innovation-topography'
   );
   return ventureProjects[idx];
 }
@@ -2258,8 +2273,13 @@ export function decideVentureGrantRequest(projectId: string, decision: 'approved
     ? `Your grant request for "${project.title}" was approved.`
     : `Your grant request for "${project.title}" was declined.${decisionNote ? ` Reason: ${decisionNote}` : ''}`;
   if (project.professorId === 'vp-owned') {
-    createNotification('vp', 'vp', 'grant_decided', decidedTitle, decidedBody, 'venture-board');
+    // Same link fix as the grant_requested notification above — this is
+    // the VP's own request being decided, so it belongs on Innovation
+    // Topography too, not Venture Board.
+    createNotification('vp', 'vp', 'grant_decided', decidedTitle, decidedBody, 'innovation-topography');
   } else {
+    // The advisor's own confirmation still belongs on Venture Board — that's
+    // where GrantRequestPanel shows their request's live status, unchanged.
     createNotification('advisor', project.professorId, 'grant_decided', decidedTitle, decidedBody, 'venture-board');
   }
   return ventureProjects[idx];

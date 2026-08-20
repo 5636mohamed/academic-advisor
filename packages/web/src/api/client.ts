@@ -251,6 +251,8 @@ export interface VentureGrantRequestDTO {
   status: 'pending' | 'approved' | 'declined';
   decidedAt?: string;
   decisionNote?: string;
+  timelinePlanFileName?: string;
+  timelinePlanDataUrl?: string;
 }
 
 export interface VentureMatchResultDTO {
@@ -523,9 +525,14 @@ export const api = {
   setVentureMatchStatus: (matchId: string, status: 'accepted' | 'declined') =>
     request<{ id: string; status: VentureMatchStatus }>(`/venture-matches/${matchId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   /** An advisor requesting funding on one of THEIR OWN ventures — allowed
-   *  regardless of the project's current active/archived status. */
-  requestVentureGrant: (professorId: string, projectId: string, amount: number, note: string) =>
-    request<VentureProjectDTO>(`/professors/${professorId}/venture-projects/${projectId}/grant-request`, { method: 'POST', body: JSON.stringify({ amount, note }) }),
+   *  regardless of the project's current active/archived status. `timelinePlan`
+   *  is optional (read client-side as a base64 data: URL, same pattern as
+   *  a student's CV attachment — see lib/readFileAsDataUrl.ts). */
+  requestVentureGrant: (professorId: string, projectId: string, amount: number, note: string, timelinePlan?: { fileName: string; dataUrl: string }) =>
+    request<VentureProjectDTO>(`/professors/${professorId}/venture-projects/${projectId}/grant-request`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, note, ...(timelinePlan ? { timelinePlanFileName: timelinePlan.fileName, timelinePlanDataUrl: timelinePlan.dataUrl } : {}) }),
+    }),
   decideVentureGrantRequest: (projectId: string, decision: 'approved' | 'declined', decisionNote?: string) =>
     request<VentureProjectDTO>(`/vp/venture-projects/${projectId}/grant-request/decide`, { method: 'POST', body: JSON.stringify({ decision, decisionNote }) }),
   /** Advisor console's own Venture Board — every project across every

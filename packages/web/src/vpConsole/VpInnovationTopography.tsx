@@ -4,6 +4,7 @@
 // here instead for a first cut so funding a project and seeing where it
 // sits on the topography aren't two separate navigations).
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
 import { api, ColliderProjectDTO, AdvisorDTO, AdvisorVentureProjectRowDTO } from '../api/client';
 import { TopographyCell } from '@advisor/shared';
@@ -121,6 +122,12 @@ function FundForm({ project, onFunded }: { project: ColliderProjectDTO; onFunded
 function VentureGrantRequestsSection({ advisors }: { advisors: AdvisorDTO[] }) {
   const [rows, setRows] = useState<AdvisorVentureProjectRowDTO[] | null>(null);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
+  // Per explicit request: a "review the timeline plan onsite, no download"
+  // reader for the grant request's optional PDF attachment — same pattern
+  // as AdvisorVentureBoard.tsx's CV reviewer modal (an <iframe> pointed at
+  // the data: URL, portalled to <body> so a `.su-pop` ancestor's transform
+  // can't shrink the fullscreen overlay down to the card's own size).
+  const [viewingPlanFor, setViewingPlanFor] = useState<AdvisorVentureProjectRowDTO | null>(null);
   const { show, node } = useToast();
 
   const load = () => {
@@ -171,15 +178,46 @@ function VentureGrantRequestsSection({ advisors }: { advisors: AdvisorDTO[] }) {
                   {r.project.grantRequest!.note && <span className="su-muted"> — {r.project.grantRequest!.note}</span>}
                 </div>
               </div>
-              <div className="su-flex su-gap-8 su-mt-16">
+              <div className="su-flex su-gap-8 su-mt-16" style={{ flexWrap: 'wrap' }}>
                 <button type="button" className="su-btn su-btn-sm" style={{ background: 'var(--su-good)' }} disabled={busyProjectId === r.project.id} onClick={() => decide(r.project.id, 'approved')}>Approve</button>
                 <button type="button" className="su-btn su-btn-sm su-btn-outline" disabled={busyProjectId === r.project.id} onClick={() => decide(r.project.id, 'declined')}>Decline</button>
+                {r.project.grantRequest!.timelinePlanDataUrl && (
+                  <button type="button" className="su-btn su-btn-sm su-btn-ghost" onClick={() => setViewingPlanFor(r)}>📄 View timeline plan</button>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
       {node}
+
+      {viewingPlanFor && viewingPlanFor.project.grantRequest?.timelinePlanDataUrl && createPortal(
+        <div className="su">
+          <div
+            className="su-modal-overlay"
+            role="dialog"
+            aria-label={`${viewingPlanFor.project.title}'s timeline plan`}
+            onMouseDown={e => e.target === e.currentTarget && setViewingPlanFor(null)}
+          >
+            <div className="su-modal su-modal-fullscreen su-pop">
+              <div className="su-card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div className="su-flex su-justify-between su-items-center" style={{ marginBottom: 10 }}>
+                  <div className="su-title" style={{ fontSize: 15 }}>
+                    {viewingPlanFor.project.title} — timeline plan{viewingPlanFor.project.grantRequest.timelinePlanFileName ? ` — ${viewingPlanFor.project.grantRequest.timelinePlanFileName}` : ''}
+                  </div>
+                  <button type="button" className="su-btn su-btn-sm su-btn-secondary" onClick={() => setViewingPlanFor(null)}>Close</button>
+                </div>
+                <iframe
+                  title={`${viewingPlanFor.project.title}'s timeline plan`}
+                  src={viewingPlanFor.project.grantRequest.timelinePlanDataUrl}
+                  style={{ flex: 1, width: '100%', border: '1px solid var(--su-border)', borderRadius: 8 }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </Section>
   );
 }
