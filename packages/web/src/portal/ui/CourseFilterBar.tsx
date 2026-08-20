@@ -39,10 +39,19 @@ const CATEGORY_LABEL: Record<string, string> = {
   special: 'Special',
 };
 
+// `departments`/`category`/`isBasicScience` are defensively treated as
+// possibly-missing here (`?? []` / `?? false`) even though the shared
+// CategoryFilterable type declares them required — a real live production
+// crash caught right after shipping: GitHub Pages and Railway deploy
+// independently and NOT atomically (Pages redeploys in ~30s, Railway can
+// lag several minutes), so a client already on the new frontend can hit
+// the still-old API mid-deploy, whose responses don't have these fields
+// yet. Degrading to "no department/category info yet" instead of throwing
+// is the right behavior for that window regardless of how long it lasts.
 export function filterCourses<T extends CategoryFilterable>(courses: T[], filter: CourseFilterValue): T[] {
   return courses.filter(c => {
-    if (filter.department !== 'all' && !c.departments.includes(filter.department)) return false;
-    if (filter.category === 'basic_science') return c.isBasicScience;
+    if (filter.department !== 'all' && !(c.departments ?? []).includes(filter.department)) return false;
+    if (filter.category === 'basic_science') return c.isBasicScience ?? false;
     if (filter.category !== 'all' && c.category !== filter.category) return false;
     return true;
   });
@@ -61,8 +70,8 @@ export function CourseFilterBar({
    *  the department dropdown would only ever have one option there. */
   showDepartment?: boolean;
 }) {
-  const departments = useMemo(() => [...new Set(courses.flatMap(c => c.departments))].sort(), [courses]);
-  const categories = useMemo(() => [...new Set(courses.map(c => c.category))].sort(), [courses]);
+  const departments = useMemo(() => [...new Set(courses.flatMap(c => c.departments ?? []))].sort(), [courses]);
+  const categories = useMemo(() => [...new Set(courses.map(c => c.category).filter((c): c is string => !!c))].sort(), [courses]);
   const hasBasicScience = useMemo(() => courses.some(c => c.isBasicScience), [courses]);
   const isFiltered = value.department !== 'all' || value.category !== 'all';
 
