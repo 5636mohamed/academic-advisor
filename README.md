@@ -149,6 +149,23 @@ probation/dismissal, retake gate, department/faculty fit, transfer
 execution, the full advisor/student frontend, best-case grading, and real
 student/advisor/Vice-President access separation):
 
+- **Curriculum Analytics (v1.2.0)** — three new department/VP-facing
+  modules, all reasoning over real historical enrollment and prerequisite
+  data (see `docs/CURRICULUM_ANALYTICS_BLUEPRINT.md`): **Academic Resource
+  Demand Forecasting** projects next-term enrollment per course
+  (recency-weighted regression, the same primitive grade/CGPA trend
+  already uses) and rolls it up per department, with a derived
+  sections/seats/instructor-load estimate honestly labeled as such;
+  **Curriculum Health Monitor** scores every course 0-100 from its real
+  failure rate, downstream prerequisite-chain impact, current demand
+  pressure, and expected graduation delay; **Course Bottleneck &
+  Dependency Analyzer** ranks every course institution-wide by expected
+  cascading-delay impact and shows exactly which other courses it directly
+  blocks, plus — the one feature scoped to advisors, not just departments
+  — which of an advisor's own advisees are genuinely affected by a real
+  bottleneck right now. All three share one new risk-scoring primitive
+  (`courseRiskScore.service.ts`) rather than duplicating the math, and
+  ship with their own advisor/VP page pairs and nav tabs.
 - **§17 Multi-advisor model & Vice President oversight** — a single shared
   advisor account became 14 real advisor identities, each with their own
   25-student roster — a real, deterministic random mix across all 10
