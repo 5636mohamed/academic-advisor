@@ -92,7 +92,7 @@ export function AdvisorLayout() {
                 aria-label="Log out"
                 title="Log out"
                 onClick={() => {
-                  logout();
+                  void logout(); // fire-and-forget — navigation shouldn't wait on the server round-trip
                   navigate('/login');
                 }}
               >

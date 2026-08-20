@@ -1,46 +1,32 @@
-// Redesigned to match /login.pdf — a real (if still demo-only: client-side,
-// no server session) email + password gate instead of the old "pick your
-// identity from a list of buttons" picker. See auth/credentials.ts for how
-// email/password map to a role, and docs/LOGIN_CREDENTIALS.md for the full
-// human-readable roster (every student/advisor's email is derived straight
-// from their real seeded NAME — firstname.lastname@aegis.edu.eg — never a
-// second hardcoded list).
-import { FormEvent, useEffect, useState } from 'react';
+// Redesigned to match /login.pdf — email + password gate. Real backend
+// authentication epic: this now calls POST /api/auth/login for real
+// server-side verification (api/client.ts) instead of the old client-only
+// check (fetch the full roster unauthenticated, compare the typed
+// password against a shared constant in the browser). The roster
+// pre-fetch this used to do is gone entirely — the backend does the
+// email->identity match itself now, so there's nothing to load before a
+// submit can be attempted. See docs/LOGIN_CREDENTIALS.md for the full
+// human-readable demo roster (every student/advisor's email is still
+// derived from their real seeded NAME — firstname.lastname@aegis.edu.eg).
+import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { useTheme } from '../../theme/ThemeContext';
-import { api, AdvisorDTO, StudentSummary } from '../../api/client';
-import { ADVISOR_PASSWORD, STUDENT_PASSWORD, VP_EMAIL, VP_PASSWORD, advisorEmailFor, studentEmailFor } from '../../auth/credentials';
+import { api } from '../../api/client';
 import { IconMoon, IconSun } from '../../portal/ui/Icons';
 import { BrandMark } from '../../portal/ui/BrandMark';
 import { Typewriter } from '../../components/Typewriter';
 import '../../portal/student-theme.css';
 
 export function Login() {
-  const { loginAsAdvisor, loginAsStudent, loginAsVicePresident } = useAuth();
+  const { applyLoginResult } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const [students, setStudents] = useState<StudentSummary[] | null>(null);
-  const [advisors, setAdvisors] = useState<AdvisorDTO[] | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showForgot, setShowForgot] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    api.listStudents().then(setStudents);
-    api.advisors().then(setAdvisors);
-  }, []);
-
-  // Real race condition found by audit: students/advisors start `null` and
-  // load asynchronously, but nothing blocked submitting before they
-  // resolved — a fast submit (autofill+autosubmit, a quick typist on a
-  // slow connection) would evaluate `advisors?.find(...)`/`students?.find(...)`
-  // against `null`, so even fully correct credentials fell straight
-  // through to "No account found" instead of the retry that would have
-  // succeeded a moment later.
-  const rosterLoaded = students !== null && advisors !== null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,32 +36,20 @@ export function Login() {
       setError('Enter both your email and password.');
       return;
     }
-    if (!rosterLoaded) {
-      setError('Still loading — try again in a moment.');
-      return;
-    }
     setSubmitting(true);
     try {
-      if (typedEmail === VP_EMAIL && password === VP_PASSWORD) {
-        loginAsVicePresident();
-        navigate('/vp');
-        return;
-      }
-      const advisor = advisors?.find(a => advisorEmailFor(a.name) === typedEmail);
-      if (advisor) {
-        if (password !== ADVISOR_PASSWORD) return setError('Incorrect password.');
-        loginAsAdvisor(advisor.id);
-        navigate('/');
-        return;
-      }
-      const student = students?.find(s => studentEmailFor(s.name) === typedEmail);
-      if (student) {
-        if (password !== STUDENT_PASSWORD) return setError('Incorrect password.');
-        loginAsStudent(student.id);
-        navigate(`/portal/${student.id}`);
-        return;
-      }
-      setError('No account found for that email. See docs/LOGIN_CREDENTIALS.md for the demo roster.');
+      const result = await api.login(typedEmail, password);
+      applyLoginResult(result);
+      if (result.role === 'vice_president') navigate('/vp');
+      else if (result.role === 'advisor') navigate('/');
+      else navigate(`/portal/${result.id}`);
+    } catch {
+      // api.login's request() throws with the server's own message
+      // ("Invalid email or password") for any failure — kept generic here
+      // too (not "wrong password" vs "no such user") for the same reason
+      // the server route itself returns one generic message: avoiding
+      // user-enumeration via distinct error text.
+      setError('No account found for that email/password. See docs/LOGIN_CREDENTIALS.md for the demo roster.');
     } finally {
       setSubmitting(false);
     }
@@ -137,8 +111,8 @@ export function Login() {
                 )}
                 {error && <div className="su-note danger su-mt-16" style={{ marginTop: 14 }}>{error}</div>}
 
-                <button type="submit" className="su-btn su-btn-block su-login-submit" disabled={submitting || !rosterLoaded}>
-                  {submitting ? 'Signing in…' : !rosterLoaded ? 'Loading…' : 'Sign In to Advising Portal'}
+                <button type="submit" className="su-btn su-btn-block su-login-submit" disabled={submitting}>
+                  {submitting ? 'Signing in…' : 'Sign In to Advising Portal'}
                 </button>
               </form>
 

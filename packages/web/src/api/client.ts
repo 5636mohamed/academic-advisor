@@ -12,15 +12,55 @@ import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounter
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
+// Real backend authentication epic — every request now carries the
+// logged-in session's token, same "module-level mutable set by
+// AuthContext" pattern as this file already needed for the token itself
+// (no way to thread it through 100+ individual api.* call sites without
+// touching every one of them). AuthContext.tsx calls setAuthToken() on
+// login/logout/mount-from-localStorage; nothing else in this file needs
+// to know a token exists.
+let authToken: string | null = null;
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+
+// A 401 means the session is gone (logged out elsewhere, expired, or —
+// per this app's own in-memory store — a server restart wiped it, same
+// as every other in-memory collection resetting on redeploy). Rather
+// than let every single api.* caller handle that individually, one
+// registered callback (AuthContext, on mount) clears the local session —
+// the existing RequireRole route guards then redirect to /login on the
+// next render, no new navigation code needed.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}/api${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> | undefined) };
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  const res = await fetch(`${API_BASE_URL}/api${path}`, { ...init, headers });
+  // A 401 means the session is gone (expired, logged out elsewhere, or —
+  // per this app's own in-memory store — wiped by a server restart, same
+  // as every other in-memory collection resetting on redeploy).
+  // onUnauthorized clears the local session; the existing RequireRole
+  // route guards then redirect to /login on the next render. Still
+  // THROWS below like any other non-ok response, deliberately — an
+  // earlier version of this tried resolving `undefined` here instead to
+  // quiet the console during that redirect, but that's the same real bug
+  // class already caught once this session (a component assuming a
+  // response shape it never actually got — `undefined.length`-style
+  // crashes) traded for a smaller cosmetic one. A handful of "401" console
+  // entries during the brief transition to /login is normal and expected;
+  // silently handing back the wrong data shape to whichever component
+  // hasn't unmounted yet is not.
+  if (res.status === 401) onUnauthorized?.();
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `${res.status} ${res.statusText}`);
   }
+  // 204 No Content (currently only POST /auth/logout) has no body to parse.
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
@@ -398,7 +438,18 @@ export interface AdvisorVentureProjectRowDTO {
   pendingCount: number;
 }
 
+export interface LoginResponseDTO {
+  token: string;
+  role: 'student' | 'advisor' | 'vice_president';
+  id: string | null;
+}
+
 export const api = {
+  // Real backend authentication epic — replaces the old client-only demo
+  // login. No Authorization header is attached here (there's no token
+  // yet) — request() only adds one once authToken is set.
+  login: (email: string, password: string) => request<LoginResponseDTO>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
   listStudents: (advisorId?: string) => request<StudentSummary[]>(`/students${advisorId ? `?advisorId=${encodeURIComponent(advisorId)}` : ''}`),
   getStudent: (id: string) => request<StudentDetail>(`/students/${id}`),
   getEligibleCourses: (id: string) => request<EligibleCourseDTO[]>(`/students/${id}/eligible-courses`),
