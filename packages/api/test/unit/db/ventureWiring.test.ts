@@ -177,6 +177,25 @@ describe('product-owner follow-up — expressing interest regardless of match sc
     expect(applied.id).toBe(card!.matchId);
   });
 
+  it('applying to an already-"suggested" match notifies the owning advisor — real gap: this is the COMMON case (Mohamed/Ahmed\'s actual demo path per §16.5) and used to only notify on a brand-new match, never this one', () => {
+    const card = db.getTopVentureCardMatch('ahmed-1');
+    expect(card).not.toBeNull();
+    const project = db.getVentureProject(card!.project.id)!;
+    const applied = db.applyToVentureProject('ahmed-1', card!.project.id);
+    expect(applied.status).toBe('applied');
+    const notifs = db.listNotifications('advisor', project.professorId);
+    expect(notifs.some(n => n.type === 'venture_new_candidate')).toBe(true);
+  });
+
+  it('a repeat call (e.g. just attaching a CV afterward) does not spam a duplicate notification', () => {
+    const card = db.getTopVentureCardMatch('ahmed-1');
+    const project = db.getVentureProject(card!.project.id)!;
+    db.applyToVentureProject('ahmed-1', card!.project.id);
+    db.applyToVentureProject('ahmed-1', card!.project.id, { fileName: 'cv.pdf', dataUrl: 'data:text/plain;base64,eA==' });
+    const notifs = db.listNotifications('advisor', project.professorId).filter(n => n.type === 'venture_new_candidate');
+    expect(notifs).toHaveLength(1);
+  });
+
   it('throws for a nonexistent project', () => {
     expect(() => db.applyToVentureProject('mona-2', 'proj-does-not-exist')).toThrow();
   });

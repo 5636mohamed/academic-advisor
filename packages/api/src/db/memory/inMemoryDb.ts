@@ -2116,7 +2116,21 @@ export function applyToVentureProject(studentId: string, projectId: string, cv?:
 
   const idx = student.ventureMatches.findIndex(m => m.ventureProjectId === projectId);
   if (idx !== -1) {
+    // Real gap reported live, and the COMMON case (per §16.5's demo
+    // fixture note — this is Mohamed's and Ahmed's actual path, both
+    // pre-seeded with an already-`suggested` match): applyToMatch only
+    // transitions `suggested` -> `applied`; a repeat call (e.g. just
+    // attaching/replacing a CV afterward) is a no-op on status. Only
+    // notify on the genuine transition, not every repeat call.
+    const wasSuggested = student.ventureMatches[idx].status === 'suggested';
     student.ventureMatches[idx] = applyToMatch(student.ventureMatches[idx], cv);
+    if (wasSuggested && student.ventureMatches[idx].status === 'applied') {
+      if (getAdvisor(project.professorId)) {
+        createNotification('advisor', project.professorId, 'venture_new_candidate', 'New venture applicant', `${student.name} applied to "${project.title}."`, 'venture-board');
+      } else if (project.professorId === 'vp-owned') {
+        createNotification('vp', 'vp', 'venture_new_candidate', 'New venture applicant', `${student.name} applied to "${project.title}."`, 'venture-board');
+      }
+    }
     return student.ventureMatches[idx];
   }
 

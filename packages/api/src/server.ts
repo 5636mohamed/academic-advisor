@@ -201,11 +201,12 @@ app.get('/api/students/:id/curriculum', (req, res) => {
 // ---------------------------------------------------------------------
 // §5 retake gate
 // ---------------------------------------------------------------------
-app.post('/api/students/:id/retake-preference', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.post('/api/students/:id/retake-preference', blockIfDismissed, (req, res) => {
+  const id = paramStr(req, 'id');
+  if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   const { considerRetakes } = req.body ?? {};
   if (typeof considerRetakes !== 'boolean') return res.status(400).json({ error: 'expected { considerRetakes: boolean }' });
-  db.setRetakePreference(req.params.id, considerRetakes);
+  db.setRetakePreference(id, considerRetakes);
   res.json({ ok: true, considerRetakes });
 });
 
@@ -226,11 +227,12 @@ app.post('/api/students/:id/enroll', blockIfDismissed, (req, res) => {
   }
 });
 
-app.post('/api/students/:id/quiz', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.post('/api/students/:id/quiz', blockIfDismissed, (req, res) => {
+  const id = paramStr(req, 'id');
+  if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   const answers = req.body ?? {};
-  db.setQuizAnswers(req.params.id, answers);
-  res.json({ ok: true, quizAnswers: db.getStudent(req.params.id)?.quizAnswers });
+  db.setQuizAnswers(id, answers);
+  res.json({ ok: true, quizAnswers: db.getStudent(id)?.quizAnswers });
 });
 
 // ---------------------------------------------------------------------
@@ -583,13 +585,14 @@ function proposalsWithImpact(studentId: string) {
   return { proposals, ...impact };
 }
 
-app.post('/api/students/:id/proposals/generate', async (req, res) => {
-  const student = toStudentWithCgpa(req.params.id);
+app.post('/api/students/:id/proposals/generate', blockIfDismissed, async (req, res) => {
+  const id = paramStr(req, 'id');
+  const student = toStudentWithCgpa(id);
   if (!student) return res.status(404).json({ error: 'student not found' });
   try {
     const result = await runAdvisingCycle(student, ports); // §4.2/§8, unchanged
-    db.addProposalsFromPlan(req.params.id, result.plan);
-    res.json(proposalsWithImpact(req.params.id));
+    db.addProposalsFromPlan(id, result.plan);
+    res.json(proposalsWithImpact(id));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -615,7 +618,7 @@ app.post('/api/advisor/students/:id/proposals/approve-all', (req, res) => {
   if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
   try {
     db.approveAllPendingSystemProposals(req.params.id);
-    res.json(proposalsWithImpact(req.params.id));
+    res.json(proposalsWithImpact(paramStr(req, 'id')));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -684,10 +687,11 @@ app.post('/api/advisor/students/:id/proposals/:slotKey/alternate', async (req, r
 });
 
 // §15.3.2 step 3 — student picks one option for a slot.
-app.post('/api/students/:id/proposals/:proposalId/choose', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.post('/api/students/:id/proposals/:proposalId/choose', blockIfDismissed, (req, res) => {
+  const id = paramStr(req, 'id');
+  if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   try {
-    const result = db.chooseProposalById(req.params.id, req.params.proposalId);
+    const result = db.chooseProposalById(id, paramStr(req, 'proposalId'));
     res.json(result);
   } catch (err) {
     res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
@@ -697,11 +701,12 @@ app.post('/api/students/:id/proposals/:proposalId/choose', (req, res) => {
 // "Choose all" — the student's own bulk action (see chooseAllReadyProposals's
 // doc comment). Returns the same shape GET/generate use, plus the slots that
 // still need advisor review, so the client can render one consolidated note.
-app.post('/api/students/:id/proposals/choose-all', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.post('/api/students/:id/proposals/choose-all', blockIfDismissed, (req, res) => {
+  const id = paramStr(req, 'id');
+  if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   try {
-    const { stillPendingSlots } = db.chooseAllReadyProposals(req.params.id);
-    res.json({ ...proposalsWithImpact(req.params.id), stillPendingSlots });
+    const { stillPendingSlots } = db.chooseAllReadyProposals(id);
+    res.json({ ...proposalsWithImpact(id), stillPendingSlots });
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -742,23 +747,25 @@ app.get('/api/students/:id/venture-interest-form', (req, res) => {
   res.json({ answers: db.getVentureInterestAnswers(req.params.id) });
 });
 
-app.post('/api/students/:id/venture-gate', (req, res) => {
-  const student = db.getStudent(req.params.id);
+app.post('/api/students/:id/venture-gate', blockIfDismissed, (req, res) => {
+  const id = paramStr(req, 'id');
+  const student = db.getStudent(id);
   if (!student) return res.status(404).json({ error: 'student not found' });
   const { interested } = req.body ?? {};
   if (typeof interested !== 'boolean') return res.status(400).json({ error: 'expected { interested: boolean }' });
   if (student.level < weights.ventureFit.minLevel) {
     return res.status(403).json({ error: `Venture Gate is only asked of Level ${weights.ventureFit.minLevel}+ students (§16.1)` });
   }
-  db.setVentureGateAnswer(req.params.id, interested);
+  db.setVentureGateAnswer(id, interested);
   res.json({ ok: true, interested });
 });
 
-app.post('/api/students/:id/venture-interest-form', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
+app.post('/api/students/:id/venture-interest-form', blockIfDismissed, (req, res) => {
+  const id = paramStr(req, 'id');
+  if (!db.getStudent(id)) return res.status(404).json({ error: 'student not found' });
   const answers = req.body ?? {};
-  db.setVentureInterestAnswers(req.params.id, answers);
-  res.json({ ok: true, answers: db.getVentureInterestAnswers(req.params.id) });
+  db.setVentureInterestAnswers(id, answers);
+  res.json({ ok: true, answers: db.getVentureInterestAnswers(id) });
 });
 
 // The Faculty Console/Venture Board both need to show which professor
