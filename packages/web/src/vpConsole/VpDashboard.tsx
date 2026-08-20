@@ -147,7 +147,7 @@ export function VpDashboard() {
         }
       >
         <div className="su-subtitle" style={{ marginBottom: 12 }}>
-          Every student's still-pending system recommendation, across all 5 advisors — approve directly here even if
+          Every student's still-pending system recommendation, across every advisor — approve directly here even if
           the student's own advisor hasn't reviewed it yet.
         </div>
         {pending.length === 0 ? (

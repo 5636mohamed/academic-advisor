@@ -52,7 +52,7 @@ export function VpTransferRequests() {
     <div className="su-fade">
       <div className="su-title" style={{ fontSize: 22, marginBottom: 4 }}>Transfer Requests</div>
       <div className="su-subtitle" style={{ marginBottom: 18 }}>
-        Every transfer request across all 5 advisors, from submission through final decision. Only advisor-approved
+        Every transfer request across every advisor, from submission through final decision. Only advisor-approved
         requests need your action — approving is what actually executes the transfer, visible to both the student
         and their advisor.
       </div>
