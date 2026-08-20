@@ -19,6 +19,7 @@ import { AdvisorVentureBoard } from '../advisorConsole/venture/AdvisorVentureBoa
 import { AdvisorTransferRequests } from '../advisorConsole/AdvisorTransferRequests';
 import { AdvisorFrictionOverview } from '../advisorConsole/AdvisorFrictionOverview';
 import { AdvisorColliderBoard } from '../advisorConsole/AdvisorColliderBoard';
+import { AdvisorDemandForecast } from '../advisorConsole/AdvisorDemandForecast';
 import { VpLayout } from '../vpConsole/VpLayout';
 import { VpDashboard } from '../vpConsole/VpDashboard';
 import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
@@ -26,6 +27,7 @@ import { VpTransferRequests } from '../vpConsole/VpTransferRequests';
 import { VpVentureBoard } from '../vpConsole/VpVentureBoard';
 import { VpInnovationTopography } from '../vpConsole/VpInnovationTopography';
 import { VpInstitutionalFrictionDashboard } from '../vpConsole/VpInstitutionalFrictionDashboard';
+import { VpDemandForecast } from '../vpConsole/VpDemandForecast';
 import { RequireAdvisor, RequireStudent, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -71,6 +73,7 @@ export const router = createBrowserRouter([
           { path: 'transfer-requests', element: <AdvisorTransferRequests /> },
           { path: 'workload-overview', element: <AdvisorFrictionOverview /> },
           { path: 'collider-board', element: <AdvisorColliderBoard /> },
+          { path: 'demand-forecast', element: <AdvisorDemandForecast /> },
           { path: 'advisor-console', element: <Navigate to="/students" replace /> },
         ],
       },
@@ -119,6 +122,7 @@ export const router = createBrowserRouter([
           { path: 'venture-board', element: <VpVentureBoard /> },
           { path: 'innovation-topography', element: <VpInnovationTopography /> },
           { path: 'institutional-friction', element: <VpInstitutionalFrictionDashboard /> },
+          { path: 'demand-forecast', element: <VpDemandForecast /> },
         ],
       },
     ],

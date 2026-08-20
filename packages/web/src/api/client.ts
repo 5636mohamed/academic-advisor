@@ -8,7 +8,7 @@
 // var; the API itself needs CORS enabled for the Pages origin). Deliberately
 // plain fetch + small helpers rather than a data-fetching library — keeps
 // the surface easy to read alongside the routes it calls.
-import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation, ColdStartAssessment } from '@advisor/shared';
+import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation, ColdStartAssessment, DepartmentDemandForecast } from '@advisor/shared';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -564,6 +564,12 @@ export const api = {
     }),
   advisorFrictionOverview: (advisorId: string) => request<FrictionOverviewRowDTO[]>(`/advisors/${advisorId}/friction-overview`),
   vpInstitutionalBottlenecks: () => request<InstitutionalFrictionCell[]>('/vp/friction/institutional-bottlenecks'),
+
+  // Curriculum Analytics epic — Academic Resource Demand Forecasting
+  // (Department, VP). Advisor-scoped = that advisor's own HOME department,
+  // not their roster — see server.ts's own route comment for why.
+  vpDemandForecast: () => request<DepartmentDemandForecast[]>('/vp/curriculum-analytics/demand-forecast'),
+  advisorDemandForecast: (advisorId: string) => request<DepartmentDemandForecast>(`/advisors/${advisorId}/curriculum-analytics/demand-forecast`),
 
   // AI Features Blueprint — Project Collider (advisor/VP-facing only)
   advisorColliderProjects: (advisorId: string) => request<ColliderProjectDTO[]>(`/advisors/${advisorId}/collider/projects`),

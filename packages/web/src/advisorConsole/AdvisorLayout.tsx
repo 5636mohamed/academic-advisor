@@ -57,6 +57,7 @@ export function AdvisorLayout() {
     { to: '/transfer-requests', label: 'Transfer requests' },
     { to: '/workload-overview', label: 'Workload' },
     { to: '/collider-board', label: 'Collider board' },
+    { to: '/demand-forecast', label: 'Demand forecast' },
   ];
 
   return (

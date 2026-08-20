@@ -21,7 +21,8 @@ import { onFirstSemesterClose } from './modules/probation/firstSemesterRule.serv
 import { projectCGPATrend } from './modules/prediction/cgpaTrendProjection';
 import { deriveCgpaTrend } from './modules/grading/cgpa';
 import { chainUnlockValue, clearChainUnlockCache } from './modules/prediction/chainUnlockValue';
-import { CATALOG, CATALOG_BY_CODE } from './db/seed/seedCatalog';
+import { CATALOG, CATALOG_BY_CODE, CATALOG_BY_DEPARTMENT } from './db/seed/seedCatalog';
+import { OFFERINGS_BY_COURSE } from './db/seed/seedCourseOfferings';
 import { buildCandidatePool } from './modules/retakeGate/retakePreference.service';
 import { packPlan, PackPlanResult } from './modules/prediction/planPacker';
 import { DEPARTMENTS, OTHER_FACULTY_DEPARTMENTS, FACULTIES, QUIZ } from './modules/fitEngine/deptFitEngine';
@@ -38,6 +39,7 @@ import { computeInstitutionalBottlenecks, StudentForBottleneck } from './modules
 import { matchOpportunitiesForProject } from './modules/collider/colliderOpportunityMatch.service';
 import { getAllOpportunities } from './modules/collider/externalOpportunitiesLive.service';
 import { buildTopography } from './modules/collider/innovationTopography.service';
+import { forecastDepartmentDemand, forecastAllDepartments } from './modules/curriculumAnalytics/resourceForecast.service';
 import { MILESTONES_BY_COURSE, SYLLABUS_MILESTONES, SEMESTER_WEEKS } from './db/seed/seedSyllabusMilestones';
 import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
 
@@ -1044,6 +1046,28 @@ app.get('/api/vp/friction/institutional-bottlenecks', (_req, res) => {
     transcript: Object.values(db.getTranscript(s.id)).map(r => ({ courseCode: r.courseCode, semesterOrdinal: r.semesterOrdinal })),
   }));
   res.json(computeInstitutionalBottlenecks(studentsData, MILESTONES_BY_COURSE, courseCreditsFor));
+});
+
+// ---------------------------------------------------------------------
+// Curriculum Analytics epic — Academic Resource Demand Forecasting.
+// See docs/CURRICULUM_ANALYTICS_BLUEPRINT.md. Same VP-wide/Advisor-scoped
+// route-pair pattern as friction/collider above: the VP route pulls every
+// real department (CATALOG_BY_DEPARTMENT, unfiltered); the Advisor route
+// 404s on an unknown advisor and scopes to that advisor's own HOME
+// department (not their 25-student roster — this is a department-level
+// diagnostic view, a deliberately wider scope than the Advisor's other,
+// roster-scoped pages).
+// ---------------------------------------------------------------------
+app.get('/api/vp/curriculum-analytics/demand-forecast', (_req, res) => {
+  res.json(forecastAllDepartments(CATALOG_BY_DEPARTMENT, OFFERINGS_BY_COURSE));
+});
+
+app.get('/api/advisors/:advisorId/curriculum-analytics/demand-forecast', (req, res) => {
+  const advisorId = paramStr(req, 'advisorId');
+  const advisor = db.getAdvisor(advisorId);
+  if (!advisor) return res.status(404).json({ error: 'advisor not found' });
+  const departmentCatalog = CATALOG_BY_DEPARTMENT[advisor.departmentId] ?? [];
+  res.json(forecastDepartmentDemand(advisor.departmentId, departmentCatalog, OFFERINGS_BY_COURSE));
 });
 
 // ---------------------------------------------------------------------

@@ -26,6 +26,7 @@ export function VpLayout() {
     { to: '/vp/venture-board', label: 'Venture board' },
     { to: '/vp/innovation-topography', label: 'Innovation topography' },
     { to: '/vp/institutional-friction', label: 'Institutional friction' },
+    { to: '/vp/demand-forecast', label: 'Demand forecast' },
   ];
 
   return (
