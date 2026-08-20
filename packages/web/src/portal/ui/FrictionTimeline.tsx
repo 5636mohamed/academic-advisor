@@ -57,6 +57,136 @@ function originalWeekOf(milestoneId: string): number {
   return Number(milestoneId.split('::')[1]);
 }
 
+type FrictionReading = FrictionTimelineDTO['readings'][number];
+type ContributingMilestone = FrictionReading['contributingMilestones'][number];
+
+/** One task row — the checkbox + move-buttons markup, shared by both the
+ *  single-list and two-column layouts below so there's only one place that
+ *  actually renders a task. */
+function TaskItem({
+  m, weekNumber, interactive, busyId, onToggle, onMove,
+}: {
+  m: ContributingMilestone;
+  weekNumber: number;
+  interactive: boolean;
+  busyId: string | null;
+  onToggle: (milestoneId: string) => void;
+  onMove: (milestoneId: string, newWeek: number) => void;
+}) {
+  const originalWeek = originalWeekOf(m.id);
+  const wasMoved = originalWeek !== weekNumber;
+  const movable = MOVABLE_TYPES.includes(m.type) && !m.done;
+  const maxReachable = Math.min(originalWeek + MAX_MOVE_WEEKS, SEMESTER_WEEKS);
+  return (
+    <div>
+      <label className="su-flex su-gap-10 su-items-center" style={{ cursor: interactive ? 'pointer' : 'default', opacity: m.done ? 0.6 : 1 }}>
+        <input type="checkbox" checked={m.done} disabled={!interactive || busyId === m.id} onChange={() => onToggle(m.id)} />
+        <span style={{ flex: 1 }}>
+          <span style={{ textDecoration: m.done ? 'line-through' : 'none' }}>{m.title}</span>
+          <span className="su-muted" style={{ marginLeft: 6, fontSize: 11.5 }}>
+            {m.courseCode} · {TYPE_LABEL[m.type] ?? m.type}{wasMoved && ` · moved from Week ${originalWeek}`}
+          </span>
+        </span>
+      </label>
+      {interactive && movable && (
+        <div className="su-flex su-gap-6" style={{ marginLeft: 28, marginTop: 4 }}>
+          {Array.from({ length: MAX_MOVE_WEEKS }, (_, i) => originalWeek + i + 1)
+            .filter(w => w <= maxReachable && w !== weekNumber)
+            .map(w => (
+              <button
+                key={w} type="button" className="su-btn su-btn-secondary" style={{ fontSize: 11, padding: '4px 9px' }}
+                disabled={busyId === m.id}
+                onClick={() => onMove(m.id, w)}
+              >
+                Move to Week {w}
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A heavy/burnout week's task window splits into two columns — one for
+ *  tasks with a real, fixed institutional date (exams, midterms, finals,
+ *  project deadlines — never movable, per MOVABLE_TYPES) and one for the
+ *  tasks that actually CAN be eased by moving them (assignments, quizzes,
+ *  lab reports) — so a student staring down a long, heavy list can see at
+ *  a glance which items are genuinely fixed vs. which ones are worth
+ *  considering moving. A lighter week (not burnout, or few enough tasks
+ *  that there's nothing to triage) stays the simpler single flat list —
+ *  splitting a 1-2-task week into two mostly-empty columns would just add
+ *  visual noise for no real benefit. */
+/** A week counts as "heavy" for the two-column split (and the wider modal
+ *  it needs) once it's flagged burnout-risk or has enough tasks that
+ *  triaging fixed-vs-movable is actually useful — exported so
+ *  FrictionTimeline can pick the right modal width with the exact same
+ *  rule TaskList uses to decide its own layout, rather than a second,
+ *  possibly-drifting copy of the threshold. */
+export function isHeavyWeek(reading: FrictionReading): boolean {
+  const HEAVY_TASK_COUNT = 5;
+  return reading.burnoutRisk || reading.contributingMilestones.length >= HEAVY_TASK_COUNT;
+}
+
+function TaskList({
+  reading, interactive, busyId, onToggle, onMove,
+}: {
+  reading: FrictionReading;
+  interactive: boolean;
+  busyId: string | null;
+  onToggle: (milestoneId: string) => void;
+  onMove: (milestoneId: string, newWeek: number) => void;
+}) {
+  const milestones = reading.contributingMilestones;
+
+  if (!isHeavyWeek(reading)) {
+    return (
+      <div className="su-flex" style={{ flexDirection: 'column', gap: 10, marginTop: 14 }}>
+        {milestones.map(m => (
+          <TaskItem key={m.id} m={m} weekNumber={reading.weekNumber} interactive={interactive} busyId={busyId} onToggle={onToggle} onMove={onMove} />
+        ))}
+      </div>
+    );
+  }
+
+  const fixed = milestones.filter(m => !MOVABLE_TYPES.includes(m.type));
+  const movable = milestones.filter(m => MOVABLE_TYPES.includes(m.type));
+
+  return (
+    <div className="su-mt-16">
+      <div className="su-note warn" style={{ marginBottom: 12, fontSize: 12 }}>
+        A heavy week — split below so it's easier to see what's genuinely fixed vs. worth moving.
+      </div>
+      <div className="su-flex su-gap-18" style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+          <div className="su-eyebrow" style={{ marginBottom: 8 }}>🔒 Fixed — exams &amp; deadlines ({fixed.length})</div>
+          {fixed.length === 0 ? (
+            <div className="su-muted" style={{ fontSize: 12 }}>None this week.</div>
+          ) : (
+            <div className="su-flex" style={{ flexDirection: 'column', gap: 10 }}>
+              {fixed.map(m => (
+                <TaskItem key={m.id} m={m} weekNumber={reading.weekNumber} interactive={interactive} busyId={busyId} onToggle={onToggle} onMove={onMove} />
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+          <div className="su-eyebrow" style={{ marginBottom: 8 }}>📝 Flexible — assignments &amp; reports ({movable.length})</div>
+          {movable.length === 0 ? (
+            <div className="su-muted" style={{ fontSize: 12 }}>None this week.</div>
+          ) : (
+            <div className="su-flex" style={{ flexDirection: 'column', gap: 10 }}>
+              {movable.map(m => (
+                <TaskItem key={m.id} m={m} weekNumber={reading.weekNumber} interactive={interactive} busyId={busyId} onToggle={onToggle} onMove={onMove} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FrictionTimeline({
   timeline,
   studentId,
@@ -170,7 +300,7 @@ export function FrictionTimeline({
       {openReading && createPortal(
         <div className="su">
           <div className="su-modal-overlay" role="dialog" onMouseDown={e => e.target === e.currentTarget && setOpenWeek(null)}>
-            <div className="su-card su-modal su-pop">
+            <div className={`su-card su-modal su-pop${openReading && isHeavyWeek(openReading) ? ' su-modal-wide' : ''}`}>
               <div className="su-title">Week {openReading.weekNumber} tasks</div>
               <div className="su-subtitle">
                 {openReading.contributingMilestones.length === 0
@@ -195,42 +325,7 @@ export function FrictionTimeline({
               )}
 
               {openReading.contributingMilestones.length > 0 && (
-                <div className="su-flex" style={{ flexDirection: 'column', gap: 10, marginTop: 14 }}>
-                  {openReading.contributingMilestones.map(m => {
-                    const originalWeek = originalWeekOf(m.id);
-                    const wasMoved = originalWeek !== openReading.weekNumber;
-                    const movable = MOVABLE_TYPES.includes(m.type) && !m.done;
-                    const maxReachable = Math.min(originalWeek + MAX_MOVE_WEEKS, SEMESTER_WEEKS);
-                    return (
-                      <div key={m.id}>
-                        <label className="su-flex su-gap-10 su-items-center" style={{ cursor: interactive ? 'pointer' : 'default', opacity: m.done ? 0.6 : 1 }}>
-                          <input type="checkbox" checked={m.done} disabled={!interactive || busyId === m.id} onChange={() => toggle(m.id)} />
-                          <span style={{ flex: 1 }}>
-                            <span style={{ textDecoration: m.done ? 'line-through' : 'none' }}>{m.title}</span>
-                            <span className="su-muted" style={{ marginLeft: 6, fontSize: 11.5 }}>
-                              {m.courseCode} · {TYPE_LABEL[m.type] ?? m.type}{wasMoved && ` · moved from Week ${originalWeek}`}
-                            </span>
-                          </span>
-                        </label>
-                        {interactive && movable && (
-                          <div className="su-flex su-gap-6" style={{ marginLeft: 28, marginTop: 4 }}>
-                            {Array.from({ length: MAX_MOVE_WEEKS }, (_, i) => originalWeek + i + 1)
-                              .filter(w => w <= maxReachable && w !== openReading.weekNumber)
-                              .map(w => (
-                                <button
-                                  key={w} type="button" className="su-btn su-btn-secondary" style={{ fontSize: 11, padding: '4px 9px' }}
-                                  disabled={busyId === m.id}
-                                  onClick={() => move(m.id, w)}
-                                >
-                                  Move to Week {w}
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <TaskList reading={openReading} interactive={interactive} busyId={busyId} onToggle={toggle} onMove={move} />
               )}
               {!interactive && <div className="su-muted su-mt-16" style={{ fontSize: 11.5 }}>Read-only view.</div>}
               <button type="button" className="su-btn su-mt-16" onClick={() => setOpenWeek(null)}>Close</button>

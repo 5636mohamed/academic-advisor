@@ -835,6 +835,14 @@
    a dialog (click-outside-to-close, Esc-friendly framing) rather than a
    full page navigation. */
 .su-modal-fullscreen { max-width: 96vw; width: 96vw; height: 94vh; }
+/* A heavy week's task window (FrictionTimeline.tsx) splits fixed vs.
+ * movable tasks into two side-by-side columns, each needing real room
+ * (min 220px) — the base 420px modal was sized for a single-column list
+ * and forced the two columns to collapse to stacked even on a normal
+ * desktop window. Below 640px this still correctly becomes the same
+ * fullscreen sheet every other modal gets (the rule above already covers
+ * it — `:not(.su-modal-fullscreen)` matches this too). */
+.su-modal-wide { max-width: 640px; }
 /* The CV/document viewer's own Close button — turns the brand accent red
    on hover, rather than the plain neutral-gray hover every other
    .su-btn-secondary gets, since this is the one button on that whole
