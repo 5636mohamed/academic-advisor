@@ -15,6 +15,7 @@
 [![API Status](https://img.shields.io/website?url=https%3A%2F%2Facademic-advisor-api-production.up.railway.app%2Fapi%2Fstudents&label=api&up_message=online&down_message=offline&up_color=success&down_color=critical)](https://academic-advisor-api-production.up.railway.app/)
 [![AEGIS](https://img.shields.io/badge/brand-AEGIS-d6241f)](https://github.com/5636mohamed/academic-advisor)
 [![EJUST edition](https://img.shields.io/badge/EJUST%20edition-v1.0.1-1a1a1a?logo=github&logoColor=white)](https://github.com/5636mohamed/ejust-academic-advisor)
+[![Technical Deep Dive](https://img.shields.io/badge/technical%20deep%20dive-read%20more-1a1a1a?logo=readthedocs&logoColor=white)](docs/TECHNICAL_OVERVIEW.md)
 
 </div>
 
@@ -30,33 +31,46 @@
 
 **https://5636mohamed.github.io/academic-advisor/**
 
-The real, fully working system — not a static mockup. Frontend on GitHub
-Pages, backend API live on Railway; log in with any credential from
-`docs/LOGIN_CREDENTIALS.md` — try the Vice President
-(`vice-president@aegis.edu.eg` / `AEGIS@2025`) for the full cross-advisor
-view, or any of the 14 advisors (e.g. `nabil.fathy@aegis.edu.eg` /
-`Advisor@123`) for a single 25-35-student roster — and click through the real
-dashboard, course plans, transfer approvals, and venture board with real
-seeded data. The API's free tier can spin down after a period of
-inactivity — the very first request after a quiet stretch may take up to
-~30–60 seconds to wake back up; every request after that is normal speed.
-(The **api** badge above does a real live check on every page load, so it
-can briefly show *offline* right as the API is waking from that idle
-state — not a sign anything's actually broken, just the free tier's cold
-start racing the badge's own timeout.)
+No installation, no account to create — it's the real, fully working
+system running live, not a mockup or a set of static screenshots. Open the
+link, log in with any credential from `docs/LOGIN_CREDENTIALS.md` — try
+the Vice President (`vice-president@aegis.edu.eg` / `AEGIS@2025`) to see
+the full overview across every advisor, or any of the 14 advisors (e.g.
+`nabil.fathy@aegis.edu.eg` / `Advisor@123`) to see one advisor's own group
+of students — and click through the dashboard, course plans, transfer
+approvals, and project board with real, realistic data behind every
+screen. The free hosting tier the API runs on can doze off after a quiet
+stretch, so the very first click after a while might take up to a minute
+to wake it up — after that, everything runs at normal speed. (The **api**
+badge above checks the server live on every page load, so it can briefly
+say *offline* right as it's waking up — that's the free tier's cold start
+racing the badge's own check, not a sign anything is actually broken.)
 
-Implementation of `docs/BUILD_SPEC.md` — the full specification for the
-probation/dismissal state machine, retake-gate planning, department/faculty
-best-fit engine, internal/external transfer execution, a role-restricted
-student portal, best-case grade projection, a dual advisor/student course
-approval-and-registration workflow, advisor PDF reporting (§15), the
-Innovation & Venture Catalyst — a research/spin-off matching engine
-managed directly from the student, advisor, and Vice President surfaces
-(§16, no separate professor role/Faculty Console) — and a full
-multi-advisor model with Vice President oversight (§17): 5 real advisors
-each with their own 25-student roster, an advisor-responsibility workflow
-with signed PDF letters for course overrides, and a 3-stage transfer
-approval chain (student → advisor → Vice President).
+## What is AEGIS?
+
+AEGIS is a digital academic-advising assistant, built around one real
+university engineering faculty's actual student handbook and course
+catalog. It's for three kinds of people:
+
+- **Students**, who get a personal dashboard that tracks their own grades
+  and workload, warns them early if they're drifting toward academic
+  trouble — long before it would become a formal problem — and recommends
+  which courses to take next: not just any courses they're allowed to
+  register for, but the ones they're realistically likely to do well in
+  and that open up the most options later.
+- **Advisors**, each responsible for their own group of students, who get
+  an at-a-glance overview of everyone they're advising, can review and
+  fine-tune the system's course suggestions before a student registers,
+  and sign off on transfers between departments.
+- **A Vice President–level role**, who oversees every advisor and every
+  student across the whole faculty at once, without having to dig through
+  each advisor's records one by one.
+
+Beyond grades and course planning, AEGIS also connects students with real
+opportunities in their field — research projects, startup ideas run by
+their own advisors, competitions, internships, and funding programs — so
+it works less like a report card and more like a career co-pilot that
+happens to also watch out for academic trouble before it starts.
 
 ## Screenshots
 
@@ -135,9 +149,9 @@ execution, the full advisor/student frontend, best-case grading, and real
 student/advisor/Vice-President access separation):
 
 - **§17 Multi-advisor model & Vice President oversight** — a single shared
-  advisor account became 5 real advisor identities, each with their own
-  25-student roster (real server-side scoping, not just a UI narrowing),
-  and a new Vice President role oversees all 5: per-advisor summaries and
+  advisor account became 14 real advisor identities, each with their own
+  25-35-student roster (real server-side scoping, not just a UI narrowing),
+  and a new Vice President role oversees all 14: per-advisor summaries and
   roster drill-down, a flat cross-advisor pending-approvals queue the VP
   can act on directly, per-advisor transfer-in-flight counters, and its
   own Venture Board.
@@ -179,7 +193,7 @@ student/advisor/Vice-President access separation):
   counterpart, toggled from a button in every masthead (and the login
   page). Defaults to the OS's `prefers-color-scheme`, remembers an
   explicit choice across visits.
-- **Three-way access separation** — student, advisor (one of 5 real
+- **Three-way access separation** — student, advisor (one of 14 real
   identities, each roster-scoped server-side), and Vice President are
   all enforced-separate parties (there is no separate professor role): a
   demo login at `/login` picks one identity, and route guards bounce any
@@ -211,38 +225,14 @@ See `PROGRESS.md`'s newest session note for exact test counts and what's
 still a documented simplification (no real login backend, in-memory
 store, etc.).
 
-## Structure
+## How it's put together
 
-Three npm workspace packages ("subspaces" of the monorepo) — each is its
-own `package.json` with its own version. **📦 Registry: published via the
-npm registry, through GitHub Packages** — see the [Packages
-tab](https://github.com/5636mohamed/academic-advisor/packages) of this
-repository for the live listing. (The `"private": true` in each
-`package.json` only blocks an accidental `npm publish` to the *public* npm
-registry — it does not affect GitHub Packages, which is npm's own
-registry, just scoped to GitHub instead of npmjs.com.)
-
-[![@advisor/shared](https://img.shields.io/badge/%40advisor%2Fshared-v0.1.0-d6241f?logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABQAAAAWCAYAAADAQbwGAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAQuSURBVDhPvVTvTxt1GC9b3YAJykAKbDIXl5jQll5%2F33GFDiizC8g0gReggRgTZgxxIfwBp29MjJCQdWs4itb2oOTOlTSNISIkfecLf%2F%2BYjiF3hdJCEQpuMtEt62Oesmsq2TS%2B8ZNc7nvfe57P9%2FN8nx8Kxf%2BNmZmZo%2BOh8aLp6elSQRAeFwThyEGbf0QkElGio8%2FnKw0EAlUTExOnBEGoxre8DnJc5eTkZEk4HC4UBOHwQQ4FnurxeI4HAgEVx3Enp6amnsGH5%2FkTSKwAUHYCHOY4rpjn%2BafQxu%2F3n742MXEKbXAPD8iq9%2Fv95WNjYyd9Prba6%2FVWeL3eJ3meL5AP3LrYcyI9MJD9RqA6tPMEAiqfz1eNxCgo89PtdpdwHFfJsuxjuU6i026LtzRcjp0lN9cpIrHmqL98o6O9PZZzGIKJRJQul6sK7zmz4XK5SlF2rtFCf%2F%2Fp%2BLn6xV2KgFVDDSRMGtgldbBOG7el9ucvgUKRt9ja0hFtdQxGGSb%2FHZ%2BvNBwOl2Wc8f4wbJlMbHNUJ2ymz%2BJm7X3JqIYVEz4aEI1q2CN1EKWN%2Foydo%2BFDqYn%2BOjYwUDDEsmVZwuHh4Szh%2BuDgsaUW%2B6e7lA5WkMyoBokkfpXqjNtxQw1EKSIVbTBvL7fUNyXffE0VfaO3IsIwSrfbXf5QhTfG3y0S7eRPSZMaRJt5c8NSC2KDeVaiDd%2FftmhBNGvubtbp70q06SM5IsTIyIjqoYSis9mctNaCZKm9LdrJH7cwVIr4aqW1uXejzhDdIXWQMmtghdTdWujq2ifYT2z53NzcflIwO9zoaGWG0G59%2Bw5ZCyJtTIm0YStmqIEdkoDl841NEYbJX2ume%2BKUPv4HRYBkt06C3a5EP6ySTM3KCkeDwcqFvq4yidKLSZMmLdHGP0VKfy9qqIEUhkob5mU1P7zofHaFNv62ZLd%2Bm2hrK2QY5hDWItZlxsDv9x97b3a2%2FOarr%2BhiDtu1VZLYWzapQTJpYPlBYuJWXTp24bxWJr3%2Bwrkziy87i3EdCoWKsC2zzYAnYN8qAPKWGsmrdyhdpkRQnWgz%2Fi6atfdvWWtBrDd%2FIBPKAIC8YDBYiSHjOvsD%2B3QoEin7%2FNLrz61SRHzTooWEUQ1LZ6nvRIpY%2BwUVk0Tyy76%2BwlxCnuePY7g4UHL3EXnYi2fS6aPf9HQ3JikiBXUELDls7%2F9MEjczZWTV7UV7eytkB0EQnpCHw9%2BpHgALFEPvSKcLvui%2FaNlqIN1Rp30gbtHCBpYPSSSud3YewavBjOLUQRHAMIcOcmXBMIwSS4jZ2clkTHqptT1Vp4%2Feo%2FXYcm%2FhGEMSlmWrPR6PCgAeTSYDLxcV4EhjttLFn1wdejrWcaE75HJVeYWPK1AZltpBv38FlgGq8czPq7oBSsZDoSrvlSs4L%2FMP2v4nsCxbiIpzh%2B6j8BcneUZNhdaojQAAAABJRU5ErkJggg%3D%3D)](packages/shared)
-[![@advisor/api](https://img.shields.io/badge/%40advisor%2Fapi-v0.1.0-2b2b2b?logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABQAAAAWCAYAAADAQbwGAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAQuSURBVDhPvVTvTxt1GC9b3YAJykAKbDIXl5jQll5%2F33GFDiizC8g0gReggRgTZgxxIfwBp29MjJCQdWs4itb2oOTOlTSNISIkfecLf%2F%2BYjiF3hdJCEQpuMtEt62Oesmsq2TS%2B8ZNc7nvfe57P9%2FN8nx8Kxf%2BNmZmZo%2BOh8aLp6elSQRAeFwThyEGbf0QkElGio8%2FnKw0EAlUTExOnBEGoxre8DnJc5eTkZEk4HC4UBOHwQQ4FnurxeI4HAgEVx3Enp6amnsGH5%2FkTSKwAUHYCHOY4rpjn%2BafQxu%2F3n742MXEKbXAPD8iq9%2Fv95WNjYyd9Prba6%2FVWeL3eJ3meL5AP3LrYcyI9MJD9RqA6tPMEAiqfz1eNxCgo89PtdpdwHFfJsuxjuU6i026LtzRcjp0lN9cpIrHmqL98o6O9PZZzGIKJRJQul6sK7zmz4XK5SlF2rtFCf%2F%2Fp%2BLn6xV2KgFVDDSRMGtgldbBOG7el9ucvgUKRt9ja0hFtdQxGGSb%2FHZ%2BvNBwOl2Wc8f4wbJlMbHNUJ2ymz%2BJm7X3JqIYVEz4aEI1q2CN1EKWN%2Foydo%2BFDqYn%2BOjYwUDDEsmVZwuHh4Szh%2BuDgsaUW%2B6e7lA5WkMyoBokkfpXqjNtxQw1EKSIVbTBvL7fUNyXffE0VfaO3IsIwSrfbXf5QhTfG3y0S7eRPSZMaRJt5c8NSC2KDeVaiDd%2FftmhBNGvubtbp70q06SM5IsTIyIjqoYSis9mctNaCZKm9LdrJH7cwVIr4aqW1uXejzhDdIXWQMmtghdTdWujq2ifYT2z53NzcflIwO9zoaGWG0G59%2Bw5ZCyJtTIm0YStmqIEdkoDl841NEYbJX2ume%2BKUPv4HRYBkt06C3a5EP6ySTM3KCkeDwcqFvq4yidKLSZMmLdHGP0VKfy9qqIEUhkob5mU1P7zofHaFNv62ZLd%2Bm2hrK2QY5hDWItZlxsDv9x97b3a2%2FOarr%2BhiDtu1VZLYWzapQTJpYPlBYuJWXTp24bxWJr3%2Bwrkziy87i3EdCoWKsC2zzYAnYN8qAPKWGsmrdyhdpkRQnWgz%2Fi6atfdvWWtBrDd%2FIBPKAIC8YDBYiSHjOvsD%2B3QoEin7%2FNLrz61SRHzTooWEUQ1LZ6nvRIpY%2BwUVk0Tyy76%2BwlxCnuePY7g4UHL3EXnYi2fS6aPf9HQ3JikiBXUELDls7%2F9MEjczZWTV7UV7eytkB0EQnpCHw9%2BpHgALFEPvSKcLvui%2FaNlqIN1Rp30gbtHCBpYPSSSud3YewavBjOLUQRHAMIcOcmXBMIwSS4jZ2clkTHqptT1Vp4%2Feo%2FXYcm%2FhGEMSlmWrPR6PCgAeTSYDLxcV4EhjttLFn1wdejrWcaE75HJVeYWPK1AZltpBv38FlgGq8czPq7oBSsZDoSrvlSs4L%2FMP2v4nsCxbiIpzh%2B6j8BcneUZNhdaojQAAAABJRU5ErkJggg%3D%3D)](packages/api)
-[![@advisor/web](https://img.shields.io/badge/%40advisor%2Fweb-v0.1.0-8b1512?logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABQAAAAWCAYAAADAQbwGAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAQuSURBVDhPvVTvTxt1GC9b3YAJykAKbDIXl5jQll5%2F33GFDiizC8g0gReggRgTZgxxIfwBp29MjJCQdWs4itb2oOTOlTSNISIkfecLf%2F%2BYjiF3hdJCEQpuMtEt62Oesmsq2TS%2B8ZNc7nvfe57P9%2FN8nx8Kxf%2BNmZmZo%2BOh8aLp6elSQRAeFwThyEGbf0QkElGio8%2FnKw0EAlUTExOnBEGoxre8DnJc5eTkZEk4HC4UBOHwQQ4FnurxeI4HAgEVx3Enp6amnsGH5%2FkTSKwAUHYCHOY4rpjn%2BafQxu%2F3n742MXEKbXAPD8iq9%2Fv95WNjYyd9Prba6%2FVWeL3eJ3meL5AP3LrYcyI9MJD9RqA6tPMEAiqfz1eNxCgo89PtdpdwHFfJsuxjuU6i026LtzRcjp0lN9cpIrHmqL98o6O9PZZzGIKJRJQul6sK7zmz4XK5SlF2rtFCf%2F%2Fp%2BLn6xV2KgFVDDSRMGtgldbBOG7el9ucvgUKRt9ja0hFtdQxGGSb%2FHZ%2BvNBwOl2Wc8f4wbJlMbHNUJ2ymz%2BJm7X3JqIYVEz4aEI1q2CN1EKWN%2Foydo%2BFDqYn%2BOjYwUDDEsmVZwuHh4Szh%2BuDgsaUW%2B6e7lA5WkMyoBokkfpXqjNtxQw1EKSIVbTBvL7fUNyXffE0VfaO3IsIwSrfbXf5QhTfG3y0S7eRPSZMaRJt5c8NSC2KDeVaiDd%2FftmhBNGvubtbp70q06SM5IsTIyIjqoYSis9mctNaCZKm9LdrJH7cwVIr4aqW1uXejzhDdIXWQMmtghdTdWujq2ifYT2z53NzcflIwO9zoaGWG0G59%2Bw5ZCyJtTIm0YStmqIEdkoDl841NEYbJX2ume%2BKUPv4HRYBkt06C3a5EP6ySTM3KCkeDwcqFvq4yidKLSZMmLdHGP0VKfy9qqIEUhkob5mU1P7zofHaFNv62ZLd%2Bm2hrK2QY5hDWItZlxsDv9x97b3a2%2FOarr%2BhiDtu1VZLYWzapQTJpYPlBYuJWXTp24bxWJr3%2Bwrkziy87i3EdCoWKsC2zzYAnYN8qAPKWGsmrdyhdpkRQnWgz%2Fi6atfdvWWtBrDd%2FIBPKAIC8YDBYiSHjOvsD%2B3QoEin7%2FNLrz61SRHzTooWEUQ1LZ6nvRIpY%2BwUVk0Tyy76%2BwlxCnuePY7g4UHL3EXnYi2fS6aPf9HQ3JikiBXUELDls7%2F9MEjczZWTV7UV7eytkB0EQnpCHw9%2BpHgALFEPvSKcLvui%2FaNlqIN1Rp30gbtHCBpYPSSSud3YewavBjOLUQRHAMIcOcmXBMIwSS4jZ2clkTHqptT1Vp4%2Feo%2FXYcm%2FhGEMSlmWrPR6PCgAeTSYDLxcV4EhjttLFn1wdejrWcaE75HJVeYWPK1AZltpBv38FlgGq8czPq7oBSsZDoSrvlSs4L%2FMP2v4nsCxbiIpzh%2B6j8BcneUZNhdaojQAAAABJRU5ErkJggg%3D%3D)](packages/web)
-
-```
-packages/
-  shared/   → @advisor/shared — types + grading tables shared by api & web
-  api/      → @advisor/api — Node/TS backend: grading, prediction, probation,
-              retake-gate, fit-engine, transfer-execution, proposal, and
-              venture-matching modules + the full HTTP API (src/server.ts)
-              over an in-memory data layer
-  web/      → @advisor/web — React/TS frontend — Vite + React Router. Three
-              route trees: the advisor console, the student portal
-              (/portal/:id), and the Vice President portal (/vp), each
-              behind its own auth guard (no separate professor role)
-docs/
-  BUILD_SPEC.md         → full specification (the single source of truth)
-  HANDBOOK_RULES.md     → every business rule restated in plain language, cross-referenced to code
-  DECISION_TREE.md      → the advising-cycle branch logic as a diagram, incl. the §17.4 transfer approval chain
-  LOGIN_CREDENTIALS.md  → the full demo credential roster (student/advisor/VP)
-```
+AEGIS is three connected pieces sharing one codebase: a set of shared type
+definitions, a backend that does all the actual thinking (grading,
+predicting, matching), and the website you click through. **For the full
+repository layout, module-by-module breakdown, and how the real 10-program
+course catalog was built, see the
+[Technical Deep Dive](docs/TECHNICAL_OVERVIEW.md).**
 
 ## Tech Stack
 
@@ -319,7 +309,7 @@ if you want to pull one down yourself.
 | `@prisma/client` / `prisma` | 5.18 | A real schema is scaffolded (`src/db/prisma/schema.prisma`) for the eventual database layer — the live app currently runs on an in-memory store (`db/memory/inMemoryDb.ts`), a documented simplification, not a hidden gap |
 | `tsx` | 4.16 | Runs the server directly from TypeScript source, in both dev (`tsx watch`) **and** the deployed production `start` script — see the Deployment section below for why |
 | `typescript` | 5.5 | Type-checking / the `build` script (used as a CI gate; its compiled output isn't what actually runs — `tsx` is) |
-| `vitest` | 2.0 | Unit tests — 220 passing, run in CI on every push |
+| `vitest` | 2.0 | Unit tests — 347 passing, run in CI on every push |
 
 **Shared (`packages/shared`)** — plain TypeScript types and grading tables imported directly as source by both `api` and `web` (no build step of its own); only dependency is `typescript` for its own type-checking.
 
@@ -337,57 +327,17 @@ if you want to pull one down yourself.
 | Backend (`packages/api`) | Railway | Free tier; `railway.json` at the repo root configures the build/start commands. `render.yaml` is also included as a ready-to-go alternative |
 | Tests & type-checking | GitHub Actions | `.github/workflows/ci.yml` runs the backend suite plus `shared`/`web` type-checks on every push and pull request — the "tests" badge at the top of this README reflects this workflow's real, current status |
 
-See [Deployment](#deployment) below for how the two live pieces are wired together.
+See the [Technical Deep Dive](docs/TECHNICAL_OVERVIEW.md) for exactly how
+the two live pieces are wired together, plus full local setup instructions.
 
-## Getting started
-```bash
-npm install --workspaces
+## Want to try it yourself?
 
-# backend — tests + API server
-cd packages/api
-npx vitest run                # 220 tests
-npx tsx src/server.ts         # API on http://localhost:3001
-
-# frontend — in a second terminal
-cd packages/web
-npx vite                      # app on http://localhost:5173, proxies /api to :3001
-```
-
-Open `http://localhost:5173/login` and sign in with a real email + password
-(still a demo gate — client-side only, no server-side session) — one of the
-14 advisors, the Vice President, or a student. The full credential roster
-(every student/advisor email is derived straight from their real seeded
-name) is in `docs/LOGIN_CREDENTIALS.md`. The
-demo roster includes personas for every worked example in spec §11 (a
-good-standing student, a mid-probation warning-ladder student, a
-mandatory-retake-overflow case, a dismissed student, a faculty-transfer
-candidate, **Mohamed for the §16 venture-match scenario**, etc.) so every
-branch of the system is reachable through the UI, not just through unit
-tests. See the 🎬 full tour GIF near the top of this README for a guided
-walkthrough of all 4 roles before you start clicking around yourself.
-
-No `node_modules` are committed. `npm install --workspaces` installs
-everything (Express, Vitest, React, Vite, jsPDF, Prisma client, etc.)
-across all three workspace packages.
-
-## Deployment
-
-The live demo linked near the top of this README is two separately-deployed
-pieces, wired together with CORS:
-
-- **`packages/web`** (the frontend) → **GitHub Pages**, built and deployed
-  automatically on every push to `master` by
-  `.github/workflows/pages.yml`.
-- **`packages/api`** (the backend) → **Railway**, since GitHub Pages only
-  serves static files and can't run a real Node server. `railway.json`
-  configures the build/start commands (this is an npm-workspaces monorepo,
-  so the install step has to run from the repo root, not per-package).
-
-The frontend build is pointed at the live API via a `VITE_API_BASE_URL`
-GitHub Actions repo variable — if the Railway URL ever changes, update
-that variable and re-run the Pages workflow. `render.yaml` is also in the
-repo as a ready-to-go alternative if you'd rather deploy the API to Render
-instead of Railway.
+The fastest way is the [live demo](#-live-demo--try-it-now) above — no
+installation needed. If you're a developer and want to run AEGIS on your
+own machine, extend it, or just poke around the code, the
+**[Technical Deep Dive](docs/TECHNICAL_OVERVIEW.md)** has the full local
+setup instructions, the repository walkthrough, and how testing and
+deployment work.
 
 ## Authors
 

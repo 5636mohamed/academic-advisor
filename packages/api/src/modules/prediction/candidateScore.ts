@@ -40,7 +40,12 @@ export function scoreCandidate(c: CandidateForScoring, mode: PlanMode): number {
   }
   if (mode === 'probation_repair') {
     score += w.probationRepair.gradeQualityBonus * (c.expectedPoints / 4);
-    score -= w.riskPenalty * w.probationRepair.riskPenaltyMultiplier * (1 - c.passRate / 100);
+    // Spec §3.2: probation_repair's TOTAL risk penalty should be
+    // riskPenalty * riskPenaltyMultiplier (20*2=40), not an additional
+    // riskPenalty*multiplier ON TOP OF the base riskPenalty already
+    // applied above — that would triple (60), not double (40), the risk
+    // aversion. Only the difference is added here.
+    score -= w.riskPenalty * (w.probationRepair.riskPenaltyMultiplier - 1) * (1 - c.passRate / 100);
     score += w.creditProgress * w.probationRepair.creditWeightScale * (c.credits / 3) - w.creditProgress * (c.credits / 3);
   }
 

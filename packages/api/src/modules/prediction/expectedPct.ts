@@ -25,10 +25,19 @@ export function expectedPct(inputs: ExpectedPctInputs): number {
   const student = inputs.studentTrendPct ?? cohort; // no personal history -> lean on cohort signal
   const difficulty = courseDifficultyAdjustment(inputs.tier);
 
+  // Spec §3.1(c): expectedPct = 0.45*cohort + 0.40*student + 0.15*difficulty
+  // — difficulty is a small standalone ±5-point nudge, not (cohort +
+  // difficulty). The previous version multiplied difficultyWeight by
+  // (cohort + difficulty), which silently re-added the cohort term a
+  // second time (effective cohort weight 0.60, not 0.45) — a real bug
+  // caught by code review, not a hypothetical: it fed straight into
+  // runAdvisingCycle via repositoryBackedPorts.ts's scoreEligibleCourse,
+  // systematically overstating projectedCGPA for any student whose
+  // personal trend lagged their cohort's.
   const blended =
     weights.expectedPct.cohortWeight * cohort +
     weights.expectedPct.studentWeight * student +
-    weights.expectedPct.difficultyWeight * (cohort + difficulty);
+    weights.expectedPct.difficultyWeight * difficulty;
 
   return clamp(Math.round(blended * 10) / 10, 0, 100);
 }
