@@ -6,12 +6,29 @@
 // instructor-load are explicitly derived estimates — this app has no real
 // Section/Instructor entity — labeled as such in the UI, not presented as
 // if real staffing data exists.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '../api/client';
-import { DepartmentDemandForecast } from '@advisor/shared';
+import { DemandForecast, DepartmentDemandForecast } from '@advisor/shared';
 import { Loading, Section, Empty, StatCard } from '../portal/ui/Primitives';
 import { useChartTokens } from '../portal/ui/chartTheme';
+import { ALL_COURSE_FILTER, CourseFilterBar, CourseFilterValue, filterCourses } from '../portal/ui/CourseFilterBar';
+import { departmentsCell } from '../portal/lib/departmentsCell';
+import { downloadDemandForecastPdf } from '../lib/pdfReport';
+
+/** Every department's own `courses[]` already includes every shared/UR
+ *  course it requires (same double-counting shape curriculumHealthMonitor.
+ *  service.ts's own doc comment already documents) — dedupe by courseCode
+ *  before showing a flat "every course" table, same discipline. */
+function dedupeCourses(departments: DepartmentDemandForecast[]): DemandForecast[] {
+  const seen = new Map<string, DemandForecast>();
+  for (const d of departments) {
+    for (const c of d.courses) {
+      if (!seen.has(c.courseCode)) seen.set(c.courseCode, c);
+    }
+  }
+  return [...seen.values()];
+}
 
 function DepartmentDemandChart({ departments }: { departments: DepartmentDemandForecast[] }) {
   const tokens = useChartTokens();
@@ -46,7 +63,18 @@ function DepartmentDemandChart({ departments }: { departments: DepartmentDemandF
 
 export function VpDemandForecast() {
   const [departments, setDepartments] = useState<DepartmentDemandForecast[] | null>(null);
+  const [filter, setFilter] = useState<CourseFilterValue>(ALL_COURSE_FILTER);
+  const [downloading, setDownloading] = useState(false);
   useEffect(() => { api.vpDemandForecast().then(setDepartments); }, []);
+
+  // Both kept ABOVE the `!departments` early return below — useMemo must
+  // run every render in the same order (real rules-of-hooks bug caught
+  // before shipping, see VpCurriculumHealthMonitor.tsx's identical fix).
+  const allCourses = useMemo(() => dedupeCourses(departments ?? []), [departments]);
+  const filteredCourses = useMemo(
+    () => filterCourses(allCourses, filter).sort((a, b) => b.nextTermEnrolled - a.nextTermEnrolled),
+    [allCourses, filter]
+  );
 
   if (!departments) return <Loading label="Forecasting demand across every department…" />;
 
@@ -97,6 +125,55 @@ export function VpDemandForecast() {
               </table>
             </div>
           </>
+        )}
+      </Section>
+
+      <Section
+        eyebrow="Resource Planning"
+        title="Course-level forecast"
+        subtitle="Every real course's own forecast — filterable by department or category (Basic Science Requirements, University Requirements/LRA, and so on) instead of one flat department rollup."
+        className="su-mt-16"
+        right={
+          <button
+            className="su-btn su-btn-secondary su-btn-sm"
+            disabled={downloading}
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                await downloadDemandForecastPdf({ title: 'Academic Resource Demand Forecast — Vice President', courses: filteredCourses });
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            {downloading ? 'Building PDF…' : 'Download PDF'}
+          </button>
+        }
+      >
+        <CourseFilterBar courses={allCourses} value={filter} onChange={setFilter} />
+        {filteredCourses.length === 0 ? (
+          <Empty>No courses match the selected filters.</Empty>
+        ) : (
+          <div className="su-table-wrap">
+            <table className="su-table">
+              <thead>
+                <tr><th>Course</th><th>Department</th><th>Forecasted seats</th><th>Sections (est.)</th><th>Trend</th></tr>
+              </thead>
+              <tbody>
+                {filteredCourses.map(c => (
+                  <tr key={c.courseCode}>
+                    <td><b>{c.courseCode}</b><div className="su-muted" style={{ fontSize: 11.5 }}>{c.courseName}</div></td>
+                    <td className="su-muted">{departmentsCell(c.departments)}</td>
+                    <td>{c.nextTermEnrolled} <span className="su-muted">±{c.confidenceBand}</span></td>
+                    <td className="su-muted">{c.forecastedSections}</td>
+                    <td>
+                      {c.trendSlope > 0.5 ? <span className="su-badge warn">Rising</span> : c.trendSlope < -0.5 ? <span className="su-badge ok">Declining</span> : <span className="su-badge neutral">Steady</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Section>
     </>

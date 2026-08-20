@@ -24,6 +24,27 @@ function offering(enrolled: number, passed: number): CourseOffering {
 }
 
 describe('computeCourseRisk (Curriculum Analytics — shared risk primitive)', () => {
+  // Real live-reported gap: the VP's unscoped views had no way to filter
+  // by department or category ("categorized, not all shown like that").
+  // category/isUR/isBasicScience come straight from the Course object;
+  // `departments` (plural — a course can genuinely belong to more than
+  // one, unlike the always-null Course.departmentId) is passed in by the
+  // caller from seedCatalog.ts's DEPARTMENTS_BY_COURSE_CODE.
+  it('passes through category/isUR/isBasicScience from the course, and the caller-supplied departments list untouched', () => {
+    const c = course({ code: 'LRA401', category: 'ur_core', isUR: true, isBasicScience: false });
+    const result = computeCourseRisk({ course: c, offerings: [], catalog: [c], forecastedNextTermEnrolled: 40, departments: ['ECE', 'EPE', 'CSE'] });
+    expect(result.category).toBe('ur_core');
+    expect(result.isUR).toBe(true);
+    expect(result.isBasicScience).toBe(false);
+    expect(result.departments).toEqual(['ECE', 'EPE', 'CSE']);
+  });
+
+  it('departments defaults to an empty array when the caller omits it (synthetic test fixtures, not a real caller)', () => {
+    const c = course({ code: 'NODEPT' });
+    const result = computeCourseRisk({ course: c, offerings: [], catalog: [c], forecastedNextTermEnrolled: 40 });
+    expect(result.departments).toEqual([]);
+  });
+
   it('a course with zero offering history falls back sanely (no divide-by-zero, no NaN)', () => {
     const c = course({ code: 'NEW101' });
     const result = computeCourseRisk({ course: c, offerings: [], catalog: [c], forecastedNextTermEnrolled: 40 });
@@ -99,6 +120,55 @@ describe('computeCourseRisk (Curriculum Analytics — shared risk primitive)', (
     // the actual proof the Math.min(...,1) cap holds, not comparing 1.3
     // against 2.0 (two genuinely different, uncapped-vs-capped points).
     expect(doubleCapacity.healthScore).toBeCloseTo(wayOverCapacity.healthScore, 1);
+  });
+
+  // Real bug reported live in the VP portal: "there are healthy subjects
+  // with +50% failure rate." A leaf course (no downstream dependents) with
+  // a bare-majority failure rate used to lose at most failureWeight (35)
+  // points from the weighted sum, landing well above atRiskThreshold with
+  // a green "healthy" badge — this is the hard ceiling that closes that gap.
+  describe('majority-fail ceiling: a course more than half of students fail is never scored "healthy"', () => {
+    it('a leaf course at exactly the 50% failure threshold is capped, not left at whatever the weighted sum alone produces', () => {
+      const leaf = course({ code: 'HALFFAIL' });
+      const result = computeCourseRisk({ course: leaf, offerings: [offering(100, 50)], catalog: [leaf], forecastedNextTermEnrolled: 55 });
+      expect(result.failureRate).toBe(50);
+      // atRiskThreshold is 55 — this must land BELOW it (not just below 75's
+      // "healthy" cutoff), so it's correctly counted as at-risk too.
+      expect(result.healthScore).toBeLessThan(55);
+    });
+
+    it('a leaf course just under 50% failure is untouched by the ceiling (only >= the threshold triggers it)', () => {
+      const leaf = course({ code: 'JUSTUNDER' });
+      const result = computeCourseRisk({ course: leaf, offerings: [offering(100, 51)], catalog: [leaf], forecastedNextTermEnrolled: 55 }); // 49% failure
+      expect(result.failureRate).toBe(49);
+      // Unaffected by the ceiling: only the ordinary weighted-sum deduction
+      // applies (100 - failureWeight(35) * 0.49 = 82.85), same as before
+      // this fix — nowhere near atRiskThreshold(55), unlike the >=50% cases.
+      expect(result.healthScore).toBeGreaterThanOrEqual(80);
+    });
+
+    it('a worse failure rate still scores strictly worse than a bare-majority one — the ceiling slides down, courses don\'t all tie at one value', () => {
+      const leaf = course({ code: 'SEVEREFAIL' });
+      const bareMajority = computeCourseRisk({ course: leaf, offerings: [offering(100, 50)], catalog: [leaf], forecastedNextTermEnrolled: 55 }); // 50% failure
+      const severe = computeCourseRisk({ course: leaf, offerings: [offering(100, 5)], catalog: [leaf], forecastedNextTermEnrolled: 55 }); // 95% failure
+      expect(severe.healthScore).toBeLessThan(bareMajority.healthScore);
+    });
+
+    it('the ceiling only ever pulls a score DOWN — a course that already scores worse on its own merits (real chain position) is untouched', () => {
+      // GATE2 gates 4 downstream courses AND has a 60% failure rate — its
+      // ordinary weighted-sum score (chain + delay + failure terms) should
+      // already land below what the ceiling alone would impose, so the
+      // ceiling must not be the binding constraint here.
+      const gate = course({ code: 'GATE2' });
+      const downstream = ['D1', 'D2', 'D3', 'D4'].map(code => course({ code, prereq: ['GATE2'] }));
+      const catalog = [gate, ...downstream];
+      const result = computeCourseRisk({ course: gate, offerings: [offering(100, 40)], catalog, forecastedNextTermEnrolled: 55 }); // 60% failure
+      expect(result.failureRate).toBe(60);
+      expect(result.cascadingDelaySemesters).toBeGreaterThan(0);
+      // Still well under atRiskThreshold either way — real chain position
+      // plus a majority failure rate compound, they don't cancel out.
+      expect(result.healthScore).toBeLessThan(55);
+    });
   });
 
   it('healthScore is always clamped to [0, 100] even for a maximally bad course', () => {

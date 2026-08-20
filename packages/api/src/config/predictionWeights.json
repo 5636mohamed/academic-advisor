@@ -76,7 +76,10 @@
       "chainWeight": 25,
       "demandWeight": 20,
       "delayWeight": 20,
-      "atRiskThreshold": 55
+      "atRiskThreshold": 55,
+      "majorityFailThreshold": 50,
+      "majorityFailCeiling": 44,
+      "majorityFailCeilingSlope": 0.3
     },
     "forecast": {
       "saturationThreshold": 1.3,

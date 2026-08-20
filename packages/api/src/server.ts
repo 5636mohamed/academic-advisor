@@ -21,7 +21,7 @@ import { onFirstSemesterClose } from './modules/probation/firstSemesterRule.serv
 import { projectCGPATrend } from './modules/prediction/cgpaTrendProjection';
 import { deriveCgpaTrend } from './modules/grading/cgpa';
 import { chainUnlockValue, clearChainUnlockCache } from './modules/prediction/chainUnlockValue';
-import { CATALOG, CATALOG_BY_CODE, CATALOG_BY_DEPARTMENT } from './db/seed/seedCatalog';
+import { CATALOG, CATALOG_BY_CODE, CATALOG_BY_DEPARTMENT, DEPARTMENTS_BY_COURSE_CODE } from './db/seed/seedCatalog';
 import { OFFERINGS_BY_COURSE } from './db/seed/seedCourseOfferings';
 import { buildCandidatePool } from './modules/retakeGate/retakePreference.service';
 import { packPlan, PackPlanResult } from './modules/prediction/planPacker';
@@ -1061,7 +1061,7 @@ app.get('/api/vp/friction/institutional-bottlenecks', (_req, res) => {
 // roster-scoped pages).
 // ---------------------------------------------------------------------
 app.get('/api/vp/curriculum-analytics/demand-forecast', (_req, res) => {
-  res.json(forecastAllDepartments(CATALOG_BY_DEPARTMENT, OFFERINGS_BY_COURSE));
+  res.json(forecastAllDepartments(CATALOG_BY_DEPARTMENT, OFFERINGS_BY_COURSE, DEPARTMENTS_BY_COURSE_CODE));
 });
 
 app.get('/api/advisors/:advisorId/curriculum-analytics/demand-forecast', (req, res) => {
@@ -1069,20 +1069,20 @@ app.get('/api/advisors/:advisorId/curriculum-analytics/demand-forecast', (req, r
   const advisor = db.getAdvisor(advisorId);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
   const departmentCatalog = CATALOG_BY_DEPARTMENT[advisor.departmentId] ?? [];
-  res.json(forecastDepartmentDemand(advisor.departmentId, departmentCatalog, OFFERINGS_BY_COURSE));
+  res.json(forecastDepartmentDemand(advisor.departmentId, departmentCatalog, OFFERINGS_BY_COURSE, DEPARTMENTS_BY_COURSE_CODE));
 });
 
 // Feature 2 — Curriculum Health Monitor. Same VP-wide (departmentId: null)
 // / Advisor-own-department pattern as demand-forecast just above.
 app.get('/api/vp/curriculum-analytics/health-monitor', (_req, res) => {
-  res.json(buildHealthMonitor(null, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE));
+  res.json(buildHealthMonitor(null, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE, DEPARTMENTS_BY_COURSE_CODE));
 });
 
 app.get('/api/advisors/:advisorId/curriculum-analytics/health-monitor', (req, res) => {
   const advisorId = paramStr(req, 'advisorId');
   const advisor = db.getAdvisor(advisorId);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
-  res.json(buildHealthMonitor(advisor.departmentId, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE));
+  res.json(buildHealthMonitor(advisor.departmentId, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE, DEPARTMENTS_BY_COURSE_CODE));
 });
 
 // Feature 3 — Course Bottleneck & Dependency Analyzer. The VP route is
@@ -1098,7 +1098,7 @@ function forecastedEnrolledByCode(catalog: (typeof CATALOG)): Record<string, num
 }
 
 app.get('/api/vp/curriculum-analytics/bottlenecks', (_req, res) => {
-  res.json(rankBottlenecks(CATALOG, OFFERINGS_BY_COURSE, forecastedEnrolledByCode(CATALOG)));
+  res.json(rankBottlenecks(CATALOG, OFFERINGS_BY_COURSE, forecastedEnrolledByCode(CATALOG), DEPARTMENTS_BY_COURSE_CODE));
 });
 
 app.get('/api/advisors/:advisorId/curriculum-analytics/bottlenecks', (req, res) => {
@@ -1106,7 +1106,7 @@ app.get('/api/advisors/:advisorId/curriculum-analytics/bottlenecks', (req, res) 
   const advisor = db.getAdvisor(advisorId);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
 
-  const bottlenecks = rankBottlenecks(CATALOG, OFFERINGS_BY_COURSE, forecastedEnrolledByCode(CATALOG));
+  const bottlenecks = rankBottlenecks(CATALOG, OFFERINGS_BY_COURSE, forecastedEnrolledByCode(CATALOG), DEPARTMENTS_BY_COURSE_CODE);
 
   const roster = db.listStudents().filter(s => s.advisorId === advisorId && s.status !== 'dismissed');
   const rosterForCheck: StudentForBottleneckCheck[] = roster.map(s => {

@@ -6,11 +6,14 @@
 // it's still a real unfulfilled gate ahead in their own remaining plan) —
 // the roster-actionable framing that's why this feature is "Advisors, VP"
 // rather than "Department, VP" like Features 1-2.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, AdvisorBottlenecksDTO } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { Loading, Section, Empty, StatCard } from '../portal/ui/Primitives';
+import { ALL_COURSE_FILTER, CourseFilterBar, CourseFilterValue, filterCourses } from '../portal/ui/CourseFilterBar';
+import { departmentsCell } from '../portal/lib/departmentsCell';
+import { downloadBottleneckAnalyzerPdf } from '../lib/pdfReport';
 
 const REASON_LABEL: Record<string, string> = {
   failed_needs_retake: 'Already failed — needs a retake',
@@ -22,14 +25,21 @@ export function AdvisorBottleneckAnalyzer() {
   const { auth } = useAuth();
   const advisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
   const [data, setData] = useState<AdvisorBottlenecksDTO | null>(null);
+  const [filter, setFilter] = useState<CourseFilterValue>(ALL_COURSE_FILTER);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (advisorId) api.advisorBottlenecks(advisorId).then(setData);
   }, [advisorId]);
 
+  // Kept ABOVE the `!data` early return below — useMemo must run every
+  // render in the same order (real rules-of-hooks bug caught before
+  // shipping, see VpCurriculumHealthMonitor.tsx's identical fix).
+  const genuineBottlenecks = (data?.bottlenecks ?? []).filter(b => b.cascadingDelaySemesters > 0);
+  const real = useMemo(() => filterCourses(genuineBottlenecks, filter), [genuineBottlenecks, filter]);
+
   if (!data) return <Loading label="Checking your roster against real institutional bottlenecks…" />;
 
-  const real = data.bottlenecks.filter(b => b.cascadingDelaySemesters > 0);
   const affected = data.affectedAdvisees;
   const affectedStudentCount = new Set(affected.map(a => a.studentId)).size;
 
@@ -46,6 +56,22 @@ export function AdvisorBottleneckAnalyzer() {
         title="Advisees affected by a real bottleneck"
         subtitle="Students on your roster who've already failed a bottleneck course, or still have one as a real, unfulfilled gate ahead in their remaining plan."
         className="su-mt-16"
+        right={
+          <button
+            className="su-btn su-btn-secondary su-btn-sm"
+            disabled={downloading}
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                await downloadBottleneckAnalyzerPdf({ title: 'Course Bottleneck & Dependency Analyzer — Advisor', bottlenecks: real, affectedAdvisees: affected });
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            {downloading ? 'Building PDF…' : 'Download PDF'}
+          </button>
+        }
       >
         {affected.length === 0 ? (
           <Empty>No advisee on your roster is currently affected by a real bottleneck course.</Empty>
@@ -77,8 +103,9 @@ export function AdvisorBottleneckAnalyzer() {
         subtitle="Every course ranked by expected graduation-delay impact, across all departments — for context on where your advisees' bottlenecks rank institution-wide."
         className="su-mt-16"
       >
+        <CourseFilterBar courses={genuineBottlenecks} value={filter} onChange={setFilter} />
         {real.length === 0 ? (
-          <Empty>No genuine bottlenecks found institution-wide.</Empty>
+          <Empty>No genuine bottlenecks match the selected filters.</Empty>
         ) : (
           <div className="su-table-wrap">
             <table className="su-table">
@@ -89,7 +116,7 @@ export function AdvisorBottleneckAnalyzer() {
                 {real.slice(0, 15).map(b => (
                   <tr key={b.courseCode}>
                     <td><b>{b.courseCode}</b><div className="su-muted" style={{ fontSize: 11.5 }}>{b.courseName}</div></td>
-                    <td className="su-muted">{b.departmentId ?? 'Shared / UR'}</td>
+                    <td className="su-muted">{departmentsCell(b.departments)}</td>
                     <td><span className="su-badge danger">{b.cascadingDelaySemesters.toFixed(1)} sem</span></td>
                     <td className="su-muted">{b.failureRate}%</td>
                     <td className="su-muted" style={{ fontSize: 12 }}>{b.directlyBlocks.length > 0 ? b.directlyBlocks.join(', ') : '—'}</td>

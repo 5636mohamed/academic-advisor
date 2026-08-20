@@ -7,10 +7,13 @@
 // these needs attention" list in this app already uses (AdvisorFrictionOverview,
 // AdvisorAllStudents' risk column) — not a chart forced onto content a
 // sortable table already serves better.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { CurriculumHealthReport } from '@advisor/shared';
 import { Loading, Section, Empty, StatCard } from '../portal/ui/Primitives';
+import { ALL_COURSE_FILTER, CourseFilterBar, CourseFilterValue, filterCourses } from '../portal/ui/CourseFilterBar';
+import { departmentsCell } from '../portal/lib/departmentsCell';
+import { downloadCurriculumHealthPdf } from '../lib/pdfReport';
 
 function healthBadge(score: number) {
   if (score >= 75) return <span className="su-badge ok">{score}</span>;
@@ -20,11 +23,20 @@ function healthBadge(score: number) {
 
 export function VpCurriculumHealthMonitor() {
   const [report, setReport] = useState<CurriculumHealthReport | null>(null);
+  const [filter, setFilter] = useState<CourseFilterValue>(ALL_COURSE_FILTER);
+  const [downloading, setDownloading] = useState(false);
   useEffect(() => { api.vpCurriculumHealthMonitor().then(setReport); }, []);
 
-  if (!report) return <Loading label="Scoring curriculum health across every department…" />;
+  // useMemo must run every render, in the same order — kept ABOVE the
+  // `!report` early return below (a real rules-of-hooks violation caught
+  // before shipping: the first render, before data loads, would otherwise
+  // skip this hook entirely, then call it on every render after).
+  const sortedCourses = useMemo(
+    () => filterCourses([...(report?.allCourses ?? [])].sort((a, b) => a.healthScore - b.healthScore), filter),
+    [report, filter]
+  );
 
-  const sortedCourses = [...report.allCourses].sort((a, b) => a.healthScore - b.healthScore);
+  if (!report) return <Loading label="Scoring curriculum health across every department…" />;
 
   return (
     <>
@@ -46,9 +58,26 @@ export function VpCurriculumHealthMonitor() {
         title="Curriculum Health Monitor"
         subtitle="Every course's health score — from its real failure rate, how many other courses it gates, current demand pressure, and the resulting expected graduation delay — worst first."
         className="su-mt-16"
+        right={
+          <button
+            className="su-btn su-btn-secondary su-btn-sm"
+            disabled={downloading}
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                await downloadCurriculumHealthPdf({ title: 'Curriculum Health Monitor — Vice President', courses: sortedCourses });
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            {downloading ? 'Building PDF…' : 'Download PDF'}
+          </button>
+        }
       >
+        <CourseFilterBar courses={report.allCourses} value={filter} onChange={setFilter} />
         {sortedCourses.length === 0 ? (
-          <Empty>No courses scored yet.</Empty>
+          <Empty>No courses match the selected filters.</Empty>
         ) : (
           <div className="su-table-wrap">
             <table className="su-table">
@@ -59,7 +88,7 @@ export function VpCurriculumHealthMonitor() {
                 {sortedCourses.map(c => (
                   <tr key={c.courseCode}>
                     <td><b>{c.courseCode}</b><div className="su-muted" style={{ fontSize: 11.5 }}>{c.courseName}</div></td>
-                    <td className="su-muted">{c.departmentId ?? 'Shared / UR'}</td>
+                    <td className="su-muted">{departmentsCell(c.departments)}</td>
                     <td>{healthBadge(c.healthScore)}</td>
                     <td className="su-muted">{c.failureRate}%</td>
                     <td className="su-muted">{c.downstreamImpact.toFixed(1)}</td>

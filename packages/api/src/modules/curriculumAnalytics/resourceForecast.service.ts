@@ -21,7 +21,7 @@ function residualStdDev(x: number[], y: number[], fit: { a: number; b: number })
   return Math.sqrt(variance);
 }
 
-export function forecastCourseDemand(course: Course, offerings: CourseOffering[]): DemandForecast {
+export function forecastCourseDemand(course: Course, offerings: CourseOffering[], departments: string[] = []): DemandForecast {
   const chronological = [...offerings].sort((a, b) => a.year - b.year || a.term.localeCompare(b.term));
   const x = chronological.map((_, i) => i);
   const y = chronological.map(o => o.enrolled);
@@ -38,6 +38,10 @@ export function forecastCourseDemand(course: Course, offerings: CourseOffering[]
     courseCode: course.code,
     courseName: course.name,
     departmentId: course.departmentId,
+    category: course.category,
+    isUR: course.isUR,
+    isBasicScience: course.isBasicScience,
+    departments,
     history: chronological.map(o => ({ term: o.term, year: o.year, enrolled: o.enrolled })),
     nextTermEnrolled,
     confidenceBand,
@@ -54,9 +58,15 @@ export function forecastCourseDemand(course: Course, offerings: CourseOffering[]
 export function forecastDepartmentDemand(
   departmentId: string,
   departmentCatalog: Course[],
-  offeringsByCourse: Record<string, CourseOffering[]>
+  offeringsByCourse: Record<string, CourseOffering[]>,
+  // §"categorized, not all shown like that" — see rankBottlenecks'/
+  // buildHealthMonitor's identical param for why this can't just be
+  // course.departmentId.
+  departmentsByCourseCode: Record<string, string[]> = {}
 ): DepartmentDemandForecast {
-  const courses = departmentCatalog.map(c => forecastCourseDemand(c, offeringsByCourse[c.code] ?? []));
+  const courses = departmentCatalog.map(c =>
+    forecastCourseDemand(c, offeringsByCourse[c.code] ?? [], departmentsByCourseCode[c.code] ?? [])
+  );
   return {
     departmentId,
     totalNextTermEnrolled: courses.reduce((s, c) => s + c.nextTermEnrolled, 0),
@@ -68,9 +78,10 @@ export function forecastDepartmentDemand(
 
 export function forecastAllDepartments(
   catalogByDepartment: Record<string, Course[]>,
-  offeringsByCourse: Record<string, CourseOffering[]>
+  offeringsByCourse: Record<string, CourseOffering[]>,
+  departmentsByCourseCode: Record<string, string[]> = {}
 ): DepartmentDemandForecast[] {
   return Object.keys(catalogByDepartment).map(deptId =>
-    forecastDepartmentDemand(deptId, catalogByDepartment[deptId], offeringsByCourse)
+    forecastDepartmentDemand(deptId, catalogByDepartment[deptId], offeringsByCourse, departmentsByCourseCode)
   );
 }

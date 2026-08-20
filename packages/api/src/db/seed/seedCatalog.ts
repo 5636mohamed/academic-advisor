@@ -143,6 +143,27 @@ export const CATALOG: Course[] = dedupeByCode(Object.values(CATALOG_BY_DEPARTMEN
 
 export const CATALOG_BY_CODE: Record<string, Course> = Object.fromEntries(CATALOG.map(x => [x.code, x]));
 
+// Curriculum Analytics epic — `Course.departmentId` itself is null for
+// EVERY course (real, department-specific courses were never tagged with
+// it any more than genuinely shared ones were; the field was never
+// populated at all) — the ONLY real source of "which department(s) is
+// this course part of" is CATALOG_BY_DEPARTMENT membership, and a course
+// can legitimately belong to more than one (e.g. ECE316 is both ECE and
+// EPE; every LRA/UR course is all 10) — a single nullable field could
+// never have represented that anyway. Computed once here, reused by
+// courseRiskScore.service.ts and resourceForecast.service.ts instead of
+// each re-deriving the same reverse lookup, same "shared, precomputed
+// index" pattern OFFERINGS_BY_COURSE already establishes.
+export const DEPARTMENTS_BY_COURSE_CODE: Record<string, string[]> = (() => {
+  const map: Record<string, string[]> = {};
+  for (const [dept, courses] of Object.entries(CATALOG_BY_DEPARTMENT)) {
+    for (const c of courses) {
+      (map[c.code] ??= []).push(dept);
+    }
+  }
+  return map;
+})();
+
 // Per-department elective pools, keyed the same way CATALOG_BY_DEPARTMENT
 // is — resolves each department's own XXXEL1..5 program-elective slots.
 export const ELECTIVE_POOL_BY_DEPARTMENT: Record<string, typeof ECE_ELECTIVE_POOL> = {

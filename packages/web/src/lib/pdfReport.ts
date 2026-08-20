@@ -2,7 +2,9 @@
 // backend runtime dependency) from GET /api/advisor/report.
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { AdvisorReportRowDTO, AdvisorResponsibilityDetailDTO, VpAdvisorSummaryDTO, ColliderProjectDTO } from '../api/client';
+import { AdvisorReportRowDTO, AdvisorResponsibilityDetailDTO, VpAdvisorSummaryDTO, ColliderProjectDTO, AffectedStudentRowDTO } from '../api/client';
+import { DemandForecast, CourseRiskProfile, BottleneckCourse } from '@advisor/shared';
+import { departmentsCell } from '../portal/lib/departmentsCell';
 import { drawHeaderLogo, drawSeal, drawWatermark, getPdfBrandKit } from './pdfBrandKit';
 
 // AEGIS rebrand — every PDF below is a white-page document, so the black-
@@ -446,4 +448,157 @@ export async function downloadInnovationTopographyPdf(input: { projects: (Collid
 
   drawVerificationFooter(doc, brand);
   doc.save(`innovation-topography-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+// ---------------------------------------------------------------------
+// Curriculum Analytics epic — "make the new features data downloadable
+// via PDF." Same client-side jsPDF+autoTable+pdfBrandKit pattern as every
+// report above, no new dependency. Each function takes the courses/rows
+// the CALLING page is already showing (post-filter, post-sort) — the
+// export always matches exactly what's on screen when the VP or advisor
+// clicks the button, department/category filter included, not a second,
+// separately-fetched "everything" dump.
+// ---------------------------------------------------------------------
+
+const TREND_LABEL = (slope: number) => (slope > 0.5 ? 'Rising' : slope < -0.5 ? 'Declining' : 'Steady');
+
+export async function downloadDemandForecastPdf(input: { title: string; courses: DemandForecast[] }): Promise<void> {
+  const { title, courses } = input;
+  const doc = new jsPDF();
+  const brand = await getPdfBrandKit();
+  const textLeft = drawHeaderLogo(doc, brand);
+  doc.setFontSize(16);
+  doc.text(title, textLeft, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
+
+  autoTable(doc, {
+    startY: 32,
+    head: [['Course', 'Department(s)', 'Forecasted next term', 'Confidence', 'Sections (est.)', 'Instructor load (est.)', 'Trend']],
+    body: courses.map(c => [
+      `${c.courseCode} — ${c.courseName}`,
+      departmentsCell(c.departments),
+      String(c.nextTermEnrolled),
+      `± ${c.confidenceBand}`,
+      String(c.forecastedSections),
+      String(c.forecastedInstructorLoad),
+      TREND_LABEL(c.trendSlope),
+    ]),
+    headStyles: { fillColor: [35, 32, 23] },
+    styles: { fontSize: 8 },
+    willDrawPage: () => drawWatermark(doc, brand),
+  });
+
+  doc.setFontSize(8);
+  doc.setTextColor(130);
+  const afterTable = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  doc.text('Sections and instructor load are derived estimates (forecasted enrollment ÷ typical class size) — not real section-scheduling or instructor-assignment data.', 14, afterTable, { maxWidth: 182 });
+
+  drawVerificationFooter(doc, brand);
+  doc.save(`demand-forecast-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+// Mirrors VpCurriculumHealthMonitor.tsx/AdvisorCurriculumHealthMonitor.tsx's
+// own healthBadge() cutoffs (75/55) — those are themselves already inline
+// magic numbers matching predictionWeights.json's atRiskThreshold=55,
+// same duplication those components already carry, not a new one.
+const HEALTH_ROW_RGB: [number, number, number] = [252, 214, 210]; // at-risk red, distinct from the amber "responsibility" highlight elsewhere in this file
+
+export async function downloadCurriculumHealthPdf(input: { title: string; courses: CourseRiskProfile[] }): Promise<void> {
+  const { title, courses } = input;
+  const doc = new jsPDF();
+  const brand = await getPdfBrandKit();
+  const textLeft = drawHeaderLogo(doc, brand);
+  doc.setFontSize(16);
+  doc.text(title, textLeft, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
+
+  autoTable(doc, {
+    startY: 32,
+    head: [['Course', 'Department(s)', 'Health', 'Failure rate', 'Gates', 'Demand pressure', 'Expected delay']],
+    body: courses.map(c => [
+      `${c.courseCode} — ${c.courseName}`,
+      departmentsCell(c.departments),
+      `${c.healthScore}/100`,
+      `${c.failureRate}%`,
+      c.downstreamImpact.toFixed(1),
+      `${(c.demandPressure * 100).toFixed(0)}%`,
+      c.cascadingDelaySemesters > 0 ? `${c.cascadingDelaySemesters.toFixed(1)} sem` : '—',
+    ]),
+    headStyles: { fillColor: [35, 32, 23] },
+    styles: { fontSize: 8 },
+    didParseCell: data => {
+      if (data.section === 'body' && courses[data.row.index]?.healthScore < 55) {
+        data.cell.styles.fillColor = HEALTH_ROW_RGB;
+      }
+    },
+    willDrawPage: () => drawWatermark(doc, brand),
+  });
+
+  if (courses.some(c => c.healthScore < 55)) {
+    drawHighlightLegend(doc, 'Highlighted rows: below the at-risk health threshold (55/100).');
+  }
+  drawVerificationFooter(doc, brand);
+  doc.save(`curriculum-health-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+const BOTTLENECK_REASON_LABEL: Record<string, string> = {
+  failed_needs_retake: 'Already failed — needs a retake',
+  prereq_not_yet_cleared: 'Still a real gate ahead in their plan',
+};
+
+export async function downloadBottleneckAnalyzerPdf(input: {
+  title: string;
+  bottlenecks: BottleneckCourse[];
+  /** Advisor-only — omit/empty on the VP's export, which has no per-
+   *  student roster tracing (same scope split as the live pages). */
+  affectedAdvisees?: AffectedStudentRowDTO[];
+}): Promise<void> {
+  const { title, bottlenecks, affectedAdvisees = [] } = input;
+  const doc = new jsPDF();
+  const brand = await getPdfBrandKit();
+  const textLeft = drawHeaderLogo(doc, brand);
+  doc.setFontSize(16);
+  doc.text(title, textLeft, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
+
+  let startY = 32;
+  if (affectedAdvisees.length > 0) {
+    autoTable(doc, {
+      startY,
+      head: [['Student', 'Bottleneck course', 'Why']],
+      body: affectedAdvisees.map(a => [a.studentName, a.bottleneckCourseCode, BOTTLENECK_REASON_LABEL[a.reason] ?? a.reason]),
+      headStyles: { fillColor: [35, 32, 23] },
+      styles: { fontSize: 8.5 },
+      willDrawPage: () => drawWatermark(doc, brand),
+    });
+    startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
+    doc.setFontSize(12);
+    doc.setTextColor(20);
+    doc.text('Institution-wide Bottleneck Ranking', 14, startY);
+    startY += 4;
+  }
+
+  autoTable(doc, {
+    startY,
+    head: [['Course', 'Department(s)', 'Expected delay', 'Failure rate', 'Directly blocks']],
+    body: bottlenecks.map(b => [
+      `${b.courseCode} — ${b.courseName}`,
+      departmentsCell(b.departments),
+      `${b.cascadingDelaySemesters.toFixed(1)} sem`,
+      `${b.failureRate}%`,
+      b.directlyBlocks.length > 0 ? b.directlyBlocks.join(', ') : '—',
+    ]),
+    headStyles: { fillColor: [35, 32, 23] },
+    styles: { fontSize: 8 },
+    willDrawPage: () => drawWatermark(doc, brand),
+  });
+
+  drawVerificationFooter(doc, brand);
+  doc.save(`bottleneck-analyzer-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

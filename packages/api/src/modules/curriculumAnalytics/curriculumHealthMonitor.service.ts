@@ -31,14 +31,22 @@ export function buildHealthMonitor(
   departmentId: string | null,
   catalogByDepartment: Record<string, Course[]>,
   catalog: Course[],
-  offeringsByCourse: Record<string, CourseOffering[]>
+  offeringsByCourse: Record<string, CourseOffering[]>,
+  // §"categorized, not all shown like that": real department membership
+  // for the frontend's filter bar — see seedCatalog.ts's
+  // DEPARTMENTS_BY_COURSE_CODE doc comment for why this can't just be
+  // course.departmentId (always null). Optional so synthetic test
+  // fixtures that don't care about it don't all need to thread one
+  // through — server.ts's real caller does pass it.
+  departmentsByCourseCode: Record<string, string[]> = {}
 ): CurriculumHealthReport {
   const scopedCourses = departmentId === null ? catalog : (catalogByDepartment[departmentId] ?? []);
 
   const allCourses = scopedCourses.map(course => {
     const offerings = offeringsByCourse[course.code] ?? [];
     const forecastedNextTermEnrolled = forecastCourseDemand(course, offerings).nextTermEnrolled;
-    return computeCourseRisk({ course, offerings, catalog, forecastedNextTermEnrolled });
+    const departments = departmentsByCourseCode[course.code] ?? [];
+    return computeCourseRisk({ course, offerings, catalog, forecastedNextTermEnrolled, departments });
   });
 
   const atRiskThreshold = weights.curriculumAnalytics.health.atRiskThreshold;

@@ -3,13 +3,32 @@
 // for the full design. All three features are built on real historical
 // CourseOffering data (course.ts) and the existing prerequisite graph
 // (Course.prereq) — nothing here invents a parallel data source.
+import { CourseCategory } from './course';
+
+/** Real, live-reported gap: the VP's unscoped views dumped every course
+ *  (up to 306) into one flat table with no way to slice it — "I want him
+ *  to have the option to know each department separately or Basic Science
+ *  Requirements or LRA subjects... to be categorized not all shown like
+ *  that." `departments` (plural — see Course.departmentId's own doc
+ *  comment on why a course can genuinely belong to more than one) plus the
+ *  existing category/isUR/isBasicScience fields are attached to every
+ *  course-level row across all three features so the frontend can filter
+ *  without a second round-trip; the VP already receives the full unscoped
+ *  dataset in one call, so this is purely a client-side filter, no new
+ *  routes needed. */
+export interface CourseCategoryTags {
+  category: CourseCategory;
+  isUR: boolean;
+  isBasicScience: boolean;
+  departments: string[];
+}
 
 /** Feature 1 — one course's demand projection, derived from its real
  *  CourseOffering history via the same OLS regression (linearRegression.ts)
  *  every other trend projection in this system already uses. `history` is
  *  included so the UI can plot "what actually happened" next to "what's
  *  projected," not just show the projected number in isolation. */
-export interface DemandForecast {
+export interface DemandForecast extends CourseCategoryTags {
   courseCode: string;
   courseName: string;
   departmentId: string | null;
@@ -45,7 +64,7 @@ export interface DepartmentDemandForecast {
  *  <- chainUnlockValue) or the one genuinely new formula this epic adds
  *  (cascadingDelaySemesters / healthScore) — see the blueprint for the full
  *  derivation. */
-export interface CourseRiskProfile {
+export interface CourseRiskProfile extends CourseCategoryTags {
   courseCode: string;
   courseName: string;
   departmentId: string | null;

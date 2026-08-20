@@ -12,7 +12,16 @@ export interface Course {
   category: CourseCategory;
   isUR: boolean;
   isBasicScience: boolean;       // §7.2.1 — feeds Transfer Semester eligibility
-  departmentId: string | null;   // null for shared/UR courses
+  // Never actually populated — every Course in the system has this null,
+  // department-specific courses included (confirmed live during the
+  // Curriculum Analytics epic: a single nullable field can't represent
+  // ownership anyway, since a course can legitimately belong to more than
+  // one department — e.g. ECE316 is both ECE and EPE, every LRA/UR course
+  // is all 10). Real per-department membership lives in
+  // CATALOG_BY_DEPARTMENT (api/db/seed/seedCatalog.ts) — its derived
+  // DEPARTMENTS_BY_COURSE_CODE reverse-lookup is the correct source for
+  // "which department(s) is this course part of," not this field.
+  departmentId: string | null;
   prereq: string[];              // course codes
   coreq: string[];               // course codes
   transferable: boolean;

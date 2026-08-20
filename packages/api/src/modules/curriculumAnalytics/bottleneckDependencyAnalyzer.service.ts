@@ -16,7 +16,14 @@ import { computeCourseRisk } from './courseRiskScore.service';
 export function rankBottlenecks(
   catalog: Course[],
   offeringsByCourse: Record<string, CourseOffering[]>,
-  forecastedEnrolledByCode: Record<string, number>
+  forecastedEnrolledByCode: Record<string, number>,
+  // §"categorized, not all shown like that": real department membership
+  // for the frontend's filter bar — see seedCatalog.ts's
+  // DEPARTMENTS_BY_COURSE_CODE doc comment for why this can't just be
+  // course.departmentId (always null). Optional so synthetic test
+  // fixtures that don't care about it don't all need to thread one
+  // through — server.ts's real caller does pass it.
+  departmentsByCourseCode: Record<string, string[]> = {}
 ): BottleneckCourse[] {
   const withRisk = catalog.map(course => {
     const risk = computeCourseRisk({
@@ -24,6 +31,7 @@ export function rankBottlenecks(
       offerings: offeringsByCourse[course.code] ?? [],
       catalog,
       forecastedNextTermEnrolled: forecastedEnrolledByCode[course.code] ?? 0,
+      departments: departmentsByCourseCode[course.code] ?? [],
     });
     const directlyBlocks = catalog.filter(c => c.prereq.includes(course.code)).map(c => c.code);
     return { ...risk, directlyBlocks };

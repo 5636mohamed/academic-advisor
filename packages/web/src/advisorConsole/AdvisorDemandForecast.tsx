@@ -4,24 +4,34 @@
 // a department-level diagnostic view, deliberately wider than the advisor's
 // other, roster-scoped pages (mirrors why the feature is named "Department,
 // VP" rather than "Advisors, VP" in the request).
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { DepartmentDemandForecast } from '@advisor/shared';
 import { useAuth } from '../auth/AuthContext';
 import { Loading, Section, Empty, StatCard } from '../portal/ui/Primitives';
+import { ALL_COURSE_FILTER, CourseFilterBar, CourseFilterValue, filterCourses } from '../portal/ui/CourseFilterBar';
+import { downloadDemandForecastPdf } from '../lib/pdfReport';
 
 export function AdvisorDemandForecast() {
   const { auth } = useAuth();
   const advisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
   const [forecast, setForecast] = useState<DepartmentDemandForecast | null>(null);
+  const [filter, setFilter] = useState<CourseFilterValue>(ALL_COURSE_FILTER);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (advisorId) api.advisorDemandForecast(advisorId).then(setForecast);
   }, [advisorId]);
 
-  if (!forecast) return <Loading label="Forecasting demand across your department…" />;
+  // Kept ABOVE the `!forecast` early return below — useMemo must run every
+  // render in the same order (real rules-of-hooks bug caught before
+  // shipping, see VpCurriculumHealthMonitor.tsx's identical fix).
+  const sortedCourses = useMemo(
+    () => filterCourses([...(forecast?.courses ?? [])], filter).sort((a, b) => b.nextTermEnrolled - a.nextTermEnrolled),
+    [forecast, filter]
+  );
 
-  const sortedCourses = [...forecast.courses].sort((a, b) => b.nextTermEnrolled - a.nextTermEnrolled);
+  if (!forecast) return <Loading label="Forecasting demand across your department…" />;
 
   return (
     <>
@@ -36,9 +46,26 @@ export function AdvisorDemandForecast() {
         title={`${forecast.departmentId} Demand Forecast`}
         subtitle="Next-term enrollment projected from each course's real historical offering data (recency-weighted trend) — sorted by highest forecasted demand."
         className="su-mt-16"
+        right={
+          <button
+            className="su-btn su-btn-secondary su-btn-sm"
+            disabled={downloading}
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                await downloadDemandForecastPdf({ title: `Academic Resource Demand Forecast — ${forecast.departmentId}`, courses: sortedCourses });
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            {downloading ? 'Building PDF…' : 'Download PDF'}
+          </button>
+        }
       >
+        <CourseFilterBar courses={forecast.courses} value={filter} onChange={setFilter} showDepartment={false} />
         {sortedCourses.length === 0 ? (
-          <Empty>No courses seeded for this department yet.</Empty>
+          <Empty>No courses match the selected filters.</Empty>
         ) : (
           <>
             <div className="su-note su-mt-16" style={{ fontSize: 12, marginTop: 0 }}>
