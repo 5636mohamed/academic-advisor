@@ -40,8 +40,12 @@ function jitter(seed: number, spread: number): number {
 /** Category-level baseline — reflects the ordinary shape of a program like
  *  this: general-university/UR courses run easier and bigger, core
  *  engineering "program" courses run harder and smaller, electives sit in
- *  between. Not a claim about any real course, just a believable prior. */
-const CATEGORY_BASELINE: Record<CourseCategory, { mean: number; std: number; classSize: number }> = {
+ *  between. Not a claim about any real course, just a believable prior.
+ *  Exported: courseRiskScore.service.ts (Curriculum Analytics epic) reuses
+ *  `classSize` as the "typical section size" reference for demand-pressure/
+ *  forecasted-sections math — same category-shaped prior, not a second,
+ *  independently-drifting copy of it. */
+export const CATEGORY_BASELINE: Record<CourseCategory, { mean: number; std: number; classSize: number }> = {
   ur_core: { mean: 85, std: 6, classSize: 150 },
   ur_elective: { mean: 82, std: 7, classSize: 95 },
   faculty: { mean: 76, std: 8, classSize: 115 },
