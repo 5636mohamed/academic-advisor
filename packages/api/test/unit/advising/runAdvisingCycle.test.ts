@@ -190,4 +190,51 @@ describe('runAdvisingCycle (§4.2 orchestrator, full async wiring)', () => {
     expect(totalCredits).toBeGreaterThan(14); // proves the 20-credit cap applied, not the 14-credit probation one
     expect(result.action).toBe('SHOW_PLAN'); // not routed through the probation-repair branch at all
   });
+
+  it('real bug fixed (live-reported): a non-mandatory candidate predicted an outright F is never recommended, even when it would otherwise win a knapsack slot', async () => {
+    const student = baseStudent(2.4);
+    // ECE999 predicts F but has a huge chainUnlockValue — high enough that,
+    // pre-fix, scoreCandidate's weighted sum could still make it the
+    // knapsack's top pick despite the risk penalty. ECE888 is a normal,
+    // safely-passing alternative with plenty of spare credit capacity for
+    // both to fit (so this isn't just "the F course lost on credits").
+    const eligible: EligibleCourse[] = [
+      { course: course('ECE999', 3), isRetake: false, oldLetter: null, oldPoints: null },
+      { course: course('ECE888', 3), isRetake: false, oldLetter: null, oldPoints: null },
+      // A genuinely mandatory F-grade retake — must stay in the plan
+      // regardless of this cycle's prediction; only the OPTIONAL pool
+      // above is subject to the new F-exclusion filter.
+      { course: course('ECE777', 3), isRetake: true, oldLetter: 'F', oldPoints: 1.0 },
+    ];
+
+    const scoreByCode: Record<string, ScoredCandidate> = {
+      ECE999: { ...scored('ECE999', 1.0), expectedPct: 45, expectedLetter: 'F', chainUnlockValue: 4, passRate: 20 },
+      ECE888: { ...scored('ECE888', 2.3), expectedPct: 72, expectedLetter: 'C', chainUnlockValue: 1, passRate: 85 },
+      ECE777: { ...scored('ECE777', 1.0), expectedPct: 50, expectedLetter: 'F', chainUnlockValue: 1, passRate: 30, isRetake: true },
+    };
+
+    const ports: AdvisingCyclePorts = {
+      getRetakeGateAnswer: () => true,
+      getEligibleCourses: () => eligible,
+      scoreEligibleCourse: (_s, c) => scoreByCode[c.course.code],
+      isPostLowFirstSemester: () => false,
+      projectPlanCGPA: () => 2.3,
+      getCgpaSnapshots: () => [
+        { semesterId: 's1', semesterOrdinal: 1, semesterGpa: 2.4, cgpa: 2.4, cumulativeCredits: 30, isBaseSnapshot: false },
+      ],
+      recommendDepartments: () => [],
+      simulateUnderDepartment: () => ({ projectedCGPA: 2.4, trend: { slope: 0, reading: 'insufficient_history' } }),
+      rankFacultiesByFit: () => [],
+      alreadyTransferredInternallyOnce: () => false,
+      getProbationCounter: () => ({ studentId: student.id, count: 0, armed: true }),
+    };
+
+    const result = await runAdvisingCycle(student, ports);
+    const codes = result.plan.map(p => p.courseCode);
+
+    expect(codes).not.toContain('ECE999'); // optional, F-predicted -> excluded
+    expect(codes).toContain('ECE888'); // optional, passing -> still recommended
+    expect(codes).toContain('ECE777'); // mandatory F-retake -> stays, even though it's F-predicted again
+    expect(result.plan.find(p => p.courseCode === 'ECE777')?.mandatory).toBe(true);
+  });
 });

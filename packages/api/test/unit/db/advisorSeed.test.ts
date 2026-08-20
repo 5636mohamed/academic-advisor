@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import * as db from '../../../src/db/memory/inMemoryDb';
 import { ADVISORS, NAMED_STUDENT_ADVISOR, STUDENTS_PER_DEPARTMENT, STUDENTS_PER_ADVISOR } from '../../../src/db/seed/seedAdvisors';
 import { CATALOG_BY_DEPARTMENT } from '../../../src/db/seed/seedCatalog';
+import { DISMISSAL_THRESHOLD } from '@advisor/shared';
 
 const TOTAL_ROSTER_SIZE = ADVISORS.length * STUDENTS_PER_ADVISOR;
 const REAL_DEPARTMENT_IDS = Object.keys(CATALOG_BY_DEPARTMENT);
@@ -124,6 +125,30 @@ describe(`advisor seed — ${ADVISORS.length} advisors, ${REAL_DEPARTMENT_IDS.le
     db.__resetForTests();
     const after = db.listStudents().map(s => ({ id: s.id, advisorId: s.advisorId, cgpa: db.getCurrentCgpa(s.id), level: s.level }));
     expect(after).toEqual(before);
+  });
+
+  // Real bug caught by a full student-by-student live audit (350 students,
+  // not just the one reported): a GENERATED student's replayed probation
+  // history can organically land at count >= DISMISSAL_THRESHOLD (6) —
+  // same as a real student's could at runtime through /semesters/close —
+  // but deriveStudent used to only sync `probationCounter` from the
+  // replay, never `status`. That left "phantom dismissed" students: every
+  // advising/registration/venture endpoint (blockIfDismissed, keyed off
+  // the counter) already 403'd them, while every UI surface that trusts
+  // `status` (roster lists, profile badges) still showed them as a normal
+  // active student. This asserts the invariant holds across the ENTIRE
+  // seeded roster (fixtures and generated alike), not just a spot check.
+  it('every student\'s status and probation counter agree on dismissal — no "phantom dismissed" student where the counter says 6/6 but status still reads active', () => {
+    for (const s of db.listStudents()) {
+      const shouldBeDismissed = s.probationCounter.count >= DISMISSAL_THRESHOLD;
+      expect(s.status === 'dismissed').toBe(shouldBeDismissed);
+    }
+  });
+
+  it('the one intentionally-dismissed fixture (nourhan-1) is still dismissed after this fix', () => {
+    const nourhan = db.getStudent('nourhan-1');
+    expect(nourhan?.status).toBe('dismissed');
+    expect(nourhan?.probationCounter.count).toBe(6);
   });
 });
 

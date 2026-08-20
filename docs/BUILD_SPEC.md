@@ -1981,6 +1981,205 @@ faculties. This section deliberately does not build BAS or FIBH — it only
 records that if they're ever seeded for real, they should use FIBH's/BAS's
 actual names, not the existing placeholders.
 
+## 19. Post-Launch Live-Bug-Report Fixes (Notifications, Venture Board, Course-Plan Safety, Data Integrity)
+
+Everything in this section was found and fixed after §1–18 were already
+built and running — most of it from direct live bug reports against the
+running system, not from re-reading the spec. Grouped by theme rather than
+chronologically; each item was individually live-verified (fresh dev
+server, real login, real click-through) before being called done, not just
+unit-tested.
+
+### 19.1 Notification gaps
+
+Several real advising-cycle moments were silently not notifying the party
+who needed to know:
+
+- A student generating a course plan (`addProposalsFromPlan`) — which
+  *is* the "submit for advisor review" moment, there's no separate submit
+  click — never notified the advisor at all. Now fires `proposal_submitted`
+  once per generation that actually adds new slots (not on a no-op
+  re-generate).
+- Bulk "Approve all" (both the advisor's own and the VP's cross-advisor
+  version) called the pure transform directly instead of the notifying
+  wrapper, silently skipping the student notification a single approve
+  always sent.
+- A student registering a course never told the advisor whether they took
+  the advisor's own proposed alternate or the system's original suggestion
+  (`proposal_choice_made`, new `NotificationType`).
+- `applyToVentureProject`'s existing-match branch — the *common* path for
+  a student re-applying to something they already had a `suggested` match
+  on — never notified the owning advisor; only a brand-new match did.
+- 7 student-mutating routes were missing the `blockIfDismissed` guard
+  §12 requires: `/proposals/generate`, `/proposals/:id/choose`,
+  `/proposals/choose-all`, `/retake-preference`, `/quiz`, `/venture-gate`,
+  `/venture-interest-form`.
+
+### 19.2 Workload — heavy/burnout-week task split
+
+`FrictionTimeline.tsx`'s to-do list now renders two columns instead of one
+flat list whenever a week reads as heavy (burnout-risk flagged, or ≥5
+tasks): a **Fixed** column (exams, midterms, finals — nothing a student
+can reschedule) and a **Flexible** column (assignments, reports — the
+things actually worth moving). The modal widens (`.su-modal-wide`, 640px)
+only in that case, so the two columns have room to sit side-by-side rather
+than being squeezed under the normal single-column width.
+
+### 19.3 Venture Board — per-professor scoping + grant requests relocated
+
+Per explicit request, a professor's Venture Board (advisor or VP alike) no
+longer has any cross-professor view — `AdvisorVentureBoard.tsx` dropped
+its `viewAllAdvisors` mode entirely; `VpVentureBoard.tsx` is now just that
+same component scoped to `professorId="vp-owned"`. **Students remain the
+one role that sees every professor's projects together**
+(`PortalVentureBoard.tsx` stays intentionally unscoped) — they can express
+interest and upload a CV for a venture even when the posting professor
+isn't their own advisor.
+
+A grant request on a venture (advisor or VP asking the VP for funding) is
+now request-only from the Venture Board side — `GrantRequestPanel` always
+shows a real, filled "💰 Apply for a grant" button on every project card
+(active or archived; funding to wrap up doesn't require staying active).
+**Deciding** the request (approve/decline) moved entirely to the VP's
+Innovation Topography page, in a new "Venture Grant Requests" section
+alongside Project Collider's own micro-funding tool — so all cross-
+professor funding review lives in one place. A real CSS overflow (the
+create-venture form's type/capacity row clipping at narrow widths) was
+fixed with `flexWrap` and explicit sizing while this area was being
+reworked.
+
+### 19.4 The VP as a professor — self-service venture/grant gap
+
+The Vice President can post and manage their own ventures under a
+reserved `professorId: 'vp-owned'` (see `seedVentureProjects.ts`'s
+`PROFESSORS`), separate from the 14 real advisor identities. This uncovered
+a class of gap the cross-professor code hadn't accounted for, reported
+live (*"I made a venture in the VP account, requested a grant, and never
+saw the request"*):
+
+- Innovation Topography's "Venture Grant Requests" section only ever
+  fetched the 14 real advisors' ventures via `api.advisorVentureProjects`
+  — never `'vp-owned'` — so a VP-posted venture's own grant request was
+  silently excluded. Now fetched explicitly, and labeled "Office of the
+  Vice President" instead of falling through to "Unknown advisor".
+- `decideVentureGrantRequest` always notified `role: 'advisor'` for the
+  outcome — fine for a real advisor id, but for `'vp-owned'` that's a
+  `(role:'advisor', recipientId:'vp-owned')` pair no session's bell ever
+  polls, so the VP deciding on their *own* posted venture produced a
+  silently undeliverable notification. Now branches to `role: 'vp'` when
+  `project.professorId === 'vp-owned'`.
+- The "New grant request" notification linked to Venture Board, even
+  though the actual decide UI lives on Innovation Topography (§19.3) — a
+  click dropped the VP somewhere they still had to navigate away from.
+  Both grant-related VP notifications (`grant_requested`, and
+  `grant_decided` for a VP self-request) now link to
+  `innovation-topography`. The advisor-facing `grant_decided` confirmation
+  is unchanged — Venture Board is still correct there, since that's where
+  `GrantRequestPanel` shows an advisor's own request status.
+
+**New feature, same request**: a grant request can now optionally carry a
+PDF timeline plan, attached client-side the same way a student's CV is
+(`readFileAsDataUrl` → base64 `data:` URL on `VentureGrantRequest.
+timelinePlanFileName`/`timelinePlanDataUrl` — no file storage/CDN in this
+demo, same stand-in already used for CVs). On Innovation Topography, a
+pending request with a plan attached shows a "📄 View timeline plan"
+button that opens it in a fullscreen inline `<iframe>` reader — the same
+portal-to-`<body>` pattern already proven by the CV reviewer modal in
+`AdvisorVentureBoard.tsx` (needed because a `.su-pop` animation's leftover
+`transform` on an ancestor becomes the containing block for `position:
+fixed`, shrinking a naively-nested overlay down to the card's own size) —
+so the VP can review it onsite, without downloading.
+
+### 19.5 Other real bugs found via systematic audit
+
+A whole-codebase audit (4 parallel Explore passes over backend logic,
+backend infra/notifications, frontend auth/portal, frontend advisor/VP
+consoles — each required to trace the real call path before reporting,
+not speculate) turned up several more genuine, previously-unknown bugs,
+each independently fixed and verified:
+
+- `expectedPct.ts` computed `difficultyWeight * (cohort + difficulty)`
+  instead of `difficultyWeight * difficulty` — silently double-counted the
+  cohort term (effective cohort weight 0.60, not the spec's 0.45),
+  systematically overstating projected CGPA for any student whose
+  personal trend lagged their cohort's.
+- `candidateScore.ts`'s `probation_repair` mode tripled the base risk
+  penalty instead of doubling it (added `riskPenalty * multiplier` on top
+  of the already-applied base, instead of only the difference).
+- `chooseProposal`/`chooseProposalById` had no real idempotency check (only
+  looked at the never-reset `advisorApproved` boolean, not `status`) — a
+  double-click or client retry could register the same course twice.
+- Both PDF reports (`pdfReport.ts`) highlighted table rows by matching on
+  `name` instead of the real unique `studentId`/`advisor.id` — a real
+  collision risk given the generated roster's small first/last-name pool.
+- `POST /api/advisor/transfer-requests/:id/approve|decline` had no
+  advisor-ownership check at all — any advisor could decide any other
+  advisor's transfer request. Now requires and validates the calling
+  `advisorId`.
+- Login: the roster fetch wasn't guaranteed loaded before submit was
+  allowed, so a fast submit could reject valid credentials — submit is now
+  disabled and labeled "Loading…" until the roster resolves.
+- A corrupted/malformed `localStorage` auth session could infinite-loop
+  between `/` and `/vp` instead of falling back to logged-out — `AuthContext`
+  now validates the parsed shape (`isValidAuthState`) before trusting it,
+  and `homeRouteFor` no longer has a silent `'/vp'` catch-all for an
+  unrecognized role.
+
+### 19.6 Course-plan safety — never recommend a predicted F
+
+Reported live against a real generated student's course plan: the
+optimizer could recommend (not just allow, but actively pick into the
+plan) a course predicted to land an outright F. Root cause: `packPlan`'s
+knapsack scores every optional/pool candidate on a weighted blend
+(grade quality, chain-unlock value, credit progress, a risk-penalty
+subtraction) and picks whatever maximizes total score under the credit
+cap — nothing in that scoring ever *excluded* a candidate outright, so a
+course with enough chain-unlock value could still out-score a safer
+alternative despite a losing predicted grade.
+
+Fixed in `runAdvisingCycle` (`advisingCycle.service.ts`): the scored pool
+is now filtered to drop any candidate with `expectedLetter === 'F'`
+*before* it's ever handed to `packPlan`, so it can't win a slot on any
+other factor. Scoped to the optional pool only — **not** the mandatory
+F-grade retakes (§5.2): those are compulsory to graduate regardless of
+this cycle's prediction, so there's nothing to "recommend" or withhold
+there, unlike a fresh/optional-retake pick the student has a real choice
+about. `bestCasePct >= expectedPct` was already a hard invariant elsewhere
+(`bestCaseProjection.ts` clamps it explicitly) — re-verified, not
+re-fixed, across the full roster below.
+
+### 19.7 Data integrity — dismissal status/counter sync ("phantom dismissed" students)
+
+A full, student-by-student live audit (all 350 seeded students, not just
+the one originally reported) surfaced a second, unrelated bug while
+verifying §19.6's fix: several **generated** students had a
+`probationCounter.count` that had organically replayed to ≥
+`DISMISSAL_THRESHOLD` (6) — same real §4.1 rule any student can trigger —
+but `status` still read `'active'` everywhere the UI trusts it (roster
+lists, profile badges, the "Record a grade" guard). Every
+advising/registration/venture endpoint (`blockIfDismissed`, keyed off the
+*counter*, not `status`) was already silently 403-ing these students with
+a confusing, unexplained failure, while the rest of the app showed them as
+completely normal.
+
+Root cause: `deriveStudent()` (`inMemoryDb.ts`) replays each seeded
+student's `cgpaSnapshots` through the real state machine
+(`replayProbationHistory`) and overwrites `probationCounter` with the
+replayed result — but never applied the matching `status` consequence.
+The runtime `/students/:id/semesters/close` route has always done this
+correctly (`if (result.dismissed) db.updateStudentStatus(...)`); the seed
+path just never mirrored it. Fixed by deriving `status` from the same
+replayed counter at seed time, so the two can never drift apart for a
+generated student either.
+
+**Full-roster verification** (a live script against the running API, not
+just unit tests): all 350 students checked for — dismissal status/counter
+agreement, curriculum cross-department leakage, missing letter/pct on any
+`passed`/`needs_retake` row, any `expectedLetter: 'F'` proposal, any
+`bestCasePct < expectedPct` violation, and a working (non-erroring)
+venture-matches fetch. Zero problems found on the fixed code, across every
+check, for every student.
+
 ---
 
-*End of specification. This document, sections 1–18, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), §17 (AEGIS rebrand, multi-advisor model, Vice President oversight, advisor responsibility workflow, transfer pending chain), §18 (the real 10-program FoE department catalog expansion), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13.*
+*End of specification. This document, sections 1–19, is intended to be handed in full to a build agent as the single source of truth for implementation — all business rules from the request are covered in §4 (probation/dismissal), §5 (retake gate), §7 (transfers), §15 (student portal, best-case projection, dual-approval registration, advisor reporting), §16 (Innovation & Venture Catalyst — venture gate, ventureFitScore, Venture Board, Faculty Console), §17 (AEGIS rebrand, multi-advisor model, Vice President oversight, advisor responsibility workflow, transfer pending chain), §18 (the real 10-program FoE department catalog expansion), §19 (post-launch live-bug-report fixes — notifications, venture board rescoping, course-plan safety, data integrity), with worked scenarios in §11/§15.6/§11.N and a corresponding test checklist in §13.*

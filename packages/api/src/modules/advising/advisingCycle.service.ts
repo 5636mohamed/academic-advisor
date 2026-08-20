@@ -355,10 +355,27 @@ export async function runAdvisingCycle(student: StudentWithCgpa, ports: Advising
   // (F-grade retakes, always force-included regardless of the gate answer).
   const { pool, mandatory } = buildCandidatePool({ eligible, considerRetakes: retakeGateYes });
 
-  const scoredPool: ScoredCandidate[] = await Promise.all(pool.map(c => ports.scoreEligibleCourse(student, c, retakeGateYes)));
+  const scoredPoolRaw: ScoredCandidate[] = await Promise.all(pool.map(c => ports.scoreEligibleCourse(student, c, retakeGateYes)));
   const scoredMandatory: ScoredCandidate[] = await Promise.all(
     mandatory.map(c => ports.scoreEligibleCourse(student, c, retakeGateYes))
   );
+
+  // Real bug reported live (a student's course plan recommended a course
+  // they were predicted to outright fail — the "Iman Tawfik case"): the
+  // knapsack optimizer scores candidates on chainUnlockValue/credit-progress/
+  // grade-quality together, so a course with a losing predicted grade could
+  // still win a slot on its OTHER merits (e.g. it unlocks a lot of future
+  // courses) even though `scoreCandidate` already subtracts a risk penalty
+  // for it. A predicted F is categorically different from a predicted D —
+  // this is someone's real degree progress, and this system should never
+  // affirmatively RECOMMEND a course it's telling the student they'll fail.
+  // Filtered out here, before packPlan ever sees it, so it can't be chosen
+  // into `pool` on any other factor. Scoped to `pool` only — NOT
+  // `scoredMandatory` — because a mandatory F-grade retake is compulsory to
+  // graduate regardless of this cycle's prediction (§5.2); the student has
+  // no real choice about attempting it again, so there's nothing to
+  // "recommend" or withhold there, unlike a fresh/optional-retake pick.
+  const scoredPool = scoredPoolRaw.filter(c => c.expectedLetter !== 'F');
 
   // Fetched once, ahead of the cap/mode decision below, so it can double
   // as the "has this student ever closed a real semester yet" signal too —

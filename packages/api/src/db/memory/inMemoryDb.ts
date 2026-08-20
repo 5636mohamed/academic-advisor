@@ -7,7 +7,7 @@
 // eventually wrap around actual SQL — swapping this module out for Prisma
 // calls later shouldn't require touching any caller (routes/ports), only
 // this file.
-import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor, Project, Notification, NotificationRole, NotificationType } from '@advisor/shared';
+import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor, Project, Notification, NotificationRole, NotificationType, DISMISSAL_THRESHOLD } from '@advisor/shared';
 import { CATALOG, CATALOG_BY_DEPARTMENT } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
 import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
@@ -720,14 +720,33 @@ function completeTranscript(s: SeedStudent): SeedStudent {
  *  student EXCEPT the dismissed one (whose seed literal's `count: 6` must
  *  win even though replay stops the loop right after reaching 6, same
  *  value either way), also overwrites `probationCounter` with the replayed
- *  result so the counter and its audit trail can never drift apart. */
+ *  result so the counter and its audit trail can never drift apart.
+ *
+ *  Real bug caught by a full student-by-student audit (systemic, not just
+ *  the one student who was reported): this only ever synced
+ *  `probationCounter` from the replay, never `status`. The runtime
+ *  `/semesters/close` route has always correctly done both together
+ *  (`if (result.dismissed) db.updateStudentStatus(...)`, server.ts) — but a
+ *  GENERATED student's random-yet-deterministic semester history can
+ *  organically replay to count >= DISMISSAL_THRESHOLD too, same as a real
+ *  student's could at runtime, and this path never applied that
+ *  consequence. The result: a "phantom dismissed" student whose counter
+ *  says 6/6 but whose `status` still reads 'active' everywhere the UI
+ *  trusts it (roster lists, profile badges, the "Record a grade" guard) —
+ *  while every advising/registration/venture endpoint (`blockIfDismissed`,
+ *  keyed off the counter, not `status`) already silently 403s them. Kept
+ *  in sync here the same way the runtime path already does it, so a
+ *  generated roster can never drift into that inconsistent state either. */
 function deriveStudent(s: SeedStudent): StoredStudent {
   const { counter, log } = replayProbationHistory(s.id, s.cgpaSnapshots);
+  const probationCounter = s.cgpaSnapshots.length > 0 ? counter : { ...s.probationCounter };
+  const status: StudentStatus = probationCounter.count >= DISMISSAL_THRESHOLD ? 'dismissed' : s.status;
   return {
     ...s,
+    status,
     allAttempts: s.allAttempts.map(a => ({ ...a })),
     cgpaSnapshots: s.cgpaSnapshots.map(sn => ({ ...sn })),
-    probationCounter: s.cgpaSnapshots.length > 0 ? counter : { ...s.probationCounter },
+    probationCounter,
     probationLog: log,
     transferRecords: [],
     proposals: [],
