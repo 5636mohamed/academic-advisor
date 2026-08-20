@@ -7,6 +7,7 @@
 // eventually wrap around actual SQL — swapping this module out for Prisma
 // calls later shouldn't require touching any caller (routes/ports), only
 // this file.
+import { randomUUID } from 'crypto';
 import { Student, StudentStatus, EnrollmentRecord, CgpaSnapshot, Course, Transcript, ProbationCounterState, ProbationCounterLogEntry, TransferRecord, TransferRequest, TransferType, CourseProposal, RegisteredCourse, AdvisorReportRow, CandidateCourseScore, ProfessorProfile, VentureProject, StudentVentureMatch, VentureMatchResult, VentureFitBreakdown, Advisor, Project, Notification, NotificationRole, NotificationType, DISMISSAL_THRESHOLD } from '@advisor/shared';
 import { CATALOG, CATALOG_BY_DEPARTMENT } from '../seed/seedCatalog';
 import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
@@ -2493,6 +2494,50 @@ export function markAllNotificationsRead(role: NotificationRole, recipientId: st
   for (const n of notifications) {
     if (n.role === role && n.recipientId === recipientId) n.read = true;
   }
+}
+
+// ---------------------------------------------------------------------
+// Real backend authentication epic — session tokens. Same "small in-
+// memory table" shape as notifications/transferRequests above. Resets on
+// every server restart/redeploy exactly like every other collection in
+// this file already does (no persistent volume behind this demo store —
+// confirmed in railway.json) — not a new risk this introduces, a real
+// user simply logs in again, same as any other in-memory state loss here.
+// ---------------------------------------------------------------------
+export type AuthRole = 'student' | 'advisor' | 'vice_president';
+export interface SessionRecord {
+  token: string;
+  role: AuthRole;
+  /** null only for vice_president — a single global identity, no id to scope by. */
+  id: string | null;
+  expiresAt: number;
+}
+
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24h — a normal demo session lifetime, not a real security-tuned value
+const sessions = new Map<string, SessionRecord>();
+
+export function createSession(role: AuthRole, id: string | null): SessionRecord {
+  const token = randomUUID();
+  const record: SessionRecord = { token, role, id, expiresAt: Date.now() + SESSION_TTL_MS };
+  sessions.set(token, record);
+  return record;
+}
+
+/** Lazily evicts an expired session on lookup (no background sweep needed
+ *  for a demo-scale in-memory map) rather than returning a stale record a
+ *  caller would have to separately check the expiry of. */
+export function getSession(token: string): SessionRecord | null {
+  const record = sessions.get(token);
+  if (!record) return null;
+  if (record.expiresAt < Date.now()) {
+    sessions.delete(token);
+    return null;
+  }
+  return record;
+}
+
+export function deleteSession(token: string): void {
+  sessions.delete(token);
 }
 
 export { courseByCode };

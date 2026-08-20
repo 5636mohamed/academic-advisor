@@ -14,3 +14,4 @@ export * from './types/coldStart';
 export * from './types/curriculumAnalytics';
 export * from './grading/engScale';
 export * from './grading/urScale';
+export * from './auth/credentials';

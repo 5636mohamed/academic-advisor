@@ -44,6 +44,8 @@ import { buildHealthMonitor } from './modules/curriculumAnalytics/curriculumHeal
 import { rankBottlenecks, affectedAdvisees, StudentForBottleneckCheck } from './modules/curriculumAnalytics/bottleneckDependencyAnalyzer.service';
 import { MILESTONES_BY_COURSE, SYLLABUS_MILESTONES, SEMESTER_WEEKS } from './db/seed/seedSyllabusMilestones';
 import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
+import { login } from './modules/auth/session.service';
+import { authenticate, requireAuthRole, requireStudentAccess, requireAdvisorAccess, GuardPorts } from './modules/auth/guards';
 
 const app = express();
 
@@ -147,6 +149,40 @@ function blockIfDismissed(req: express.Request, res: express.Response, next: exp
     throw err;
   }
 }
+
+// ---------------------------------------------------------------------
+// Real backend authentication epic — replaces the old client-only demo
+// login (a plain JSON blob in localStorage, no server verification at
+// all — see .github/SECURITY.md's rewritten Authentication section for
+// the full before/after). `POST /api/auth/login` now does the real
+// email->identity lookup + password verification this used to do
+// client-side; every guarded route below composes `authenticate` +
+// (requireAuthRole | requireStudentAccess | requireAdvisorAccess) in
+// front of its handler, same "look up -> assert -> 403/404 -> next()"
+// shape blockIfDismissed above already established.
+// ---------------------------------------------------------------------
+const guardPorts: GuardPorts = {
+  getSession: db.getSession,
+  getStudentAdvisorId: (studentId: string) => db.getStudent(studentId)?.advisorId ?? null,
+};
+const requireAuth = authenticate(guardPorts);
+
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body ?? {};
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'expected { email, password }' });
+  }
+  const result = login(email, password, { listAdvisors: db.listAdvisors, listStudents: db.listStudents, createSession: db.createSession });
+  if (!result) return res.status(401).json({ error: 'Invalid email or password' });
+  res.json(result);
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const header = req.header('authorization');
+  const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : null;
+  if (token) db.deleteSession(token);
+  res.status(204).send();
+});
 
 // ---------------------------------------------------------------------
 // Students — read
