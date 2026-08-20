@@ -35,6 +35,31 @@ describe('transfer request creation', () => {
   });
 });
 
+describe('advisor stage — ownership check (real authorization gap found by audit)', () => {
+  it('a different advisor cannot approve a request that isn\'t theirs', () => {
+    const req = db.createTransferRequestForStudent('youssef-3', 'internal_department', 'CSE'); // real advisor: advisor-mervat
+    expect(() => db.advisorDecideTransferRequest(req.id, 'approve', undefined, 'advisor-nabil')).toThrow(/not this advisor's transfer request/);
+    expect(db.listTransferRequestsForStudent('youssef-3').find(r => r.id === req.id)!.status).toBe('pending_advisor'); // unchanged
+  });
+
+  it('a different advisor cannot decline a request that isn\'t theirs either', () => {
+    const req = db.createTransferRequestForStudent('youssef-3', 'internal_department', 'CSE');
+    expect(() => db.advisorDecideTransferRequest(req.id, 'decline', 'nope', 'advisor-nabil')).toThrow(/not this advisor's transfer request/);
+  });
+
+  it('the real owning advisor can still approve normally', () => {
+    const req = db.createTransferRequestForStudent('youssef-3', 'internal_department', 'CSE');
+    const updated = db.advisorDecideTransferRequest(req.id, 'approve', undefined, 'advisor-mervat');
+    expect(updated.status).toBe('pending_vp');
+  });
+
+  it('omitting the calling advisor id entirely (existing internal callers) skips the check, unaffected', () => {
+    const req = db.createTransferRequestForStudent('youssef-3', 'internal_department', 'CSE');
+    const updated = db.advisorDecideTransferRequest(req.id, 'approve'); // no 4th arg, same as every pre-existing test in this file
+    expect(updated.status).toBe('pending_vp');
+  });
+});
+
 describe('advisor stage', () => {
   it('approving moves it to pending_vp and does not execute the transfer yet', () => {
     const req = db.createTransferRequestForStudent('youssef-3', 'internal_department', 'CSE');

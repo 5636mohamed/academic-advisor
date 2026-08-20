@@ -69,7 +69,12 @@ export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Pro
   doc.setTextColor(110);
   doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
 
-  const flaggedNames = rows.filter(r => r.hasBelowOrEqualAdvisorProposal).map(r => r.name);
+  // Real bug found by audit: matching by name risks two different
+  // students who happen to share a name (generated fillers are drawn from
+  // a shared first/last name pool — a real, non-contrived collision risk
+  // across a 25-student roster) getting the wrong one's row highlighted.
+  // studentId is the actual unique key.
+  const flaggedStudentIds = new Set(rows.filter(r => r.hasBelowOrEqualAdvisorProposal).map(r => r.studentId));
 
   autoTable(doc, {
     startY: 32,
@@ -92,7 +97,7 @@ export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Pro
     // trailing cursor, which is what used to cause it to overlap other
     // content on a multi-page report.
     didParseCell: data => {
-      if (data.section === 'body' && flaggedNames.includes(String(rows[data.row.index]?.name))) {
+      if (data.section === 'body' && flaggedStudentIds.has(rows[data.row.index]?.studentId)) {
         data.cell.styles.fillColor = RESPONSIBILITY_HIGHLIGHT_RGB;
       }
     },
@@ -103,7 +108,7 @@ export async function downloadAdvisorReportPdf(rows: AdvisorReportRowDTO[]): Pro
     willDrawPage: () => drawWatermark(doc, brand),
   });
 
-  if (flaggedNames.length > 0) {
+  if (flaggedStudentIds.size > 0) {
     drawHighlightLegend(doc, "Highlighted rows: the advisor is responsible for this student's grade in a proposed course.");
   }
   drawVerificationFooter(doc, brand);
@@ -138,7 +143,11 @@ export async function downloadVpAdvisorsReportPdf(
   doc.setTextColor(110);
   doc.text(`Generated ${new Date().toLocaleString()}`, textLeft, 25);
 
-  const flaggedAdvisors = rows.filter(r => r.flaggedStudentNames.length > 0);
+  // Real ids, not names, for the same reason as downloadAdvisorReportPdf
+  // above — advisor names are a small curated list so a collision here is
+  // far less likely in practice, but there's no reason to rely on that
+  // when advisor.id is right there and just as easy to match on.
+  const flaggedAdvisorIds = new Set(rows.filter(r => r.flaggedStudentNames.length > 0).map(r => r.advisor.id));
 
   autoTable(doc, {
     startY: 32,
@@ -153,7 +162,7 @@ export async function downloadVpAdvisorsReportPdf(
     headStyles: { fillColor: [35, 32, 23] },
     styles: { fontSize: 9 },
     didParseCell: data => {
-      if (data.section === 'body' && flaggedAdvisors.some(a => a.advisor.name === String(rows[data.row.index]?.advisor.name))) {
+      if (data.section === 'body' && flaggedAdvisorIds.has(rows[data.row.index]?.advisor.id)) {
         data.cell.styles.fillColor = RESPONSIBILITY_HIGHLIGHT_RGB;
       }
     },
@@ -175,7 +184,7 @@ export async function downloadVpAdvisorsReportPdf(
     });
   }
 
-  if (flaggedAdvisors.length > 0) {
+  if (flaggedAdvisorIds.size > 0) {
     drawHighlightLegend(
       doc,
       responsibilityDetails.length > 0

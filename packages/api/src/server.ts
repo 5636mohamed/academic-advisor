@@ -445,19 +445,31 @@ app.get('/api/advisors/:advisorId/transfer-requests', (req, res) => {
   res.json(db.listTransferRequestsForAdvisor(req.params.advisorId));
 });
 
+// Real authorization gap found by audit: neither route below checked that
+// the deciding advisor actually owns this transfer request — any advisor
+// session could approve/decline any OTHER advisor's request just by
+// knowing the requestId. advisorId is now required in the body and
+// checked against the request's own advisorId (db.advisorDecideTransferRequest
+// throws a 403-tagged error on mismatch).
 app.post('/api/advisor/transfer-requests/:requestId/approve', (req, res) => {
+  const { advisorId } = req.body ?? {};
+  if (typeof advisorId !== 'string' || !advisorId) return res.status(400).json({ error: 'expected { advisorId: string }' });
   try {
-    res.json(db.advisorDecideTransferRequest(req.params.requestId, 'approve'));
+    res.json(db.advisorDecideTransferRequest(paramStr(req, 'requestId'), 'approve', undefined, advisorId));
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    const status = (err as { httpStatus?: number })?.httpStatus ?? 400;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
 app.post('/api/advisor/transfer-requests/:requestId/decline', (req, res) => {
+  const { advisorId, reason } = req.body ?? {};
+  if (typeof advisorId !== 'string' || !advisorId) return res.status(400).json({ error: 'expected { advisorId: string }' });
   try {
-    res.json(db.advisorDecideTransferRequest(req.params.requestId, 'decline', req.body?.reason));
+    res.json(db.advisorDecideTransferRequest(paramStr(req, 'requestId'), 'decline', reason, advisorId));
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    const status = (err as { httpStatus?: number })?.httpStatus ?? 400;
+    res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 

@@ -33,16 +33,18 @@ export function AdvisorTransferRequests() {
   const history = requests.filter(r => r.status !== 'pending_advisor').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const approve = async (id: string) => {
+    if (!advisorId) return;
     setBusyId(id);
     setError(null);
-    try { await api.advisorApproveTransferRequest(id); load(); }
+    try { await api.advisorApproveTransferRequest(id, advisorId); load(); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusyId(null); }
   };
   const decline = async (id: string) => {
+    if (!advisorId) return;
     setBusyId(id);
     setError(null);
-    try { await api.advisorDeclineTransferRequest(id); load(); }
+    try { await api.advisorDeclineTransferRequest(id, advisorId); load(); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusyId(null); }
   };

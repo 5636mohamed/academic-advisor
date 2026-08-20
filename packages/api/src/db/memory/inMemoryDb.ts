@@ -1512,8 +1512,19 @@ export function getTransferCountersByAdvisor(): VpTransferCounterRow[] {
   });
 }
 
-export function advisorDecideTransferRequest(requestId: string, decision: 'approve' | 'decline', reason?: string): TransferRequest {
+export function advisorDecideTransferRequest(requestId: string, decision: 'approve' | 'decline', reason?: string, callingAdvisorId?: string): TransferRequest {
   const request = findTransferRequest(requestId);
+  // Real authorization gap found by audit: this route had no ownership
+  // check at all — any advisor session could approve/decline ANY other
+  // advisor's transfer request just by knowing the requestId, unlike
+  // every other per-advisor-scoped mutation in this app (venture grant
+  // requests, roster reads, etc.). callingAdvisorId is optional only so
+  // existing direct callers (e.g. via the transfer-request pending-chain
+  // helper) that already know they're operating correctly aren't broken;
+  // the real HTTP route always passes it.
+  if (callingAdvisorId !== undefined && request.advisorId !== callingAdvisorId) {
+    throw Object.assign(new Error('not this advisor\'s transfer request'), { httpStatus: 403 });
+  }
   if (request.status !== 'pending_advisor') {
     throw new Error(`transfer request ${requestId} is '${request.status}', not awaiting advisor review`);
   }

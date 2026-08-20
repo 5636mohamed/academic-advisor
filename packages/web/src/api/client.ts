@@ -442,9 +442,13 @@ export const api = {
     }),
   studentTransferRequests: (id: string) => request<TransferRequestDTO[]>(`/students/${id}/transfer-requests`),
   advisorTransferRequests: (advisorId: string) => request<TransferRequestDTO[]>(`/advisors/${advisorId}/transfer-requests`),
-  advisorApproveTransferRequest: (requestId: string) => request<TransferRequestDTO>(`/advisor/transfer-requests/${requestId}/approve`, { method: 'POST' }),
-  advisorDeclineTransferRequest: (requestId: string, reason?: string) =>
-    request<TransferRequestDTO>(`/advisor/transfer-requests/${requestId}/decline`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  // advisorId now required — a real authorization gap found by audit: the
+  // route used to accept no advisor identity at all, so any advisor
+  // session could approve/decline any OTHER advisor's transfer request.
+  advisorApproveTransferRequest: (requestId: string, advisorId: string) =>
+    request<TransferRequestDTO>(`/advisor/transfer-requests/${requestId}/approve`, { method: 'POST', body: JSON.stringify({ advisorId }) }),
+  advisorDeclineTransferRequest: (requestId: string, advisorId: string, reason?: string) =>
+    request<TransferRequestDTO>(`/advisor/transfer-requests/${requestId}/decline`, { method: 'POST', body: JSON.stringify({ advisorId, reason }) }),
   vpTransferRequests: () => request<TransferRequestDTO[]>('/vp/transfer-requests'),
   vpTransferCounters: () => request<VpTransferCounterDTO[]>('/vp/transfer-requests-summary'),
   vpApproveTransferRequest: (requestId: string) => request<TransferRequestDTO>(`/vp/transfer-requests/${requestId}/approve`, { method: 'POST' }),
