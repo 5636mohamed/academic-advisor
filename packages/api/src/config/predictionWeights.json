@@ -1,12 +1,14 @@
 {
   "expectedPct": {
-    "cohortWeight": 0.45,
-    "studentWeight": 0.40,
-    "difficultyWeight": 0.15
-  },
-  "difficultyAdjustment": {
-    "lowRiskBonus": 5,
-    "toughPenalty": 5
+    "studentMeanWeight": 0.35,
+    "studentModeWeight": 0.25,
+    "cohortMeanWeight": 0.25,
+    "cohortModeWeight": 0.15,
+    "risingBonus": 3,
+    "decliningPenalty": 3,
+    "inconsistencyPenalty": 2,
+    "trendSlopePerTermThreshold": 1.5,
+    "inconsistencyStdDevThreshold": 10
   },
   "candidateScore": {
     "gradeQuality": 46,

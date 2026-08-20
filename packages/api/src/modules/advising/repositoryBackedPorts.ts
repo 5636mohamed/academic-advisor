@@ -16,36 +16,38 @@ import {
 import { EligibleCourse } from '../retakeGate/retakePreference.service';
 import { PackPlanResult } from '../prediction/planPacker';
 import { expectedPct } from '../prediction/expectedPct';
-import { cohortProjectedPct } from '../prediction/cohortTrend';
-import { studentTrendPct } from '../prediction/studentTrend';
+import { cohortMeanModeTrend } from '../prediction/cohortTrend';
+import { studentMeanAndMode } from '../prediction/studentStats';
 import { chainUnlockValue } from '../prediction/chainUnlockValue';
-import { passRateFromOfferings, tierFromOfferings } from '../prediction/offeringStats';
+import { passRateFromOfferings } from '../prediction/offeringStats';
 import { CATALOG } from '../../db/seed/seedCatalog';
 import { OFFERINGS_BY_COURSE } from '../../db/seed/seedCourseOfferings';
 import * as db from '../../db/memory/inMemoryDb';
 import { recommendDepartments, rankFacultiesByFit, DEPARTMENTS, OTHER_FACULTY_DEPARTMENTS } from '../fitEngine/deptFitEngine';
 import { simulateUnderDepartment as simulateUnderDepartmentReal } from '../fitEngine/simulateUnderDepartment';
 
-/** §3.1(a)'s cohort signal now reads real (if synthetic) 3-year offering
- *  history per course (seedCourseOfferings.ts) instead of always falling
- *  back to one flat neutral number — see that file's header for why this
- *  used to be `cohortProjectedPct([])` unconditionally, and why that made
- *  every course predict roughly the same C+/C band regardless of the
- *  student's real ability or the course's real difficulty. Difficulty tier
- *  and pass-rate/confidence are now likewise derived from that same history
- *  (offeringStats.ts) instead of the old hardcoded 'moderate' / 85. */
+/** Real prediction-engine fix, live-reported: a student with a genuinely
+ *  strong recent record could still land a low expectedPct, because the
+ *  old formula weighted a regression-projected COHORT number nearly as
+ *  heavily as the student's own trend. Rebuilt around real mean + modal
+ *  grade on BOTH sides (studentStats.ts / cohortTrend.ts) plus an
+ *  explicit trend classification for the subject (rising/declining/
+ *  consistent/inconsistent) — see expectedPct.ts's own header for the
+ *  full before/after and a real worked example. */
 function scoreEligibleCourse(student: StudentWithCgpa, c: EligibleCourse, retakeGateYes: boolean): ScoredCandidate {
   const history = Object.values(db.getTranscript(student.id));
   const courseByCode = Object.fromEntries(CATALOG.map(course => [course.code, { category: course.category }]));
 
   const offerings = OFFERINGS_BY_COURSE[c.course.code] ?? [];
-  const cohort = cohortProjectedPct(offerings);
-  const studentTrend = studentTrendPct({ category: c.course.category }, history, courseByCode);
+  const cohort = cohortMeanModeTrend(offerings, c.course.isUR);
+  const studentStats = studentMeanAndMode({ category: c.course.category, isUR: c.course.isUR }, history, courseByCode);
   const pct = expectedPct({
-    cohortProjectedPct: cohort,
-    studentTrendPct: studentTrend,
-    cohortMeanFallback: 72, // only reached if a course somehow has < 3 seeded offerings
-    tier: tierFromOfferings(offerings),
+    studentMean: studentStats?.mean ?? null,
+    studentModePct: studentStats?.modePct ?? null,
+    cohortMean: cohort?.mean ?? null,
+    cohortModePct: cohort?.modePct ?? null,
+    trendAdjustment: cohort?.trendAdjustment ?? 0,
+    neutralFallback: 72, // only reached if a course AND the student both somehow have zero history
   });
   const band = pct >= 95 ? 'A+' : pct >= 90 ? 'A' : pct >= 85 ? 'B+' : pct >= 80 ? 'B' : pct >= 75 ? 'C+' : pct >= 70 ? 'C' : pct >= 65 ? 'D+' : pct >= 60 ? 'D' : 'F';
   const expectedPoints = pct >= 95 ? 4.0 : pct >= 90 ? 3.7 : pct >= 85 ? 3.3 : pct >= 80 ? 3.0 : pct >= 75 ? 2.7 : pct >= 70 ? 2.3 : pct >= 65 ? 2.0 : pct >= 60 ? 1.7 : 1.0;

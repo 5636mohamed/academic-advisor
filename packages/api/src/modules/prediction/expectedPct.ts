@@ -1,43 +1,58 @@
-// Spec §3.1(c) — weighted-sum blend of cohort trend, student trend, and a
-// difficulty nudge, into a single expected-score prediction for a course.
-// Weights are read from config so they can be retuned without a redeploy
-// (spec §12 edge-case checklist).
+// Real backend prediction-engine fix, live-reported: "some students with
+// high grades in their last performing classes... why is there low
+// expected grades." Root cause confirmed with real data before this fix
+// (562 real cases across the roster): the old formula
+// (0.45*cohortProjected + 0.40*studentTrend + 0.15*difficultyNudge)
+// weighted a course's historical cohort mean almost as heavily as the
+// student's own trend, so a historically hard course (say a ~55% class
+// mean) could still drag a student with a genuine ~90% personal average
+// down to a D-range prediction — a real, live example: Ahmed Mostafa,
+// 90.5% last-semester average, predicted a D (60.8%) in ECE312 purely
+// because ECE312's own cohort history averages low.
+//
+// Rebuilt around exactly what was asked for: the student's own mean AND
+// modal (most frequently earned) grade (studentStats.ts), the subject's
+// own 3-year mean AND modal grade (cohortTrend.ts, "like you did with the
+// student"), plus an explicit rising/declining/consistent/inconsistent
+// trend adjustment for the subject — replacing the old flat difficulty-
+// tier nudge, which only ever looked at a static average, never direction.
 import { clamp } from './linearRegression';
 import weights from '../../config/predictionWeights.json';
 
-export interface DifficultyTier { tier: 'low-risk' | 'moderate' | 'historically tough'; }
-
-export function courseDifficultyAdjustment(tier: DifficultyTier['tier']): number {
-  if (tier === 'low-risk') return weights.difficultyAdjustment.lowRiskBonus;
-  if (tier === 'historically tough') return -weights.difficultyAdjustment.toughPenalty;
-  return 0;
-}
-
 export interface ExpectedPctInputs {
-  cohortProjectedPct: number | null;
-  studentTrendPct: number | null;
-  cohortMeanFallback: number; // used when either regression input is unavailable
-  tier: DifficultyTier['tier'];
+  studentMean: number | null;
+  studentModePct: number | null;
+  cohortMean: number | null;
+  cohortModePct: number | null;
+  /** Additive nudge from cohortTrend.ts's own trendAdjustment — already
+   *  scaled (±risingBonus/decliningPenalty/inconsistencyPenalty), applied
+   *  once here, not re-derived. */
+  trendAdjustment: number;
+  /** Used only when studentMean/cohortMean are both unavailable (a course
+   *  or student with literally zero history) — the same "there is
+   *  genuinely nothing else to lean on" fallback the old formula had. */
+  neutralFallback: number;
 }
 
 export function expectedPct(inputs: ExpectedPctInputs): number {
-  const cohort = inputs.cohortProjectedPct ?? inputs.cohortMeanFallback;
-  const student = inputs.studentTrendPct ?? cohort; // no personal history -> lean on cohort signal
-  const difficulty = courseDifficultyAdjustment(inputs.tier);
+  const cfg = weights.expectedPct;
+  // A student with no comparable history at all leans on the cohort mean
+  // instead (matching the old formula's own "no personal history -> lean
+  // on cohort signal" reasoning) — and vice versa, since either signal
+  // being briefly unavailable (a brand-new course, a brand-new student)
+  // shouldn't collapse the whole prediction to the flat neutral fallback
+  // if the OTHER real signal is available.
+  const studentMean = inputs.studentMean ?? inputs.cohortMean ?? inputs.neutralFallback;
+  const studentModePct = inputs.studentModePct ?? studentMean;
+  const cohortMean = inputs.cohortMean ?? inputs.studentMean ?? inputs.neutralFallback;
+  const cohortModePct = inputs.cohortModePct ?? cohortMean;
 
-  // Spec §3.1(c): expectedPct = 0.45*cohort + 0.40*student + 0.15*difficulty
-  // — difficulty is a small standalone ±5-point nudge, not (cohort +
-  // difficulty). The previous version multiplied difficultyWeight by
-  // (cohort + difficulty), which silently re-added the cohort term a
-  // second time (effective cohort weight 0.60, not 0.45) — a real bug
-  // caught by code review, not a hypothetical: it fed straight into
-  // runAdvisingCycle via repositoryBackedPorts.ts's scoreEligibleCourse,
-  // systematically overstating projectedCGPA for any student whose
-  // personal trend lagged their cohort's.
   const blended =
-    weights.expectedPct.cohortWeight * cohort +
-    weights.expectedPct.studentWeight * student +
-    weights.expectedPct.difficultyWeight * difficulty;
+    cfg.studentMeanWeight * studentMean +
+    cfg.studentModeWeight * studentModePct +
+    cfg.cohortMeanWeight * cohortMean +
+    cfg.cohortModeWeight * cohortModePct +
+    inputs.trendAdjustment;
 
   return clamp(Math.round(blended * 10) / 10, 0, 100);
 }

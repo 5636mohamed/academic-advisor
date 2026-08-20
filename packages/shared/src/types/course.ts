@@ -35,4 +35,13 @@ export interface CourseOffering {
   passed: number;
   meanPct: number;
   stdDevPct: number;
+  /** Real prediction-engine epic: a per-letter headcount for this one
+   *  term, summing to `enrolled` — the actual data a "modal grade" can be
+   *  computed from. Optional (not every CourseOffering the codebase might
+   *  ever construct, e.g. in tests, needs one) — every REAL seeded
+   *  offering (seedCourseOfferings.ts) always has it, deterministically
+   *  derived from meanPct/stdDevPct via a normal-distribution
+   *  discretization (see prediction/gradeDistribution.ts), not a second,
+   *  independently-drifting number. */
+  gradeDistribution?: Record<string, number>;
 }

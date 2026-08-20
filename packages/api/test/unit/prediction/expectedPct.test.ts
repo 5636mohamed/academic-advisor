@@ -1,59 +1,66 @@
-// Spec §3.1(c) — expectedPct = 0.45*cohort + 0.40*student + 0.15*difficulty.
-// Real bug caught by code review: the formula used to compute
-// 0.15*(cohort + difficulty), silently re-adding the cohort term a second
-// time (effective cohort weight 0.60, not 0.45). No test previously
-// isolated this formula — the advising-cycle tests all mock the ports
-// layer, so the bug went unexercised despite feeding straight into
-// runAdvisingCycle via repositoryBackedPorts.ts.
+// Real prediction-engine fix, live-reported: "some students with high
+// grades... why low expected grades." Root cause: the old 0.45*cohort +
+// 0.40*student + 0.15*difficulty blend weighted a course's historical
+// cohort mean almost as heavily as the student's own trend. Rebuilt
+// around real mean+mode on both sides plus a trend adjustment — see
+// expectedPct.ts's own header for the full before/after.
 import { describe, it, expect } from 'vitest';
-import { expectedPct, courseDifficultyAdjustment } from '../../../src/modules/prediction/expectedPct';
+import { expectedPct } from '../../../src/modules/prediction/expectedPct';
+import weights from '../../../src/config/predictionWeights.json';
 
-describe('expectedPct — §3.1(c) weighted blend', () => {
-  it('matches the documented 0.45/0.40/0.15 formula exactly (no cohort double-count)', () => {
-    // 0.45*85 + 0.40*55 + 0.15*0 = 60.25 -> rounds to 60.3
-    const pct = expectedPct({ cohortProjectedPct: 85, studentTrendPct: 55, cohortMeanFallback: 72, tier: 'moderate' });
-    expect(pct).toBeCloseTo(60.3, 1);
-    // The buggy version (0.15*(cohort+difficulty)) would have produced 73.0 here.
-    expect(pct).not.toBeCloseTo(73.0, 1);
+const cfg = weights.expectedPct;
+
+describe('expectedPct — real mean/mode blend', () => {
+  it('matches the documented weighted-sum exactly (studentMean/studentMode/cohortMean/cohortMode + trend nudge)', () => {
+    const pct = expectedPct({ studentMean: 90, studentModePct: 90, cohortMean: 60, cohortModePct: 60, trendAdjustment: 0, neutralFallback: 72 });
+    const expected = cfg.studentMeanWeight * 90 + cfg.studentModeWeight * 90 + cfg.cohortMeanWeight * 60 + cfg.cohortModeWeight * 60;
+    expect(pct).toBeCloseTo(Math.round(expected * 10) / 10, 1);
   });
 
-  it('a low-risk course adds its +5 difficulty bonus exactly once, not blended into the cohort term', () => {
-    const flat = expectedPct({ cohortProjectedPct: 80, studentTrendPct: 80, cohortMeanFallback: 72, tier: 'moderate' });
-    const lowRisk = expectedPct({ cohortProjectedPct: 80, studentTrendPct: 80, cohortMeanFallback: 72, tier: 'low-risk' });
-    // difficultyWeight (0.15) * bonus (5) = 0.75
-    expect(lowRisk - flat).toBeCloseTo(0.75, 1);
+  it('the real live-reported case: a strong student (90.5 mean/mode) in a historically hard course (~55 cohort mean/mode) lands well above the old D-range prediction', () => {
+    const pct = expectedPct({ studentMean: 90.5, studentModePct: 90, cohortMean: 55, cohortModePct: 60, trendAdjustment: 0, neutralFallback: 72 });
+    // 0.35*90.5 + 0.25*90 + 0.25*55 + 0.15*60 = 31.675+22.5+13.75+9 = 76.925
+    expect(pct).toBeCloseTo(76.9, 0);
+    expect(pct).toBeGreaterThan(70); // decisively out of the old D-range (60-64) result
   });
 
-  it('a historically-tough course subtracts its -5 difficulty penalty exactly once', () => {
-    const flat = expectedPct({ cohortProjectedPct: 80, studentTrendPct: 80, cohortMeanFallback: 72, tier: 'moderate' });
-    const tough = expectedPct({ cohortProjectedPct: 80, studentTrendPct: 80, cohortMeanFallback: 72, tier: 'historically tough' });
-    expect(flat - tough).toBeCloseTo(0.75, 1);
+  it('the student signal (mean+mode, 0.60 combined) outweighs the cohort signal (mean+mode, 0.40 combined) by design', () => {
+    expect(cfg.studentMeanWeight + cfg.studentModeWeight).toBeGreaterThan(cfg.cohortMeanWeight + cfg.cohortModeWeight);
   });
 
-  it('with identical cohort/student inputs and a neutral tier, cohort+student weights (0.45+0.40=0.85) are the only contribution — the difficulty term never silently adds a second cohort weight', () => {
-    const pct = expectedPct({ cohortProjectedPct: 72, studentTrendPct: 72, cohortMeanFallback: 72, tier: 'moderate' });
-    // 0.45*72 + 0.40*72 + 0.15*0 = 0.85*72 = 61.2. The pre-fix bug would
-    // have added a further 0.15*72 = 10.8, landing at 72.0 instead.
-    expect(pct).toBeCloseTo(61.2, 1);
-    expect(pct).not.toBeCloseTo(72, 1);
+  it('a rising-trend course adds its bonus exactly once', () => {
+    const flat = expectedPct({ studentMean: 80, studentModePct: 80, cohortMean: 80, cohortModePct: 80, trendAdjustment: 0, neutralFallback: 72 });
+    const rising = expectedPct({ studentMean: 80, studentModePct: 80, cohortMean: 80, cohortModePct: 80, trendAdjustment: cfg.risingBonus, neutralFallback: 72 });
+    expect(rising - flat).toBeCloseTo(cfg.risingBonus, 1);
   });
 
-  it('falls back to cohortMeanFallback when cohortProjectedPct is null, and to the cohort value when studentTrendPct is null', () => {
-    const pct = expectedPct({ cohortProjectedPct: null, studentTrendPct: null, cohortMeanFallback: 75, tier: 'moderate' });
-    // both fall back to 75 -> 0.45*75 + 0.40*75 + 0.15*0 = 63.75
-    expect(pct).toBeCloseTo(63.8, 1);
+  it('a declining-trend course subtracts its penalty exactly once', () => {
+    const flat = expectedPct({ studentMean: 80, studentModePct: 80, cohortMean: 80, cohortModePct: 80, trendAdjustment: 0, neutralFallback: 72 });
+    const declining = expectedPct({ studentMean: 80, studentModePct: 80, cohortMean: 80, cohortModePct: 80, trendAdjustment: -cfg.decliningPenalty, neutralFallback: 72 });
+    expect(flat - declining).toBeCloseTo(cfg.decliningPenalty, 1);
+  });
+
+  it('a student with no history at all leans on the cohort mean (not a flat neutral fallback) when a cohort signal IS available', () => {
+    const pct = expectedPct({ studentMean: null, studentModePct: null, cohortMean: 65, cohortModePct: 68, trendAdjustment: 0, neutralFallback: 72 });
+    // studentMean/studentModePct both fall back to cohortMean (65) -> (0.35+0.25)*65 + 0.25*65 + 0.15*68
+    const expected = (cfg.studentMeanWeight + cfg.studentModeWeight) * 65 + cfg.cohortMeanWeight * 65 + cfg.cohortModeWeight * 68;
+    expect(pct).toBeCloseTo(Math.round(expected * 10) / 10, 1);
+    expect(pct).not.toBeCloseTo(72, 1); // never silently falls all the way back to neutral when a real signal exists
+  });
+
+  it('a brand-new course with no offering history leans on the student mean instead of the flat neutral fallback', () => {
+    const pct = expectedPct({ studentMean: 85, studentModePct: 88, cohortMean: null, cohortModePct: null, trendAdjustment: 0, neutralFallback: 72 });
+    const expected = cfg.studentMeanWeight * 85 + cfg.studentModeWeight * 88 + (cfg.cohortMeanWeight + cfg.cohortModeWeight) * 85;
+    expect(pct).toBeCloseTo(Math.round(expected * 10) / 10, 1);
+  });
+
+  it('only the flat neutral fallback is used when BOTH sides have zero history', () => {
+    const pct = expectedPct({ studentMean: null, studentModePct: null, cohortMean: null, cohortModePct: null, trendAdjustment: 0, neutralFallback: 72 });
+    expect(pct).toBeCloseTo(72, 1);
   });
 
   it('clamps to [0, 100]', () => {
-    expect(expectedPct({ cohortProjectedPct: 100, studentTrendPct: 100, cohortMeanFallback: 100, tier: 'low-risk' })).toBeLessThanOrEqual(100);
-    expect(expectedPct({ cohortProjectedPct: 0, studentTrendPct: 0, cohortMeanFallback: 0, tier: 'historically tough' })).toBeGreaterThanOrEqual(0);
-  });
-});
-
-describe('courseDifficultyAdjustment', () => {
-  it('low-risk is +5, historically tough is -5, moderate is 0', () => {
-    expect(courseDifficultyAdjustment('low-risk')).toBe(5);
-    expect(courseDifficultyAdjustment('historically tough')).toBe(-5);
-    expect(courseDifficultyAdjustment('moderate')).toBe(0);
+    expect(expectedPct({ studentMean: 100, studentModePct: 100, cohortMean: 100, cohortModePct: 100, trendAdjustment: 10, neutralFallback: 100 })).toBeLessThanOrEqual(100);
+    expect(expectedPct({ studentMean: 0, studentModePct: 0, cohortMean: 0, cohortModePct: 0, trendAdjustment: -10, neutralFallback: 0 })).toBeGreaterThanOrEqual(0);
   });
 });

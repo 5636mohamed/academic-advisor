@@ -1,26 +1,12 @@
-// Small pure helpers that turn a course's real CourseOffering history
-// (seedCourseOfferings.ts) into the two other real signals expectedPct's
-// blend needs — difficulty tier and pass-rate/confidence — instead of the
-// hardcoded 'moderate' / 85 placeholders repositoryBackedPorts.ts used
-// before real offering data existed.
+// Small pure helper that turns a course's real CourseOffering history
+// (seedCourseOfferings.ts) into a real pass-rate/confidence signal —
+// instead of the hardcoded 85 placeholder repositoryBackedPorts.ts used
+// before real offering data existed. The difficulty-tier classification
+// that used to live here was removed as part of the real prediction-
+// engine fix — cohortTrend.ts's cohortMeanModeTrend() now derives a
+// richer, trend-aware signal (rising/declining/consistent/inconsistent)
+// from the same offering history instead of a single static average.
 import { CourseOffering } from '@advisor/shared';
-import { DifficultyTier } from './expectedPct';
-
-export function averageMeanPct(offerings: CourseOffering[]): number | null {
-  if (offerings.length === 0) return null;
-  return offerings.reduce((s, o) => s + o.meanPct, 0) / offerings.length;
-}
-
-/** Historically tough (<68 avg) / low-risk (>=82 avg) / moderate otherwise —
- *  same rough thresholds the ENG_SCALE grade bands imply for a "hard vs.
- *  easy" course. */
-export function tierFromOfferings(offerings: CourseOffering[]): DifficultyTier['tier'] {
-  const avg = averageMeanPct(offerings);
-  if (avg === null) return 'moderate';
-  if (avg >= 82) return 'low-risk';
-  if (avg < 68) return 'historically tough';
-  return 'moderate';
-}
 
 /** Real historical pass rate (0-100), pooled across every seeded offering —
  *  falls back to the old neutral 85 only when a course genuinely has no

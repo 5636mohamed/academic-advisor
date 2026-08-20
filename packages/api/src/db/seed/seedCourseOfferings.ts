@@ -20,6 +20,7 @@
 // synthetic approximation, not real institutional data.
 import { Course, CourseCategory, CourseOffering } from '@advisor/shared';
 import { CATALOG } from './seedCatalog';
+import { deterministicGradeDistribution } from '../../modules/prediction/gradeDistribution';
 
 /** Small stable string hash (FNV-1a-ish) — same course code always yields
  *  the same numbers, so the "3 years of history" is reproducible. */
@@ -85,7 +86,12 @@ function offeringsForCourse(course: Course): CourseOffering[] {
       const passRateFraction = clamp((meanPct - 35) / 65, 0.3, 0.98);
       const passed = Math.round(enrolled * passRateFraction);
 
-      offerings.push({ courseCode: course.code, term, year, enrolled, passed, meanPct, stdDevPct });
+      // Real prediction-engine epic — a genuine per-letter headcount for
+      // this term, deterministically discretized from meanPct/stdDevPct
+      // (gradeDistribution.ts), so a course's "modal grade" is a real
+      // computed quantity rather than an invented one.
+      const gradeDistribution = deterministicGradeDistribution(meanPct, stdDevPct, enrolled, course.isUR);
+      offerings.push({ courseCode: course.code, term, year, enrolled, passed, meanPct, stdDevPct, gradeDistribution });
       termIndex++;
     }
   }
