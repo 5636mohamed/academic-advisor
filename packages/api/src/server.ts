@@ -39,8 +39,9 @@ import { computeInstitutionalBottlenecks, StudentForBottleneck } from './modules
 import { matchOpportunitiesForProject } from './modules/collider/colliderOpportunityMatch.service';
 import { getAllOpportunities } from './modules/collider/externalOpportunitiesLive.service';
 import { buildTopography } from './modules/collider/innovationTopography.service';
-import { forecastDepartmentDemand, forecastAllDepartments } from './modules/curriculumAnalytics/resourceForecast.service';
+import { forecastDepartmentDemand, forecastAllDepartments, forecastCourseDemand } from './modules/curriculumAnalytics/resourceForecast.service';
 import { buildHealthMonitor } from './modules/curriculumAnalytics/curriculumHealthMonitor.service';
+import { rankBottlenecks, affectedAdvisees, StudentForBottleneckCheck } from './modules/curriculumAnalytics/bottleneckDependencyAnalyzer.service';
 import { MILESTONES_BY_COURSE, SYLLABUS_MILESTONES, SEMESTER_WEEKS } from './db/seed/seedSyllabusMilestones';
 import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
 
@@ -1082,6 +1083,45 @@ app.get('/api/advisors/:advisorId/curriculum-analytics/health-monitor', (req, re
   const advisor = db.getAdvisor(advisorId);
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
   res.json(buildHealthMonitor(advisor.departmentId, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE));
+});
+
+// Feature 3 — Course Bottleneck & Dependency Analyzer. The VP route is
+// institution-wide with no per-student tracing (that already exists on
+// VpAdvisorDetail.tsx); the Advisor route adds affectedAdvisees — which of
+// THIS advisor's own roster (real ownership scoping, not a UI filter —
+// same §12 discipline as every other advisor-facing route) is genuinely at
+// risk from a real bottleneck course, per bottleneckDependencyAnalyzer.
+// service.ts's own doc comment on why CurriculumCourseView (db.getCurriculum)
+// is the right source here rather than just getEligibleCourses.
+function forecastedEnrolledByCode(catalog: (typeof CATALOG)): Record<string, number> {
+  return Object.fromEntries(catalog.map(c => [c.code, forecastCourseDemand(c, OFFERINGS_BY_COURSE[c.code] ?? []).nextTermEnrolled]));
+}
+
+app.get('/api/vp/curriculum-analytics/bottlenecks', (_req, res) => {
+  res.json(rankBottlenecks(CATALOG, OFFERINGS_BY_COURSE, forecastedEnrolledByCode(CATALOG)));
+});
+
+app.get('/api/advisors/:advisorId/curriculum-analytics/bottlenecks', (req, res) => {
+  const advisorId = paramStr(req, 'advisorId');
+  const advisor = db.getAdvisor(advisorId);
+  if (!advisor) return res.status(404).json({ error: 'advisor not found' });
+
+  const bottlenecks = rankBottlenecks(CATALOG, OFFERINGS_BY_COURSE, forecastedEnrolledByCode(CATALOG));
+
+  const roster = db.listStudents().filter(s => s.advisorId === advisorId && s.status !== 'dismissed');
+  const rosterForCheck: StudentForBottleneckCheck[] = roster.map(s => {
+    const curriculum = db.getCurriculum(s.id);
+    return {
+      studentId: s.id,
+      failedCourseCodes: curriculum.filter(r => r.status === 'needs_retake').map(r => r.course.code),
+      passedCourseCodes: curriculum.filter(r => r.status === 'passed').map(r => r.course.code),
+      remainingCourseCodes: curriculum.filter(r => r.status === 'eligible' || r.status === 'locked' || r.status === 'registered').map(r => r.course.code),
+    };
+  });
+  const rosterNameById = new Map(roster.map(s => [s.id, s.name]));
+  const affected = affectedAdvisees(rosterForCheck, bottlenecks).map(row => ({ ...row, studentName: rosterNameById.get(row.studentId) ?? 'Unknown student' }));
+
+  res.json({ bottlenecks, affectedAdvisees: affected });
 });
 
 // ---------------------------------------------------------------------

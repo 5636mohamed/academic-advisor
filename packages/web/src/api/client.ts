@@ -8,7 +8,7 @@
 // var; the API itself needs CORS enabled for the Pages origin). Deliberately
 // plain fetch + small helpers rather than a data-fetching library — keeps
 // the surface easy to read alongside the routes it calls.
-import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation, ColdStartAssessment, DepartmentDemandForecast, CurriculumHealthReport } from '@advisor/shared';
+import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation, ColdStartAssessment, DepartmentDemandForecast, CurriculumHealthReport, BottleneckCourse, AffectedStudentRow } from '@advisor/shared';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -312,6 +312,17 @@ export interface FrictionOverviewRowDTO {
   sustainedBurnoutRisk: boolean;
   trend: { slope: number | null; reading: FrictionTrendReading };
 }
+/** Curriculum Analytics epic, Feature 3 — server.ts's advisor bottlenecks
+ *  route enriches the pure AffectedStudentRow (shared type, id-only) with
+ *  studentName at the API boundary, same withMemberNames/withProfessorName
+ *  pattern every other enriched row in this app already follows. */
+export interface AffectedStudentRowDTO extends AffectedStudentRow {
+  studentName: string;
+}
+export interface AdvisorBottlenecksDTO {
+  bottlenecks: BottleneckCourse[];
+  affectedAdvisees: AffectedStudentRowDTO[];
+}
 export interface ColliderProjectMemberDTO extends ProjectMember {
   name: string;
 }
@@ -572,6 +583,8 @@ export const api = {
   advisorDemandForecast: (advisorId: string) => request<DepartmentDemandForecast>(`/advisors/${advisorId}/curriculum-analytics/demand-forecast`),
   vpCurriculumHealthMonitor: () => request<CurriculumHealthReport>('/vp/curriculum-analytics/health-monitor'),
   advisorCurriculumHealthMonitor: (advisorId: string) => request<CurriculumHealthReport>(`/advisors/${advisorId}/curriculum-analytics/health-monitor`),
+  vpBottlenecks: () => request<BottleneckCourse[]>('/vp/curriculum-analytics/bottlenecks'),
+  advisorBottlenecks: (advisorId: string) => request<AdvisorBottlenecksDTO>(`/advisors/${advisorId}/curriculum-analytics/bottlenecks`),
 
   // AI Features Blueprint — Project Collider (advisor/VP-facing only)
   advisorColliderProjects: (advisorId: string) => request<ColliderProjectDTO[]>(`/advisors/${advisorId}/collider/projects`),

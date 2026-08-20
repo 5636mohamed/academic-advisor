@@ -59,6 +59,7 @@ export function AdvisorLayout() {
     { to: '/collider-board', label: 'Collider board' },
     { to: '/demand-forecast', label: 'Demand forecast' },
     { to: '/curriculum-health', label: 'Curriculum health' },
+    { to: '/bottleneck-analyzer', label: 'Bottleneck analyzer' },
   ];
 
   return (

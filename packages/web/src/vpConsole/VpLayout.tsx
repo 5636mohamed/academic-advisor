@@ -28,6 +28,7 @@ export function VpLayout() {
     { to: '/vp/institutional-friction', label: 'Institutional friction' },
     { to: '/vp/demand-forecast', label: 'Demand forecast' },
     { to: '/vp/curriculum-health', label: 'Curriculum health' },
+    { to: '/vp/bottleneck-analyzer', label: 'Bottleneck analyzer' },
   ];
 
   return (

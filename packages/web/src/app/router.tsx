@@ -21,6 +21,7 @@ import { AdvisorFrictionOverview } from '../advisorConsole/AdvisorFrictionOvervi
 import { AdvisorColliderBoard } from '../advisorConsole/AdvisorColliderBoard';
 import { AdvisorDemandForecast } from '../advisorConsole/AdvisorDemandForecast';
 import { AdvisorCurriculumHealthMonitor } from '../advisorConsole/AdvisorCurriculumHealthMonitor';
+import { AdvisorBottleneckAnalyzer } from '../advisorConsole/AdvisorBottleneckAnalyzer';
 import { VpLayout } from '../vpConsole/VpLayout';
 import { VpDashboard } from '../vpConsole/VpDashboard';
 import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
@@ -30,6 +31,7 @@ import { VpInnovationTopography } from '../vpConsole/VpInnovationTopography';
 import { VpInstitutionalFrictionDashboard } from '../vpConsole/VpInstitutionalFrictionDashboard';
 import { VpDemandForecast } from '../vpConsole/VpDemandForecast';
 import { VpCurriculumHealthMonitor } from '../vpConsole/VpCurriculumHealthMonitor';
+import { VpBottleneckAnalyzer } from '../vpConsole/VpBottleneckAnalyzer';
 import { RequireAdvisor, RequireStudent, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -77,6 +79,7 @@ export const router = createBrowserRouter([
           { path: 'collider-board', element: <AdvisorColliderBoard /> },
           { path: 'demand-forecast', element: <AdvisorDemandForecast /> },
           { path: 'curriculum-health', element: <AdvisorCurriculumHealthMonitor /> },
+          { path: 'bottleneck-analyzer', element: <AdvisorBottleneckAnalyzer /> },
           { path: 'advisor-console', element: <Navigate to="/students" replace /> },
         ],
       },
@@ -127,6 +130,7 @@ export const router = createBrowserRouter([
           { path: 'institutional-friction', element: <VpInstitutionalFrictionDashboard /> },
           { path: 'demand-forecast', element: <VpDemandForecast /> },
           { path: 'curriculum-health', element: <VpCurriculumHealthMonitor /> },
+          { path: 'bottleneck-analyzer', element: <VpBottleneckAnalyzer /> },
         ],
       },
     ],
