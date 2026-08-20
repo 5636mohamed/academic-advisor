@@ -1661,9 +1661,18 @@ university's system.
 
 ### 17.1 Multi-Advisor Model
 
+*The numbers below (5 advisors, 25-per-advisor, ~112 generated) describe
+this section's original design, since superseded by §18.5's real
+10-department expansion: **14 advisors**, still exactly 25 students each,
+but drawn in a genuine random cross-department mix rather than one
+advisor per department (350 total: 14 × 25 = 10 × 35). The architecture
+described below — the `advisorId` field, roster scoping mechanism,
+generated-student gap-filling — is unchanged; only the specific counts are
+stale here. See §18.5 for the current model.*
+
 | Entity | Key fields | Notes |
 |---|---|---|
-| **Advisor** | `id`, `name`, `facultyId`, `departmentId` | 5 seeded advisors, each with exactly 25 students. |
+| **Advisor** | `id`, `name`, `facultyId`, `departmentId` | Originally 5 seeded advisors, each with exactly 25 students — see the note above for the current count (14). |
 | **Student** (extended) | `advisorId` | Every student, named or generated, belongs to exactly one advisor. |
 
 The 13 hand-authored named personas from §11's worked examples keep every
