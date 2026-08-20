@@ -14,18 +14,19 @@
 [![Live Demo](https://img.shields.io/badge/live%20demo-online-success?logo=googlechrome&logoColor=white)](https://5636mohamed.github.io/academic-advisor/)
 [![API Status](https://img.shields.io/website?url=https%3A%2F%2Facademic-advisor-api-production.up.railway.app%2Fapi%2Fstudents&label=api&up_message=online&down_message=offline&up_color=success&down_color=critical)](https://academic-advisor-api-production.up.railway.app/)
 [![AEGIS](https://img.shields.io/badge/brand-AEGIS-d6241f)](https://github.com/5636mohamed/academic-advisor)
-[![EJUST edition](https://img.shields.io/badge/EJUST%20edition-v1.0.1-1a1a1a?logo=github&logoColor=white)](https://github.com/5636mohamed/ejust-academic-advisor)
+[![EJUST edition](https://img.shields.io/badge/EJUST%20edition-v1.1.1-1a1a1a?logo=github&logoColor=white)](https://github.com/5636mohamed/ejust-academic-advisor)
 [![Technical Deep Dive](https://img.shields.io/badge/technical%20deep%20dive-read%20more-1a1a1a?logo=readthedocs&logoColor=white)](docs/TECHNICAL_OVERVIEW.md)
 
 </div>
 
-> 🔱 **Forked as an EJUST edition.** A private, EJUST-branded fork of
+> 🔱 **Forked as an EJUST edition.** A public, EJUST-branded fork of
 > this repository — **[`ejust-academic-advisor`](https://github.com/5636mohamed/ejust-academic-advisor)
-> (v1.0.1)** — exists for Egypt-Japan University of Science and
+> (v1.1.1)** — exists for Egypt-Japan University of Science and
 > Technology, using EJUST's own crest as the system's primary brand mark
 > throughout (login, topbars, generated PDFs, favicon) instead of AEGIS's.
-> Same code, same tests, same architecture as here; it's a private repo,
-> so the link above only resolves for accounts with access to it.
+> Same code, same tests, same architecture as here — see that repo's own
+> [`docs/COMPARISON.md`](https://github.com/5636mohamed/ejust-academic-advisor/blob/master/docs/COMPARISON.md)
+> for exactly what does and doesn't differ.
 
 ### 🔗 Live demo — try it now
 

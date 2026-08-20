@@ -4,7 +4,7 @@
 
 **Target version:** proposed as **v1.1.0**, a superset of v1.0.0 — every existing route, table, and component stays exactly as it is today. Nothing here replaces the fastest-graduation planner, the retake-gate engine, the transfer chain, or the existing Venture Board; it's two new modules bolted onto the same three-portal architecture, reusing the same primitives (`ols`/`recencyWeights` in `linearRegression.ts`, the `--su-*` design tokens, the advisor/VP scoping model) wherever they already do the right thing.
 
-**Repo boundary:** this blueprint targets the public `academic-advisor` repo. If it gets built and the `ejust-academic-advisor` private fork wants it too, that's a second, separate porting pass afterward (mirroring how the PDF/grade-table/regression fixes were each ported once proven in the public repo first) — not in scope here.
+**Repo boundary:** this blueprint targets the public `academic-advisor` repo. If it gets built and the `ejust-academic-advisor` fork (public since v1.1.1) wants it too, that's a second, separate porting pass afterward (mirroring how the PDF/grade-table/regression fixes were each ported once proven in the public repo first) — not in scope here.
 
 ---
 
