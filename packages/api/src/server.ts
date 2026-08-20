@@ -748,15 +748,19 @@ app.get('/api/venture-quiz', (_req, res) => {
 
 // Reads for the Venture Gate/Interest Form's current saved state — used by
 // the Venture Board tab (where these questions now live, see below) to
-// pre-fill the toggle/quiz instead of asking blind every visit.
-app.get('/api/students/:id/venture-gate', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
-  res.json({ interested: db.getVentureGateAnswer(req.params.id) });
+// pre-fill the toggle/quiz instead of asking blind every visit. Real gap
+// caught by a systematic per-student audit: their own POST siblings just
+// below (and venture-matches/friction-timeline right after) are all
+// blockIfDismissed-guarded per §12/§16.8's "fully locked out at the API
+// layer" rule, but these two GETs were missed when that guard was added —
+// a dismissed student's Venture Board tab could still silently pre-fill
+// from these two reads.
+app.get('/api/students/:id/venture-gate', blockIfDismissed, (req, res) => {
+  res.json({ interested: db.getVentureGateAnswer(paramStr(req, 'id')) });
 });
 
-app.get('/api/students/:id/venture-interest-form', (req, res) => {
-  if (!db.getStudent(req.params.id)) return res.status(404).json({ error: 'student not found' });
-  res.json({ answers: db.getVentureInterestAnswers(req.params.id) });
+app.get('/api/students/:id/venture-interest-form', blockIfDismissed, (req, res) => {
+  res.json({ answers: db.getVentureInterestAnswers(paramStr(req, 'id')) });
 });
 
 app.post('/api/students/:id/venture-gate', blockIfDismissed, (req, res) => {

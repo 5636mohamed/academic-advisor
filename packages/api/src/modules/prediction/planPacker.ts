@@ -64,7 +64,10 @@ function knapsack(bundles: Bundle[], cap: number): Bundle[] {
 
 export interface PackPlanInput {
   mandatory: Array<CandidateForScoring & { courseCode: string; coreq: string[] }>; // §5.2 F-grade retakes
-  pool: Array<CandidateForScoring & { courseCode: string; coreq: string[] }>;      // everything else, mode-scored
+  // everything else, mode-scored — expectedLetter is required here (unlike
+  // `mandatory`) because packPlan itself hard-excludes any F-predicted
+  // candidate from this list before scoring ever runs, see below.
+  pool: Array<CandidateForScoring & { courseCode: string; coreq: string[]; expectedLetter: string }>;
   cap: number;
   mode: PlanMode;
 }
@@ -78,6 +81,29 @@ export interface PackPlanResult {
 
 export function packPlan(input: PackPlanInput): PackPlanResult {
   const { mandatory, pool, cap, mode } = input;
+
+  // Real bug reported live (twice — this app has TWO independent planners
+  // that both funnel into packPlan: the full advising-cycle branch AND the
+  // §9.2 prototype-baseline Fastest-Graduation/Target-CGPA planners, and
+  // only one of them had this filter the first time it was fixed): the
+  // knapsack scores every pool candidate on a weighted blend (grade
+  // quality, chain-unlock value, credit progress, a risk-penalty
+  // subtraction) and picks whatever maximizes total score under the
+  // credit cap — nothing in that scoring ever excluded a candidate
+  // outright, so a course with enough chain-unlock value could still
+  // out-score a safer alternative despite a losing (F) predicted grade.
+  // Filtered HERE, once, at the one function every planner already calls
+  // — not duplicated at each call site — so no current or future planner
+  // can reintroduce this gap by forgetting to filter its own pool first.
+  // Scoped to `pool` only: `mandatory` (F-grade retakes already on the
+  // transcript) is compulsory to graduate regardless of this cycle's
+  // fresh prediction, §5.2 — there's no "recommend or don't" choice to
+  // make there, unlike a fresh/optional-retake pick. If excluding F
+  // candidates leaves the pool thin, the knapsack simply fills the
+  // remaining cap from whatever passing candidates ARE left — including
+  // other (non-F) optional retakes already mixed into this same pool by
+  // buildCandidatePool — never by falling back to a losing course.
+  const passingPool = pool.filter(c => c.expectedLetter !== 'F');
 
   // Reserve mandatory bundles first, prioritized by chainUnlockValue when they
   // don't all fit (spec §5.2 overflow rule / §11 Example M).
@@ -97,7 +123,7 @@ export function packPlan(input: PackPlanInput): PackPlanResult {
   }
 
   const remainingCap = cap - reserved;
-  const optimizedBundles = remainingCap > 0 ? knapsack(bundleCandidates(pool, mode), remainingCap) : [];
+  const optimizedBundles = remainingCap > 0 ? knapsack(bundleCandidates(passingPool, mode), remainingCap) : [];
 
   const totalCredits =
     fitted.reduce((s, b) => s + b.credits, 0) + optimizedBundles.reduce((s, b) => s + b.credits, 0);

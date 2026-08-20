@@ -5,11 +5,12 @@ import { describe, it, expect } from 'vitest';
 import { packPlan } from '../../../src/modules/prediction/planPacker';
 import { CandidateForScoring } from '../../../src/modules/prediction/candidateScore';
 
-type Cand = CandidateForScoring & { courseCode: string; coreq: string[] };
+type Cand = CandidateForScoring & { courseCode: string; coreq: string[]; expectedLetter: string };
 
 function cand(overrides: Partial<Cand> & Pick<Cand, 'courseCode' | 'credits'>): Cand {
   return {
     expectedPoints: 3.0,
+    expectedLetter: 'B', // safely non-F by default — see the dedicated F-exclusion tests below
     isRetake: false,
     deltaPts: null,
     passRate: 90,
@@ -104,5 +105,43 @@ describe('packPlan (§3.2 knapsack + §5.2 mandatory reservation)', () => {
     expect(result.mandatoryBundles).toHaveLength(1);
     expect(result.optimizedBundles).toEqual([]);
     expect(result.totalCredits).toBe(14);
+  });
+
+  // Real bug reported live TWICE against the same underlying gap — first
+  // fixed one level too high (only in the full advising-cycle planner),
+  // which left the Fastest-Graduation/Target-CGPA planners (server.ts's
+  // buildScoredPlan) still recommending F-predicted courses. Now enforced
+  // here, the one function both planners share, so it can't be missed by
+  // either (or a future third caller) again.
+  describe('never recommends a course predicted to result in an outright F', () => {
+    it('an F-predicted optional candidate is excluded even when it would otherwise win on every other factor', () => {
+      const pool: Cand[] = [
+        // Huge chain-unlock value and full credit weight — pre-fix, this
+        // could out-score everything else in the pool despite the F.
+        cand({ courseCode: 'DOOMED', credits: 3, expectedLetter: 'F', expectedPoints: 1.0, chainUnlockValue: 4, passRate: 15 }),
+        cand({ courseCode: 'SAFE', credits: 3, expectedLetter: 'C', expectedPoints: 2.3, chainUnlockValue: 1, passRate: 85 }),
+      ];
+      const result = packPlan({ mandatory: [], pool, cap: 6, mode: 'fast' });
+      const codes = result.optimizedBundles.flatMap(b => b.members.map(m => m.courseCode));
+      expect(codes).not.toContain('DOOMED');
+      expect(codes).toContain('SAFE');
+    });
+
+    it('fills remaining capacity from other (non-F) optional retakes when that\'s the only thing left, rather than leaving the plan short', () => {
+      const pool: Cand[] = [
+        cand({ courseCode: 'F_RETAKE', credits: 3, expectedLetter: 'F', isRetake: true, expectedPoints: 1.0 }),
+        cand({ courseCode: 'D_RETAKE', credits: 3, expectedLetter: 'D', isRetake: true, expectedPoints: 1.7 }),
+      ];
+      const result = packPlan({ mandatory: [], pool, cap: 6, mode: 'fast' });
+      const codes = result.optimizedBundles.flatMap(b => b.members.map(m => m.courseCode));
+      expect(codes).not.toContain('F_RETAKE');
+      expect(codes).toContain('D_RETAKE'); // the only passing option left still gets recommended
+    });
+
+    it('a mandatory F-grade retake (already-failed, compulsory course) is NOT excluded even if it predicts F again — there is no "recommend or not" choice for it', () => {
+      const mandatory: Cand[] = [cand({ courseCode: 'MUST_RETAKE', credits: 3, expectedLetter: 'F', isRetake: true })];
+      const result = packPlan({ mandatory, pool: [], cap: 14, mode: 'probation_repair' });
+      expect(result.mandatoryBundles.flatMap(b => b.members.map(m => m.courseCode))).toEqual(['MUST_RETAKE']);
+    });
   });
 });
