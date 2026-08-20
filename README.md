@@ -149,6 +149,21 @@ probation/dismissal, retake gate, department/faculty fit, transfer
 execution, the full advisor/student frontend, best-case grading, and real
 student/advisor/Vice-President access separation):
 
+- **Real backend authentication (v1.3.0)** — login now does actual
+  server-side password verification and issues a real session token
+  (`POST /api/auth/login`), replacing the earlier client-only demo login
+  (a plain `localStorage` blob, no server round-trip at all — see
+  `.github/SECURITY.md`'s rewritten Authentication section for the full
+  before/after). Every one of the ~83 API routes now checks that token
+  against a real per-request guard instead of trusting a client-supplied
+  id: a student can only ever reach their own record, an advisor can only
+  reach a student who's *really* on their own roster (a genuine gap
+  closed — previously any advisor could reach any student), and the Vice
+  President reaches everything, matching their institution-wide oversight
+  role everywhere else in the app. Demo passwords stay the same shared,
+  publicly-documented constants (`docs/LOGIN_CREDENTIALS.md`) — this
+  isn't a claim of production-grade security, just that the verification
+  and enforcement are now real instead of a client-side-only convention.
 - **Curriculum Analytics (v1.2.0)** — three new department/VP-facing
   modules, all reasoning over real historical enrollment and prerequisite
   data (see `docs/CURRICULUM_ANALYTICS_BLUEPRINT.md`): **Academic Resource
