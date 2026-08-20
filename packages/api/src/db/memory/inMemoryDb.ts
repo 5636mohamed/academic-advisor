@@ -2246,14 +2246,22 @@ export function decideVentureGrantRequest(projectId: string, decision: 'approved
     throw Object.assign(new Error('this project has no pending grant request'), { httpStatus: 400 });
   }
   ventureProjects[idx] = { ...project, grantRequest: { ...project.grantRequest, status: decision, decidedAt: new Date().toISOString(), decisionNote } };
-  createNotification(
-    'advisor', project.professorId, 'grant_decided',
-    decision === 'approved' ? 'Grant request approved' : 'Grant request declined',
-    decision === 'approved'
-      ? `Your grant request for "${project.title}" was approved.`
-      : `Your grant request for "${project.title}" was declined.${decisionNote ? ` Reason: ${decisionNote}` : ''}`,
-    'venture-board'
-  );
+  // Real gap found alongside the Innovation Topography display bug: this
+  // always notified role 'advisor', but a VP-posted venture's own
+  // professorId is 'vp-owned' — not a real advisor id, so that
+  // notification would go to a (role:'advisor', recipientId:'vp-owned')
+  // pair nobody's bell ever queries. Route to the VP's own notification
+  // identity in that case, same as requestGrantForVentureProject already
+  // has to special-case the reverse direction.
+  const decidedTitle = decision === 'approved' ? 'Grant request approved' : 'Grant request declined';
+  const decidedBody = decision === 'approved'
+    ? `Your grant request for "${project.title}" was approved.`
+    : `Your grant request for "${project.title}" was declined.${decisionNote ? ` Reason: ${decisionNote}` : ''}`;
+  if (project.professorId === 'vp-owned') {
+    createNotification('vp', 'vp', 'grant_decided', decidedTitle, decidedBody, 'venture-board');
+  } else {
+    createNotification('advisor', project.professorId, 'grant_decided', decidedTitle, decidedBody, 'venture-board');
+  }
   return ventureProjects[idx];
 }
 

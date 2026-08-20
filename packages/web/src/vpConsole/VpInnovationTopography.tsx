@@ -124,14 +124,23 @@ function VentureGrantRequestsSection({ advisors }: { advisors: AdvisorDTO[] }) {
   const { show, node } = useToast();
 
   const load = () => {
-    Promise.all(advisors.map(a => api.advisorVentureProjects(a.id))).then(perAdvisor => setRows(perAdvisor.flat()));
+    // Real bug reported live: this only fetched each real ADVISOR's own
+    // ventures, but the VP's own postings are attributed to the separate
+    // 'vp-owned' singleton (see seedVentureProjects.ts's PROFESSORS) —
+    // never any of the 14 advisor ids — so a grant request on a venture
+    // the VP posted themselves was silently never included here. Fetching
+    // 'vp-owned' too closes the gap for the one professor identity that
+    // was missing from this cross-professor view.
+    Promise.all([...advisors.map(a => api.advisorVentureProjects(a.id)), api.advisorVentureProjects('vp-owned')])
+      .then(perProfessor => setRows(perProfessor.flat()));
   };
   useEffect(load, [advisors]);
 
   if (!rows) return <Loading label="Loading venture grant requests…" />;
 
   const pending = rows.filter(r => r.project.grantRequest?.status === 'pending');
-  const advisorNameFor = (advisorId: string) => advisors.find(a => a.id === advisorId)?.name ?? 'Unknown advisor';
+  const advisorNameFor = (advisorId: string) =>
+    advisorId === 'vp-owned' ? 'Office of the Vice President' : advisors.find(a => a.id === advisorId)?.name ?? 'Unknown advisor';
 
   const decide = async (projectId: string, decision: 'approved' | 'declined') => {
     setBusyProjectId(projectId);
