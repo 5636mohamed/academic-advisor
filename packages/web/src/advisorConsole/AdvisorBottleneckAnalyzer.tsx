@@ -26,6 +26,10 @@ export function AdvisorBottleneckAnalyzer() {
   const advisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
   const [data, setData] = useState<AdvisorBottlenecksDTO | null>(null);
   const [filter, setFilter] = useState<CourseFilterValue>(ALL_COURSE_FILTER);
+  // Real live report: "make them categorized by level" — a level filter
+  // for the advisees table specifically (course-level filtering already
+  // covers the institution-wide ranking table below via CourseFilterBar).
+  const [levelFilter, setLevelFilter] = useState('all');
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
@@ -37,10 +41,15 @@ export function AdvisorBottleneckAnalyzer() {
   // shipping, see VpCurriculumHealthMonitor.tsx's identical fix).
   const genuineBottlenecks = (data?.bottlenecks ?? []).filter(b => b.cascadingDelaySemesters > 0);
   const real = useMemo(() => filterCourses(genuineBottlenecks, filter), [genuineBottlenecks, filter]);
+  const affectedAll = data?.affectedAdvisees ?? [];
+  const advisedLevels = useMemo(() => [...new Set(affectedAll.map(a => a.studentLevel))].sort((a, b) => a - b), [affectedAll]);
+  const affected = useMemo(
+    () => (levelFilter === 'all' ? affectedAll : affectedAll.filter(a => String(a.studentLevel) === levelFilter)),
+    [affectedAll, levelFilter]
+  );
 
   if (!data) return <Loading label="Checking your roster against real institutional bottlenecks…" />;
 
-  const affected = data.affectedAdvisees;
   const affectedStudentCount = new Set(affected.map(a => a.studentId)).size;
 
   return (
@@ -73,18 +82,30 @@ export function AdvisorBottleneckAnalyzer() {
           </button>
         }
       >
+        {advisedLevels.length > 1 && (
+          <div className="su-field" style={{ maxWidth: 200, marginBottom: 14 }}>
+            <label>Level</label>
+            <select className="su-input" value={levelFilter} onChange={e => setLevelFilter(e.target.value)}>
+              <option value="all">All levels</option>
+              {advisedLevels.map(l => (
+                <option key={l} value={l}>Level {l}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {affected.length === 0 ? (
-          <Empty>No advisee on your roster is currently affected by a real bottleneck course.</Empty>
+          <Empty>{affectedAll.length === 0 ? 'No advisee on your roster is currently affected by a real bottleneck course.' : 'No advisee at this level is currently affected.'}</Empty>
         ) : (
           <div className="su-table-wrap">
             <table className="su-table">
               <thead>
-                <tr><th>Student</th><th>Bottleneck course</th><th>Why</th></tr>
+                <tr><th>Student</th><th>Level</th><th>Bottleneck course</th><th>Why</th></tr>
               </thead>
               <tbody>
                 {affected.map((a, i) => (
                   <tr key={`${a.studentId}-${a.bottleneckCourseCode}-${i}`} style={{ cursor: 'pointer' }} onClick={() => navigate(`/students/${a.studentId}`)}>
                     <td><b>{a.studentName}</b></td>
+                    <td className="su-muted">{a.studentLevel}</td>
                     <td>{a.bottleneckCourseCode}</td>
                     <td>
                       <span className={`su-badge ${a.reason === 'failed_needs_retake' ? 'danger' : 'warn'}`}>{REASON_LABEL[a.reason]}</span>

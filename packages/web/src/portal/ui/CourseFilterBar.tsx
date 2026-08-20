@@ -14,14 +14,16 @@ export interface CategoryFilterable {
   isUR: boolean;
   isBasicScience: boolean;
   departments: string[];
+  courseLevel: number;
 }
 
 export interface CourseFilterValue {
   department: string; // 'all' or a real department code
   category: string;   // 'all', 'basic_science' (a flag, not a real category), or a real CourseCategory value
+  level: string;       // 'all' or a stringified course level number
 }
 
-export const ALL_COURSE_FILTER: CourseFilterValue = { department: 'all', category: 'all' };
+export const ALL_COURSE_FILTER: CourseFilterValue = { department: 'all', category: 'all', level: 'all' };
 
 // LRA-prefixed courses (Japanese/Arabic language, key-skills seminars,
 // electives — seedCatalog.ts's LRAE*/LRA* series) are exactly this app's
@@ -51,6 +53,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 export function filterCourses<T extends CategoryFilterable>(courses: T[], filter: CourseFilterValue): T[] {
   return courses.filter(c => {
     if (filter.department !== 'all' && !(c.departments ?? []).includes(filter.department)) return false;
+    if (filter.level !== 'all' && String(c.courseLevel) !== filter.level) return false;
     if (filter.category === 'basic_science') return c.isBasicScience ?? false;
     if (filter.category !== 'all' && c.category !== filter.category) return false;
     return true;
@@ -72,8 +75,9 @@ export function CourseFilterBar({
 }) {
   const departments = useMemo(() => [...new Set(courses.flatMap(c => c.departments ?? []))].sort(), [courses]);
   const categories = useMemo(() => [...new Set(courses.map(c => c.category).filter((c): c is string => !!c))].sort(), [courses]);
+  const levels = useMemo(() => [...new Set(courses.map(c => c.courseLevel).filter((l): l is number => typeof l === 'number'))].sort((a, b) => a - b), [courses]);
   const hasBasicScience = useMemo(() => courses.some(c => c.isBasicScience), [courses]);
-  const isFiltered = value.department !== 'all' || value.category !== 'all';
+  const isFiltered = value.department !== 'all' || value.category !== 'all' || value.level !== 'all';
 
   return (
     <div className="su-flex su-items-center su-gap-14" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
@@ -95,6 +99,15 @@ export function CourseFilterBar({
           {hasBasicScience && <option value="basic_science">Basic Science Requirements</option>}
           {categories.map(c => (
             <option key={c} value={c}>{CATEGORY_LABEL[c] ?? c}</option>
+          ))}
+        </select>
+      </div>
+      <div className="su-field">
+        <label>Level</label>
+        <select className="su-input" value={value.level} onChange={e => onChange({ ...value, level: e.target.value })}>
+          <option value="all">All levels</option>
+          {levels.map(l => (
+            <option key={l} value={l}>Level {l}</option>
           ))}
         </select>
       </div>

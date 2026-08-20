@@ -75,23 +75,23 @@ describe('affectedAdvisees — roster ownership scoping', () => {
 
   it('flags a student who already failed the bottleneck course', () => {
     const roster: StudentForBottleneckCheck[] = [
-      { studentId: 'S1', failedCourseCodes: ['GATE1'], passedCourseCodes: [], remainingCourseCodes: ['D1'] },
+      { studentId: 'S1', level: 2, failedCourseCodes: ['GATE1'], passedCourseCodes: [], remainingCourseCodes: ['D1'] },
     ];
     const rows = affectedAdvisees(roster, bottlenecks);
-    expect(rows).toContainEqual({ studentId: 'S1', bottleneckCourseCode: 'GATE1', reason: 'failed_needs_retake' });
+    expect(rows).toContainEqual({ studentId: 'S1', studentLevel: 2, bottleneckCourseCode: 'GATE1', reason: 'failed_needs_retake' });
   });
 
   it('flags a student who hasn\'t cleared the bottleneck AND still has a real downstream course ahead of them', () => {
     const roster: StudentForBottleneckCheck[] = [
-      { studentId: 'S2', failedCourseCodes: [], passedCourseCodes: [], remainingCourseCodes: ['GATE1', 'D1'] },
+      { studentId: 'S2', level: 3, failedCourseCodes: [], passedCourseCodes: [], remainingCourseCodes: ['GATE1', 'D1'] },
     ];
     const rows = affectedAdvisees(roster, bottlenecks);
-    expect(rows).toContainEqual({ studentId: 'S2', bottleneckCourseCode: 'GATE1', reason: 'prereq_not_yet_cleared' });
+    expect(rows).toContainEqual({ studentId: 'S2', studentLevel: 3, bottleneckCourseCode: 'GATE1', reason: 'prereq_not_yet_cleared' });
   });
 
   it('a student with a genuinely clean path (already passed the bottleneck) is correctly excluded, not just low-ranked', () => {
     const roster: StudentForBottleneckCheck[] = [
-      { studentId: 'S3', failedCourseCodes: [], passedCourseCodes: ['GATE1'], remainingCourseCodes: ['D1'] },
+      { studentId: 'S3', level: 3, failedCourseCodes: [], passedCourseCodes: ['GATE1'], remainingCourseCodes: ['D1'] },
     ];
     const rows = affectedAdvisees(roster, bottlenecks);
     expect(rows).toEqual([]);
@@ -99,7 +99,7 @@ describe('affectedAdvisees — roster ownership scoping', () => {
 
   it('a student with nothing remaining that the bottleneck actually gates is excluded, even if they haven\'t taken it', () => {
     const roster: StudentForBottleneckCheck[] = [
-      { studentId: 'S4', failedCourseCodes: [], passedCourseCodes: [], remainingCourseCodes: ['UNRELATED_COURSE'] },
+      { studentId: 'S4', level: 2, failedCourseCodes: [], passedCourseCodes: [], remainingCourseCodes: ['UNRELATED_COURSE'] },
     ];
     const rows = affectedAdvisees(roster, bottlenecks);
     expect(rows).toEqual([]);
@@ -107,7 +107,7 @@ describe('affectedAdvisees — roster ownership scoping', () => {
 
   it('never returns a student who isn\'t in the roster passed in — the real ownership-leak shape already found and fixed twice this session for transfer requests and venture ownership', () => {
     const roster: StudentForBottleneckCheck[] = [
-      { studentId: 'MINE-1', failedCourseCodes: ['GATE1'], passedCourseCodes: [], remainingCourseCodes: [] },
+      { studentId: 'MINE-1', level: 4, failedCourseCodes: ['GATE1'], passedCourseCodes: [], remainingCourseCodes: [] },
     ];
     // A student who'd obviously also be affected, but does NOT belong to
     // this advisor's roster — must never appear in the output no matter

@@ -1187,6 +1187,7 @@ app.get('/api/advisors/:advisorId/curriculum-analytics/bottlenecks', requireAuth
     const curriculum = db.getCurriculum(s.id);
     return {
       studentId: s.id,
+      level: s.level,
       failedCourseCodes: curriculum.filter(r => r.status === 'needs_retake').map(r => r.course.code),
       passedCourseCodes: curriculum.filter(r => r.status === 'passed').map(r => r.course.code),
       remainingCourseCodes: curriculum.filter(r => r.status === 'eligible' || r.status === 'locked' || r.status === 'registered').map(r => r.course.code),

@@ -50,6 +50,9 @@ export function rankBottlenecks(
  *  semesters out is still a real, worth-flagging risk. */
 export interface StudentForBottleneckCheck {
   studentId: string;
+  /** Real live report: "make them categorized by level" — the advisor's
+   *  own Advisees Affected table filters/groups by this. */
+  level: number;
   failedCourseCodes: string[];
   passedCourseCodes: string[];
   remainingCourseCodes: string[];
@@ -67,13 +70,13 @@ export function affectedAdvisees(roster: StudentForBottleneckCheck[], bottleneck
   for (const b of genuineBottlenecks) {
     for (const s of roster) {
       if (s.failedCourseCodes.includes(b.courseCode)) {
-        rows.push({ studentId: s.studentId, bottleneckCourseCode: b.courseCode, reason: 'failed_needs_retake' });
+        rows.push({ studentId: s.studentId, studentLevel: s.level, bottleneckCourseCode: b.courseCode, reason: 'failed_needs_retake' });
         continue;
       }
       const alreadyCleared = s.passedCourseCodes.includes(b.courseCode);
       const genuinelyGatesSomethingRemaining = !alreadyCleared && b.directlyBlocks.some(code => s.remainingCourseCodes.includes(code));
       if (genuinelyGatesSomethingRemaining) {
-        rows.push({ studentId: s.studentId, bottleneckCourseCode: b.courseCode, reason: 'prereq_not_yet_cleared' });
+        rows.push({ studentId: s.studentId, studentLevel: s.level, bottleneckCourseCode: b.courseCode, reason: 'prereq_not_yet_cleared' });
       }
     }
   }

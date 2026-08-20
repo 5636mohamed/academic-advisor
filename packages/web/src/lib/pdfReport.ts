@@ -571,8 +571,8 @@ export async function downloadBottleneckAnalyzerPdf(input: {
   if (affectedAdvisees.length > 0) {
     autoTable(doc, {
       startY,
-      head: [['Student', 'Bottleneck course', 'Why']],
-      body: affectedAdvisees.map(a => [a.studentName, a.bottleneckCourseCode, BOTTLENECK_REASON_LABEL[a.reason] ?? a.reason]),
+      head: [['Student', 'Level', 'Bottleneck course', 'Why']],
+      body: affectedAdvisees.map(a => [a.studentName, String(a.studentLevel), a.bottleneckCourseCode, BOTTLENECK_REASON_LABEL[a.reason] ?? a.reason]),
       headStyles: { fillColor: [35, 32, 23] },
       styles: { fontSize: 8.5 },
       willDrawPage: () => drawWatermark(doc, brand),

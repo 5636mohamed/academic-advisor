@@ -21,6 +21,11 @@ export interface CourseCategoryTags {
   isUR: boolean;
   isBasicScience: boolean;
   departments: string[];
+  /** Course.level (catalog year, 1-5+) — real live report: "make them
+   *  categorized by level" for the Bottleneck Analyzer, extended to every
+   *  course-level row for the same reason department/category were (one
+   *  consistent filter set, no second round-trip). */
+  courseLevel: number;
 }
 
 /** Feature 1 — one course's demand projection, derived from its real
@@ -128,4 +133,8 @@ export interface AffectedStudentRow {
   studentId: string;
   bottleneckCourseCode: string;
   reason: 'failed_needs_retake' | 'prereq_not_yet_cleared';
+  /** Student.level (academic year, 1-4+) — real live report: "make them
+   *  categorized by level" for the advisor's own Advisees Affected table,
+   *  same reasoning as CourseCategoryTags.courseLevel above. */
+  studentLevel: number;
 }

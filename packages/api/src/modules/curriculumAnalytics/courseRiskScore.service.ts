@@ -132,6 +132,7 @@ export function computeCourseRisk(input: CourseRiskInput): CourseRiskProfile {
     isUR: course.isUR,
     isBasicScience: course.isBasicScience,
     departments,
+    courseLevel: course.level,
     failureRate: Math.round(failureRate * 10) / 10,
     downstreamImpact: Math.round(downstreamImpact * 100) / 100,
     demandPressure: Math.round(demandPressure * 100) / 100,

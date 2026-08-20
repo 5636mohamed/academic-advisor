@@ -42,6 +42,7 @@ export function forecastCourseDemand(course: Course, offerings: CourseOffering[]
     isUR: course.isUR,
     isBasicScience: course.isBasicScience,
     departments,
+    courseLevel: course.level,
     history: chronological.map(o => ({ term: o.term, year: o.year, enrolled: o.enrolled })),
     nextTermEnrolled,
     confidenceBand,
