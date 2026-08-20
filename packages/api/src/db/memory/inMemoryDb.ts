@@ -1668,11 +1668,29 @@ export function approveAllPendingSystemProposals(studentId: string): CoursePropo
   const advisorHandledSlots = new Set(
     student.proposals.filter(p => p.origin === 'advisor' && p.status !== 'declined').map(p => p.slotKey)
   );
-  student.proposals = student.proposals.map(p =>
-    p.origin === 'system' && p.status === 'pending' && !advisorHandledSlots.has(p.slotKey)
-      ? approveProposal(p)
-      : p
-  );
+  let approvedCount = 0;
+  student.proposals = student.proposals.map(p => {
+    if (p.origin === 'system' && p.status === 'pending' && !advisorHandledSlots.has(p.slotKey)) {
+      approvedCount += 1;
+      return approveProposal(p);
+    }
+    return p;
+  });
+  // Real gap reported live: bulk "Approve all" called the pure
+  // approveProposal() transform directly instead of approveProposalById
+  // (which does notify), so it silently produced no notification at all —
+  // inconsistent with single-approve. One batched notification per call
+  // (not one per course) so approving a whole plan doesn't spam the
+  // student, and only fires when something was actually approved this
+  // call (idempotent re-runs after everything's already approved stay
+  // silent).
+  if (approvedCount > 0) {
+    createNotification(
+      'student', studentId, 'proposal_approved', 'Your course plan was approved',
+      `Your advisor approved ${approvedCount} course${approvedCount === 1 ? '' : 's'} in your plan.`,
+      'course-plan'
+    );
+  }
   return student.proposals;
 }
 
@@ -1828,7 +1846,7 @@ export function chooseProposalById(studentId: string, proposalId: string) {
   const result = chooseProposal(student.proposals[idx]);
   student.proposals[idx] = result.proposal;
 
-  if (result.registered) {
+  if (result.registered && !result.alreadyRegistered) {
     const nextOrdinal = Math.max(0, ...student.cgpaSnapshots.map(s => s.semesterOrdinal)) + 1;
     const registered: RegisteredCourse = {
       studentId,
@@ -1838,6 +1856,23 @@ export function chooseProposalById(studentId: string, proposalId: string) {
       registeredAt: new Date().toISOString(),
     };
     student.registeredCourses.push(registered);
+
+    // Real gap reported live: the advisor was never told which option the
+    // student actually went with — including, specifically, whether they
+    // registered the advisor's OWN proposed alternate or bypassed it for
+    // the system's original suggestion instead.
+    const advisorAlternateForSlot = student.proposals.find(
+      p => p.slotKey === result.proposal.slotKey && p.origin === 'advisor' && p.id !== result.proposal.id
+    );
+    let body: string;
+    if (result.proposal.origin === 'advisor') {
+      body = `${student.name} registered your proposed course, ${result.proposal.courseCode}.`;
+    } else if (advisorAlternateForSlot) {
+      body = `${student.name} registered the system's original suggestion, ${result.proposal.courseCode} — not the alternate you proposed (${advisorAlternateForSlot.courseCode}).`;
+    } else {
+      body = `${student.name} registered ${result.proposal.courseCode} from their course plan.`;
+    }
+    createNotification('advisor', student.advisorId, 'proposal_choice_made', 'Student registered a course', body, `students/${studentId}/course-plan?mode=proposals`);
   }
 
   return result;

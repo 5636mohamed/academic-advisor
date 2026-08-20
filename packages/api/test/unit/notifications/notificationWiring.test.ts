@@ -110,6 +110,112 @@ describe('real trigger points create the right notification', () => {
     expect(notifs).toHaveLength(1);
   });
 
+  it('bulk "Approve all" notifies the student, same as single-approve (real gap: it used to call approveProposal directly, silently skipping the notification single-approve always sent)', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    db.addProposalsFromPlan('ahmed-1', [candidate]);
+    db.approveAllPendingSystemProposals('ahmed-1');
+    const notifs = db.listNotifications('student', student.id);
+    expect(notifs.some(n => n.type === 'proposal_approved')).toBe(true);
+  });
+
+  it('re-running "Approve all" after everything is already approved does not spam a duplicate notification', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    db.addProposalsFromPlan('ahmed-1', [candidate]);
+    db.approveAllPendingSystemProposals('ahmed-1');
+    db.approveAllPendingSystemProposals('ahmed-1'); // idempotent — nothing left to approve
+    const notifs = db.listNotifications('student', student.id).filter(n => n.type === 'proposal_approved');
+    expect(notifs).toHaveLength(1);
+  });
+
+  it('the VP\'s cross-advisor bulk approve also notifies each affected student (it delegates to approveAllPendingSystemProposals per student)', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    db.addProposalsFromPlan('ahmed-1', [candidate]);
+    db.approveAllPendingProposalsAcrossAllAdvisors();
+    const notifs = db.listNotifications('student', student.id);
+    expect(notifs.some(n => n.type === 'proposal_approved')).toBe(true);
+  });
+
+  it('registering a course notifies the advisor of which option the student chose (real gap reported live)', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    const [proposal] = db.addProposalsFromPlan('ahmed-1', [candidate]).filter(p => p.slotKey === 'ECE411');
+    db.approveAllPendingSystemProposals('ahmed-1');
+    db.chooseProposalById('ahmed-1', proposal.id);
+    const notifs = db.listNotifications('advisor', student.advisorId);
+    const choiceNotif = notifs.find(n => n.type === 'proposal_choice_made');
+    expect(choiceNotif).toBeDefined();
+    expect(choiceNotif!.body).toContain('ECE411');
+  });
+
+  it('registering the SYSTEM suggestion when the advisor had proposed a different alternate tells the advisor exactly that', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    const [systemProposal] = db.addProposalsFromPlan('ahmed-1', [candidate]).filter(p => p.slotKey === 'ECE411');
+    db.approveAllPendingSystemProposals('ahmed-1');
+    const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE411', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
+    // the student bypasses the advisor's own alternate and registers the system's original suggestion instead
+    db.chooseProposalById('ahmed-1', systemProposal.id);
+    const notifs = db.listNotifications('advisor', student.advisorId);
+    const choiceNotif = notifs.find(n => n.type === 'proposal_choice_made');
+    expect(choiceNotif).toBeDefined();
+    expect(choiceNotif!.body).toContain('not the alternate you proposed');
+    expect(choiceNotif!.body).toContain(alt.courseCode);
+  });
+
+  it('registering the advisor\'s OWN proposed alternate tells the advisor it was their proposal that was picked', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    db.addProposalsFromPlan('ahmed-1', [candidate]);
+    const alt = db.addAdvisorAlternateProposal('ahmed-1', 'ECE411', 'ECE322', { expectedPct: 92, expectedLetter: 'A-', expectedPoints: 3.7 });
+    db.chooseProposalById('ahmed-1', alt.id);
+    const notifs = db.listNotifications('advisor', student.advisorId);
+    const choiceNotif = notifs.find(n => n.type === 'proposal_choice_made');
+    expect(choiceNotif).toBeDefined();
+    expect(choiceNotif!.body).toContain('your proposed course');
+  });
+
+  it('a double-click/retry on the same registration does not spam a duplicate notification', () => {
+    const student = db.getStudent('ahmed-1')!;
+    const candidate = {
+      courseCode: 'ECE411', isRetake: false, oldPoints: null,
+      expectedPct: 85, expectedLetter: 'B+', expectedPoints: 3.3,
+      deltaPts: null, chainUnlockValue: 1, passRate: 90, score: 60, mandatory: false,
+    };
+    const [proposal] = db.addProposalsFromPlan('ahmed-1', [candidate]).filter(p => p.slotKey === 'ECE411');
+    db.approveAllPendingSystemProposals('ahmed-1');
+    db.chooseProposalById('ahmed-1', proposal.id);
+    db.chooseProposalById('ahmed-1', proposal.id); // same request fired again
+    const notifs = db.listNotifications('advisor', student.advisorId).filter(n => n.type === 'proposal_choice_made');
+    expect(notifs).toHaveLength(1);
+  });
+
   it('submitting a transfer request notifies that student\'s advisor', () => {
     const student = db.getStudent('hassan-1')!;
     db.createTransferRequestForStudent('hassan-1', 'internal_department', 'CSE');

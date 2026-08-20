@@ -21,7 +21,8 @@ export type NotificationType =
   | 'transfer_awaiting_vp'
   | 'task_rescheduled'
   | 'grant_requested'
-  | 'grant_decided';
+  | 'grant_decided'
+  | 'proposal_choice_made';
 
 export interface Notification {
   id: string;

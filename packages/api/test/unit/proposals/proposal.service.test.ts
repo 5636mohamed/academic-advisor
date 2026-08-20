@@ -114,4 +114,16 @@ describe('chooseProposal — §15.3.2 step 3', () => {
     const result = chooseProposal(alt);
     expect(result.registered).toBe(true);
   });
+
+  it('is idempotent — calling it again on an already-registered proposal does not re-register (real bug: a double-click/retry used to create a second RegisteredCourse row)', () => {
+    const [p] = buildProposalsFromPlan('s1', [candidate({})], {});
+    const approved = approveProposal(p);
+    const first = chooseProposal(approved);
+    expect(first.alreadyRegistered).toBe(false);
+
+    const second = chooseProposal(first.proposal);
+    expect(second.registered).toBe(true);
+    expect(second.alreadyRegistered).toBe(true); // signals the caller: do NOT push another RegisteredCourse row
+    expect(second.proposal.status).toBe('registered');
+  });
 });

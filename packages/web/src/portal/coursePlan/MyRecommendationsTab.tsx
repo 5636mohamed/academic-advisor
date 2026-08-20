@@ -77,6 +77,14 @@ export function MyRecommendationsTab({ studentId, studentName }: { studentId: st
   const [busySlot, setBusySlot] = useState<string | null>(null);
   const [contactPopup, setContactPopup] = useState<string | null>(null);
   const [stillPendingSlots, setStillPendingSlots] = useState<string[] | null>(null);
+  // Real UX gap reported live: this tab's own empty-state text says
+  // "generate a plan and submit it to your advisor first" but had no way
+  // to actually do that — a student would have to already know to visit
+  // the separate "Fast Graduation" tab first, which is the only place
+  // that called api.generateProposals(). Since generation always runs the
+  // same advising cycle regardless of which tab triggers it, this tab can
+  // just do it directly.
+  const [generating, setGenerating] = useState(false);
 
   const load = () => {
     api.getProposals(studentId).then(r => {
@@ -119,6 +127,16 @@ export function MyRecommendationsTab({ studentId, studentName }: { studentId: st
     }
   };
 
+  const generatePlan = async () => {
+    setGenerating(true);
+    try {
+      await api.generateProposals(studentId);
+      load();
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const slots = groupBySlot(proposals);
   const readyCount = slots.filter(s => {
     const final = s.advisor ?? s.system;
@@ -145,7 +163,16 @@ export function MyRecommendationsTab({ studentId, studentName }: { studentId: st
         </div>
       )}
 
-      {slots.length === 0 && <Empty>No recommendations yet — generate a plan and submit it to your advisor first.</Empty>}
+      {slots.length === 0 && (
+        <Empty>
+          No recommendations yet — generate a plan and submit it to your advisor first.
+          <div className="su-mt-16">
+            <button className="su-btn" disabled={generating} onClick={generatePlan}>
+              {generating ? 'Generating…' : 'Generate my plan'}
+            </button>
+          </div>
+        </Empty>
+      )}
 
       <div className="su-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {slots.map(slot => (

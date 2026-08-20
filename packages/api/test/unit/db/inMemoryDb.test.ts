@@ -418,3 +418,32 @@ describe('chooseAllReadyProposals — student bulk action', () => {
     expect(() => db.chooseAllReadyProposals('nobody')).toThrow();
   });
 });
+
+describe('chooseProposalById — single-slot "Choose this course" action', () => {
+  function candidate(courseCode: string) {
+    return {
+      courseCode, isRetake: false, oldPoints: null,
+      expectedPct: 80, expectedLetter: 'B', expectedPoints: 3.0,
+      deltaPts: null, chainUnlockValue: 2, passRate: 85, score: 50, mandatory: false,
+    };
+  }
+
+  it('is idempotent — a double-click/retry calling it twice never creates a second RegisteredCourse row (real bug: the old check only looked at advisorApproved, never status)', () => {
+    // addProposalsFromPlan returns the student's FULL proposals list (not
+    // just the newly-added ones) — Ahmed already has seeded proposals, so
+    // find the ECE314 one specifically rather than assuming index 0.
+    db.addProposalsFromPlan('ahmed-1', [candidate('ECE314')]);
+    db.approveAllPendingSystemProposals('ahmed-1');
+    const proposal = db.getProposals('ahmed-1').find(p => p.slotKey === 'ECE314')!;
+
+    const first = db.chooseProposalById('ahmed-1', proposal.id);
+    expect(first.registered).toBe(true);
+    expect(db.getRegisteredCourses('ahmed-1').filter(r => r.courseCode === 'ECE314')).toHaveLength(1);
+
+    // Same request fired a second time — a double-click, a flaky-network
+    // retry, or two open tabs.
+    const second = db.chooseProposalById('ahmed-1', proposal.id);
+    expect(second.registered).toBe(true);
+    expect(db.getRegisteredCourses('ahmed-1').filter(r => r.courseCode === 'ECE314')).toHaveLength(1); // still exactly one, not two
+  });
+});

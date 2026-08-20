@@ -110,16 +110,29 @@ export interface ChooseProposalResult {
   proposal: CourseProposal;
   registered: boolean;
   requiresAdvisorContact: boolean;
+  /** True when this call found the proposal ALREADY `registered` from a
+   *  previous call — the caller (chooseProposalById) must not push a
+   *  second RegisteredCourse row in that case. Real bug this guards
+   *  against: a double-click, a flaky-network client retry, or two open
+   *  tabs calling "choose this course" twice used to register the same
+   *  course twice, since the old check only looked at the
+   *  never-un-set `advisorApproved` boolean, not `status`. */
+  alreadyRegistered: boolean;
 }
 
 /** §15.3.2 step 3 — the student picks one option for a slot. Registering
  *  requires the picked option to already be advisor-approved; picking a
  *  not-yet-approved option (including a plain, never-reviewed system
  *  suggestion) never silently registers — it always routes to the
- *  contact-your-advisor prompt instead. */
+ *  contact-your-advisor prompt instead. Idempotent: calling this again on
+ *  an already-registered proposal returns the same "registered" result
+ *  without re-registering. */
 export function chooseProposal(proposal: CourseProposal): ChooseProposalResult {
-  if (proposal.advisorApproved) {
-    return { proposal: { ...proposal, status: 'registered' }, registered: true, requiresAdvisorContact: false };
+  if (proposal.status === 'registered') {
+    return { proposal, registered: true, requiresAdvisorContact: false, alreadyRegistered: true };
   }
-  return { proposal, registered: false, requiresAdvisorContact: true };
+  if (proposal.advisorApproved) {
+    return { proposal: { ...proposal, status: 'registered' }, registered: true, requiresAdvisorContact: false, alreadyRegistered: false };
+  }
+  return { proposal, registered: false, requiresAdvisorContact: true, alreadyRegistered: false };
 }
