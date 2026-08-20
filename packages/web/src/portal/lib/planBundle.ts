@@ -27,6 +27,18 @@ export interface PlanBundle {
   members: PlanMember[];
   credits: number;
   score: number;
+  // Only set on a bundle inside `carriedToNextSemester` — see planPacker.ts's
+  // own doc comment. 'credit_overflow': a real mandatory retake that simply
+  // didn't fit under the credit cap. 'still_predicted_fail': a mandatory
+  // retake whose OWN fresh prediction for this attempt is still an F — real
+  // bug reported live (Peter Nour, IME-gen-19): these used to be packed
+  // into the plan anyway just because they're compulsory to eventually
+  // graduate, regardless of what the model itself predicted. Deferred here
+  // instead, surfaced by DeferredCoursesNotice.tsx rather than silently
+  // dropped (this field existed in the API response before this fix too —
+  // `carriedToNextSemester` was never rendered anywhere on the frontend
+  // until now).
+  carriedReason?: 'credit_overflow' | 'still_predicted_fail';
 }
 export interface PlanBundleResponse {
   mode?: string;

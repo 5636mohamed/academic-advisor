@@ -191,7 +191,7 @@ describe('runAdvisingCycle (§4.2 orchestrator, full async wiring)', () => {
     expect(result.action).toBe('SHOW_PLAN'); // not routed through the probation-repair branch at all
   });
 
-  it('real bug fixed (live-reported): a non-mandatory candidate predicted an outright F is never recommended, even when it would otherwise win a knapsack slot', async () => {
+  it('real bug fixed (live-reported, twice): a candidate predicted an outright F is never recommended — optional or mandatory retake alike — even when it would otherwise win a knapsack slot', async () => {
     const student = baseStudent(2.4);
     // ECE999 predicts F but has a huge chainUnlockValue — high enough that,
     // pre-fix, scoreCandidate's weighted sum could still make it the
@@ -201,9 +201,14 @@ describe('runAdvisingCycle (§4.2 orchestrator, full async wiring)', () => {
     const eligible: EligibleCourse[] = [
       { course: course('ECE999', 3), isRetake: false, oldLetter: null, oldPoints: null },
       { course: course('ECE888', 3), isRetake: false, oldLetter: null, oldPoints: null },
-      // A genuinely mandatory F-grade retake — must stay in the plan
-      // regardless of this cycle's prediction; only the OPTIONAL pool
-      // above is subject to the new F-exclusion filter.
+      // A mandatory F-grade retake whose FRESH prediction for this attempt
+      // is ALSO F (a real bug, reported live a third time — Peter Nour,
+      // IME-gen-19 — planPacker used to reserve this unconditionally just
+      // because it's "compulsory," no matter what the fresh prediction
+      // said). It must now be excluded from the plan the same as an
+      // optional F-predicted candidate — deferred to
+      // carriedToNextSemester instead, not silently dropped or shown as a
+      // recommendation to fail again.
       { course: course('ECE777', 3), isRetake: true, oldLetter: 'F', oldPoints: 1.0 },
     ];
 
@@ -234,7 +239,6 @@ describe('runAdvisingCycle (§4.2 orchestrator, full async wiring)', () => {
 
     expect(codes).not.toContain('ECE999'); // optional, F-predicted -> excluded
     expect(codes).toContain('ECE888'); // optional, passing -> still recommended
-    expect(codes).toContain('ECE777'); // mandatory F-retake -> stays, even though it's F-predicted again
-    expect(result.plan.find(p => p.courseCode === 'ECE777')?.mandatory).toBe(true);
+    expect(codes).not.toContain('ECE777'); // mandatory retake, but STILL F-predicted this attempt -> also excluded, not shown as a recommendation to fail again
   });
 });

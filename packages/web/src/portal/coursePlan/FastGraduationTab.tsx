@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { api, StudentDetail } from '../../api/client';
 import { categoryTag, creditCapDisplay } from '../lib/studentUiHelpers';
-import { flattenPlanBundles, PlanBundleResponse, RosterCourse } from '../lib/planBundle';
+import { flattenPlanBundles, PlanBundle, PlanBundleResponse, RosterCourse } from '../lib/planBundle';
 import { CatalogEntry } from '../lib/useCatalogMap';
 import { Loading } from '../ui/Primitives';
+import { DeferredCoursesNotice } from './DeferredCoursesNotice';
 import { defaultCategoryTag, PlanRosterTable } from './PlanRosterTable';
 import { computePlanProjection, PlanSummary } from './PlanSummary';
 
@@ -29,6 +30,7 @@ export function FastGraduationTab({
   recommendationsLinkLabel?: string;
 }) {
   const [plan, setPlan] = useState<RosterCourse[] | null>(null);
+  const [deferred, setDeferred] = useState<PlanBundle[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
@@ -36,7 +38,11 @@ export function FastGraduationTab({
   const load = () => {
     setError(null);
     api.planFast(studentId)
-      .then(r => setPlan(flattenPlanBundles(r as PlanBundleResponse)))
+      .then(r => {
+        const response = r as PlanBundleResponse;
+        setPlan(flattenPlanBundles(response));
+        setDeferred(response.carriedToNextSemester ?? []);
+      })
       .catch(e => setError(e instanceof Error ? e.message : String(e)));
   };
 
@@ -65,6 +71,7 @@ export function FastGraduationTab({
     <div className="su-fade">
       <PlanSummary totalCredits={totalCredits} semesterGpa={semesterGpa} postGpa={postGpa} currentCgpa={student.cgpa} cap={cap.cap} capReason={cap.reason} />
       <PlanRosterTable plan={plan} catalog={catalog} categoryTagFor={c => defaultCategoryTag(c, catalog, categoryTag)} />
+      <DeferredCoursesNotice bundles={deferred} />
       <div className="su-flex su-justify-between su-items-center su-mt-16" style={{ flexWrap: 'wrap', gap: 10 }}>
         <div className="su-subtitle" style={{ margin: 0 }}>
           Auto-balanced to graduate as fast as possible within your {cap.cap}-credit limit.

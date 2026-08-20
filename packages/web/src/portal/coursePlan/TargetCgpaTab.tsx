@@ -5,9 +5,10 @@
 import { useEffect, useState } from 'react';
 import { api, StudentDetail } from '../../api/client';
 import { categoryTag, creditCapDisplay } from '../lib/studentUiHelpers';
-import { flattenPlanBundles, PlanBundleResponse, RosterCourse } from '../lib/planBundle';
+import { flattenPlanBundles, PlanBundle, PlanBundleResponse, RosterCourse } from '../lib/planBundle';
 import { CatalogEntry } from '../lib/useCatalogMap';
 import { Loading } from '../ui/Primitives';
+import { DeferredCoursesNotice } from './DeferredCoursesNotice';
 import { defaultCategoryTag, PlanRosterTable } from './PlanRosterTable';
 import { computePlanProjection, PlanSummary } from './PlanSummary';
 import { TargetChainCalculator } from './TargetChainCalculator';
@@ -25,6 +26,7 @@ export function TargetCgpaTab({
 }) {
   const [target, setTarget] = useState('3.00');
   const [plan, setPlan] = useState<RosterCourse[] | null>(null);
+  const [deferred, setDeferred] = useState<PlanBundle[]>([]);
   const [mode, setMode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,6 +37,7 @@ export function TargetCgpaTab({
     try {
       const r = (await api.planTarget(studentId, Number(target))) as PlanBundleResponse;
       setPlan(flattenPlanBundles(r));
+      setDeferred(r.carriedToNextSemester ?? []);
       setMode(r.mode ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -74,6 +77,7 @@ export function TargetCgpaTab({
             capReason={cap.reason}
           />
           <PlanRosterTable plan={plan} catalog={catalog} categoryTagFor={c => defaultCategoryTag(c, catalog, categoryTag)} />
+          <DeferredCoursesNotice bundles={deferred} />
         </>
       )}
 

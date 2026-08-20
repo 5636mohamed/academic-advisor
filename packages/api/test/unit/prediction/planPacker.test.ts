@@ -138,10 +138,72 @@ describe('packPlan (§3.2 knapsack + §5.2 mandatory reservation)', () => {
       expect(codes).toContain('D_RETAKE'); // the only passing option left still gets recommended
     });
 
-    it('a mandatory F-grade retake (already-failed, compulsory course) is NOT excluded even if it predicts F again — there is no "recommend or not" choice for it', () => {
-      const mandatory: Cand[] = [cand({ courseCode: 'MUST_RETAKE', credits: 3, expectedLetter: 'F', isRetake: true })];
+    // Real bug reported live a THIRD time (Peter Nour, IME-gen-19): a
+    // mandatory retake (already an F on the transcript, compulsory to
+    // eventually graduate per §5.2) still got a FRESH prediction for this
+    // attempt — and packPlan reserved it into the plan unconditionally no
+    // matter what that fresh prediction said, i.e. this exact test used to
+    // assert the bug as intended behavior. "Compulsory to graduate" never
+    // justified showing a course the model itself expects to fail AGAIN as
+    // part of "here's what to register for."
+    it('a mandatory retake whose FRESH prediction is still F is deferred to carriedToNextSemester, not packed into the plan', () => {
+      const mandatory: Cand[] = [cand({ courseCode: 'STILL_FAILING', credits: 3, expectedLetter: 'F', isRetake: true })];
       const result = packPlan({ mandatory, pool: [], cap: 14, mode: 'probation_repair' });
-      expect(result.mandatoryBundles.flatMap(b => b.members.map(m => m.courseCode))).toEqual(['MUST_RETAKE']);
+      expect(result.mandatoryBundles).toEqual([]);
+      const carried = result.carriedToNextSemester;
+      expect(carried).toHaveLength(1);
+      expect(carried[0].members.map(m => m.courseCode)).toEqual(['STILL_FAILING']);
+      expect(carried[0].carriedReason).toBe('still_predicted_fail');
     });
+
+    it('a mandatory retake whose fresh prediction has genuinely improved (no longer F) is still reserved into the plan as before', () => {
+      const mandatory: Cand[] = [cand({ courseCode: 'IMPROVED_RETAKE', credits: 3, expectedLetter: 'C', isRetake: true, expectedPoints: 2.3 })];
+      const result = packPlan({ mandatory, pool: [], cap: 14, mode: 'probation_repair' });
+      expect(result.mandatoryBundles.flatMap(b => b.members.map(m => m.courseCode))).toEqual(['IMPROVED_RETAKE']);
+      expect(result.carriedToNextSemester).toEqual([]);
+    });
+
+    it('mixed mandatory retakes: only the still-F ones are deferred, the rest are reserved and the freed capacity still goes to the optimizer', () => {
+      const mandatory: Cand[] = [
+        cand({ courseCode: 'PASS_RETAKE', credits: 3, expectedLetter: 'C', isRetake: true, expectedPoints: 2.3 }),
+        cand({ courseCode: 'FAIL_RETAKE', credits: 3, expectedLetter: 'F', isRetake: true }),
+      ];
+      const pool: Cand[] = [cand({ courseCode: 'ELECTIVE', credits: 3, expectedPoints: 3.5 })];
+      const result = packPlan({ mandatory, pool, cap: 14, mode: 'probation_repair' });
+      expect(result.mandatoryBundles.flatMap(b => b.members.map(m => m.courseCode))).toEqual(['PASS_RETAKE']);
+      expect(result.carriedToNextSemester.flatMap(b => b.members.map(m => m.courseCode))).toEqual(['FAIL_RETAKE']);
+      expect(result.carriedToNextSemester[0].carriedReason).toBe('still_predicted_fail');
+      // freed-up capacity (cap 14 - only 3 reserved, not 6) still gets used by the optimizer
+      expect(result.optimizedBundles.flatMap(b => b.members.map(m => m.courseCode))).toContain('ELECTIVE');
+    });
+
+    it('every mandatory retake still predicted F: mandatoryBundles is empty, all of them carry with the right reason, optimizer fills the whole cap from the passing pool', () => {
+      const mandatory: Cand[] = [
+        cand({ courseCode: 'F1', credits: 3, expectedLetter: 'F', isRetake: true }),
+        cand({ courseCode: 'F2', credits: 3, expectedLetter: 'F', isRetake: true }),
+      ];
+      const pool: Cand[] = [cand({ courseCode: 'SAFE', credits: 3, expectedPoints: 3.0 })];
+      const result = packPlan({ mandatory, pool, cap: 14, mode: 'probation_repair' });
+      expect(result.mandatoryBundles).toEqual([]);
+      expect(result.carriedToNextSemester.every(b => b.carriedReason === 'still_predicted_fail')).toBe(true);
+      expect(result.carriedToNextSemester.flatMap(b => b.members.map(m => m.courseCode)).sort()).toEqual(['F1', 'F2']);
+      expect(result.optimizedBundles.flatMap(b => b.members.map(m => m.courseCode))).toContain('SAFE');
+    });
+  });
+
+  // §11 Example M's overflow carry (credit-cap overflow, not an F
+  // prediction) now needs to be distinguishable from the new still-
+  // predicted-fail carry — same bucket, different `carriedReason`.
+  it('§11 Example M\'s overflow carry is tagged carriedReason: credit_overflow (not still_predicted_fail)', () => {
+    const mandatory: Cand[] = [
+      cand({ courseCode: 'F1', credits: 3, chainUnlockValue: 4 }),
+      cand({ courseCode: 'F2', credits: 3, chainUnlockValue: 3 }),
+      cand({ courseCode: 'F3', credits: 3, chainUnlockValue: 2 }),
+      cand({ courseCode: 'F4', credits: 3, chainUnlockValue: 1 }), // lowest priority — should overflow
+    ];
+    const result = packPlan({ mandatory, pool: [], cap: 10, mode: 'probation_repair' });
+    expect(result.carriedToNextSemester).toHaveLength(1);
+    expect(result.carriedToNextSemester[0].members[0].courseCode).toBe('F4');
+    expect(result.carriedToNextSemester[0].carriedReason).toBe('credit_overflow');
   });
 });
