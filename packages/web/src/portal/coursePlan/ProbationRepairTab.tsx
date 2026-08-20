@@ -57,7 +57,10 @@ export function ProbationRepairTab({
   };
 
   const restart = () => setStep({ kind: 'gate' });
-  const cap = creditCapDisplay(student.cgpa);
+  // Same real fix as FastGraduationTab.tsx — this call was missing the
+  // hasCompletedAnyCourse arg, mislabeling a cold-start student's cap as
+  // "probation-reduced" 14 instead of the real, normal 20.
+  const cap = creditCapDisplay(student.cgpa, (completedCredits ?? 0) > 0);
 
   if (step.kind === 'gate') return <AcademicPerformanceGate onAnswer={afterGate} onSkip={onGoDashboard} />;
   if (step.kind === 'loading') return <Loading label="Running the probation-repair advising cycle…" />;

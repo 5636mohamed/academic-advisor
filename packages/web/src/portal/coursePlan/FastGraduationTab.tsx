@@ -64,7 +64,16 @@ export function FastGraduationTab({
   if (error) return <div className="su-note danger">{error}</div>;
   if (!plan) return <Loading label="Building the fastest path to graduation…" />;
 
-  const cap = creditCapDisplay(student.cgpa);
+  // Real live report: this call was missing the 2nd arg entirely, so a
+  // brand-new cold-start student (cgpa 0 — no grade yet, not a real 0.0)
+  // silently defaulted to hasCompletedAnyCourse=true and got mislabeled
+  // "14-credit limit — Reduced due to probation" even though their real
+  // packed plan (server-side, which already has this fix) is a normal
+  // 20-credit one. `completedCredits` (already a prop here) is the same
+  // "has any real coursework yet" signal PortalHome.tsx/Overview.tsx
+  // already derive from `curriculum` — just via a field this tab already
+  // has in hand, so no new prop had to be threaded through.
+  const cap = creditCapDisplay(student.cgpa, (completedCredits ?? 0) > 0);
   const { totalCredits, semesterGpa, postGpa } = computePlanProjection(plan, catalog, student.cgpa, completedCredits);
 
   return (

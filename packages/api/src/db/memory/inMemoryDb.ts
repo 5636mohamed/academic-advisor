@@ -520,9 +520,16 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
     // system's recommendation instead comes from coldStart.service.ts,
     // blending his G12 (Thanaweya Amma) and university entrance exam
     // results. Deliberately in the needs_early_support tier (projected
-    // ~64%) — the more useful scenario to demo end-to-end, since it's the
+    // ~68%) — the more useful scenario to demo end-to-end, since it's the
     // one that actually flags the advisor for early outreach before any
-    // real grade exists.
+    // real grade exists. g12Score is pinned at EJUST's own real minimum
+    // Engineering-admission threshold (78%) — real report: the original
+    // 66 was below that floor, i.e. an admission that couldn't actually
+    // happen; entranceExamScore alone (a separate, university-run exam,
+    // not gated the same way) carries the "needs early support" signal
+    // instead, which is the realistic version of this scenario: a student
+    // who cleared the G12 bar but underperformed on EJUST's own entrance
+    // exam.
     id: 'youssef-adel-1',
     name: 'Youssef Adel (cold start — new Level 1)',
     facultyId: 'ENG',
@@ -531,8 +538,8 @@ const namedSeedStudentLiterals: Array<Omit<SeedStudent, 'advisorId'>> = [
     activeBaseSnapshotId: null,
     cumulativeEarnedCredits: 0,
     level: 1,
-    g12Score: 66,
-    entranceExamScore: 61,
+    g12Score: 78,
+    entranceExamScore: 58,
     quizAnswers: {},
     allAttempts: [],
     cgpaSnapshots: [],
