@@ -27,6 +27,7 @@ export function VpLayout() {
     { to: '/vp/innovation-topography', label: 'Innovation topography' },
     { to: '/vp/institutional-friction', label: 'Institutional friction' },
     { to: '/vp/demand-forecast', label: 'Demand forecast' },
+    { to: '/vp/curriculum-health', label: 'Curriculum health' },
   ];
 
   return (

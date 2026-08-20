@@ -8,7 +8,7 @@
 // var; the API itself needs CORS enabled for the Pages origin). Deliberately
 // plain fetch + small helpers rather than a data-fetching library — keeps
 // the surface easy to read alongside the routes it calls.
-import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation, ColdStartAssessment, DepartmentDemandForecast } from '@advisor/shared';
+import { EnrollmentRecord, CgpaSnapshot, ProbationCounterState, ProbationCounterLogEntry, Course, FrictionReading, FrictionTrendReading, InstitutionalFrictionCell, Project, ProjectMember, TopographyCell, OpportunityMatch, Notification, NotificationRole, TaskMoveRecommendation, ColdStartAssessment, DepartmentDemandForecast, CurriculumHealthReport } from '@advisor/shared';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -570,6 +570,8 @@ export const api = {
   // not their roster — see server.ts's own route comment for why.
   vpDemandForecast: () => request<DepartmentDemandForecast[]>('/vp/curriculum-analytics/demand-forecast'),
   advisorDemandForecast: (advisorId: string) => request<DepartmentDemandForecast>(`/advisors/${advisorId}/curriculum-analytics/demand-forecast`),
+  vpCurriculumHealthMonitor: () => request<CurriculumHealthReport>('/vp/curriculum-analytics/health-monitor'),
+  advisorCurriculumHealthMonitor: (advisorId: string) => request<CurriculumHealthReport>(`/advisors/${advisorId}/curriculum-analytics/health-monitor`),
 
   // AI Features Blueprint — Project Collider (advisor/VP-facing only)
   advisorColliderProjects: (advisorId: string) => request<ColliderProjectDTO[]>(`/advisors/${advisorId}/collider/projects`),

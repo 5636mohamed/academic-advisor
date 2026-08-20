@@ -58,6 +58,7 @@ export function AdvisorLayout() {
     { to: '/workload-overview', label: 'Workload' },
     { to: '/collider-board', label: 'Collider board' },
     { to: '/demand-forecast', label: 'Demand forecast' },
+    { to: '/curriculum-health', label: 'Curriculum health' },
   ];
 
   return (

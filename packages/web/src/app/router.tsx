@@ -20,6 +20,7 @@ import { AdvisorTransferRequests } from '../advisorConsole/AdvisorTransferReques
 import { AdvisorFrictionOverview } from '../advisorConsole/AdvisorFrictionOverview';
 import { AdvisorColliderBoard } from '../advisorConsole/AdvisorColliderBoard';
 import { AdvisorDemandForecast } from '../advisorConsole/AdvisorDemandForecast';
+import { AdvisorCurriculumHealthMonitor } from '../advisorConsole/AdvisorCurriculumHealthMonitor';
 import { VpLayout } from '../vpConsole/VpLayout';
 import { VpDashboard } from '../vpConsole/VpDashboard';
 import { VpAdvisorDetail } from '../vpConsole/VpAdvisorDetail';
@@ -28,6 +29,7 @@ import { VpVentureBoard } from '../vpConsole/VpVentureBoard';
 import { VpInnovationTopography } from '../vpConsole/VpInnovationTopography';
 import { VpInstitutionalFrictionDashboard } from '../vpConsole/VpInstitutionalFrictionDashboard';
 import { VpDemandForecast } from '../vpConsole/VpDemandForecast';
+import { VpCurriculumHealthMonitor } from '../vpConsole/VpCurriculumHealthMonitor';
 import { RequireAdvisor, RequireStudent, RequireVicePresident } from '../auth/RequireRole';
 
 export const router = createBrowserRouter([
@@ -74,6 +76,7 @@ export const router = createBrowserRouter([
           { path: 'workload-overview', element: <AdvisorFrictionOverview /> },
           { path: 'collider-board', element: <AdvisorColliderBoard /> },
           { path: 'demand-forecast', element: <AdvisorDemandForecast /> },
+          { path: 'curriculum-health', element: <AdvisorCurriculumHealthMonitor /> },
           { path: 'advisor-console', element: <Navigate to="/students" replace /> },
         ],
       },
@@ -123,6 +126,7 @@ export const router = createBrowserRouter([
           { path: 'innovation-topography', element: <VpInnovationTopography /> },
           { path: 'institutional-friction', element: <VpInstitutionalFrictionDashboard /> },
           { path: 'demand-forecast', element: <VpDemandForecast /> },
+          { path: 'curriculum-health', element: <VpCurriculumHealthMonitor /> },
         ],
       },
     ],

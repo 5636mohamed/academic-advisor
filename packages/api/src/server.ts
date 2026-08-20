@@ -40,6 +40,7 @@ import { matchOpportunitiesForProject } from './modules/collider/colliderOpportu
 import { getAllOpportunities } from './modules/collider/externalOpportunitiesLive.service';
 import { buildTopography } from './modules/collider/innovationTopography.service';
 import { forecastDepartmentDemand, forecastAllDepartments } from './modules/curriculumAnalytics/resourceForecast.service';
+import { buildHealthMonitor } from './modules/curriculumAnalytics/curriculumHealthMonitor.service';
 import { MILESTONES_BY_COURSE, SYLLABUS_MILESTONES, SEMESTER_WEEKS } from './db/seed/seedSyllabusMilestones';
 import { COLLABORATORS_BY_ID } from './db/seed/seedColliderCollaborators';
 
@@ -1068,6 +1069,19 @@ app.get('/api/advisors/:advisorId/curriculum-analytics/demand-forecast', (req, r
   if (!advisor) return res.status(404).json({ error: 'advisor not found' });
   const departmentCatalog = CATALOG_BY_DEPARTMENT[advisor.departmentId] ?? [];
   res.json(forecastDepartmentDemand(advisor.departmentId, departmentCatalog, OFFERINGS_BY_COURSE));
+});
+
+// Feature 2 — Curriculum Health Monitor. Same VP-wide (departmentId: null)
+// / Advisor-own-department pattern as demand-forecast just above.
+app.get('/api/vp/curriculum-analytics/health-monitor', (_req, res) => {
+  res.json(buildHealthMonitor(null, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE));
+});
+
+app.get('/api/advisors/:advisorId/curriculum-analytics/health-monitor', (req, res) => {
+  const advisorId = paramStr(req, 'advisorId');
+  const advisor = db.getAdvisor(advisorId);
+  if (!advisor) return res.status(404).json({ error: 'advisor not found' });
+  res.json(buildHealthMonitor(advisor.departmentId, CATALOG_BY_DEPARTMENT, CATALOG, OFFERINGS_BY_COURSE));
 });
 
 // ---------------------------------------------------------------------
