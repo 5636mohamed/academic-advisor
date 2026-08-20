@@ -33,12 +33,25 @@ export function Login() {
     api.advisors().then(setAdvisors);
   }, []);
 
+  // Real race condition found by audit: students/advisors start `null` and
+  // load asynchronously, but nothing blocked submitting before they
+  // resolved — a fast submit (autofill+autosubmit, a quick typist on a
+  // slow connection) would evaluate `advisors?.find(...)`/`students?.find(...)`
+  // against `null`, so even fully correct credentials fell straight
+  // through to "No account found" instead of the retry that would have
+  // succeeded a moment later.
+  const rosterLoaded = students !== null && advisors !== null;
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     const typedEmail = email.trim().toLowerCase();
     if (!typedEmail || !password) {
       setError('Enter both your email and password.');
+      return;
+    }
+    if (!rosterLoaded) {
+      setError('Still loading — try again in a moment.');
       return;
     }
     setSubmitting(true);
@@ -124,8 +137,8 @@ export function Login() {
                 )}
                 {error && <div className="su-note danger su-mt-16" style={{ marginTop: 14 }}>{error}</div>}
 
-                <button type="submit" className="su-btn su-btn-block su-login-submit" disabled={submitting}>
-                  {submitting ? 'Signing in…' : 'Sign In to Advising Portal'}
+                <button type="submit" className="su-btn su-btn-block su-login-submit" disabled={submitting || !rosterLoaded}>
+                  {submitting ? 'Signing in…' : !rosterLoaded ? 'Loading…' : 'Sign In to Advising Portal'}
                 </button>
               </form>
 

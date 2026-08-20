@@ -35,11 +35,32 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const STORAGE_KEY = 'academic-advisor-auth';
 
+/** Real defense-in-depth gap found by audit: a bare `JSON.parse(raw) as
+ *  AuthState` trusts whatever's in localStorage to already match one of
+ *  the three known shapes. A malformed/partial value (a stale schema from
+ *  a future migration, a bad manual edit, a browser extension) that's
+ *  object-truthy but has no valid `role` would fall through every branch
+ *  in homeRouteFor's if-chain to its `return '/vp'` catch-all, and
+ *  RequireVicePresident would then redirect right back to homeRouteFor's
+ *  own '/vp' — an infinite loop instead of the safe "treat as logged out"
+ *  fallback every other unrecognized session should get. */
+function isValidAuthState(value: unknown): value is AuthState {
+  if (value === null) return true;
+  if (typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  if (v.role === 'advisor') return typeof v.advisorId === 'string';
+  if (v.role === 'student') return typeof v.studentId === 'string';
+  if (v.role === 'vice_president') return true;
+  return false;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as AuthState) : null;
+      if (!raw) return null;
+      const parsed: unknown = JSON.parse(raw);
+      return isValidAuthState(parsed) ? parsed : null;
     } catch {
       return null;
     }
@@ -74,5 +95,11 @@ export function homeRouteFor(auth: AuthState): string {
   if (!auth) return '/login';
   if (auth.role === 'advisor') return '/'; // unchanged — the advisor console's own URLs never gained an :advisorId segment (see plan notes); identity comes from context, not the URL
   if (auth.role === 'student') return `/portal/${auth.studentId}`;
-  return '/vp';
+  if (auth.role === 'vice_president') return '/vp';
+  // Defense in depth: an unrecognized role never falls through to '/vp' by
+  // default (that used to be able to infinite-loop against
+  // RequireVicePresident for a malformed session — see isValidAuthState
+  // above, which is the real fix; this is the second layer) — treat it
+  // exactly like a logged-out session instead.
+  return '/login';
 }
