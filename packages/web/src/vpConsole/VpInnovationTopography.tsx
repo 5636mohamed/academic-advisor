@@ -5,7 +5,7 @@
 // sits on the topography aren't two separate navigations).
 import { useEffect, useState } from 'react';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
-import { api, ColliderProjectDTO, AdvisorDTO } from '../api/client';
+import { api, ColliderProjectDTO, AdvisorDTO, AdvisorVentureProjectRowDTO } from '../api/client';
 import { TopographyCell } from '@advisor/shared';
 import { Loading, Section, Empty, useToast } from '../portal/ui/Primitives';
 import { useChartTokens } from '../portal/ui/chartTheme';
@@ -111,6 +111,70 @@ function FundForm({ project, onFunded }: { project: ColliderProjectDTO; onFunded
   );
 }
 
+/** Per explicit request: the VP's decision on an advisor's venture grant
+ *  request (separate from Project Collider's own micro-funding, above)
+ *  moved here from the Venture Board — cross-professor funding oversight
+ *  now lives in one place instead of being split across two pages. Fetches
+ *  every advisor's own venture rows and flattens them (same "no single
+ *  cross-advisor endpoint, by design" pattern the Collider section above
+ *  already uses) rather than needing a new backend route. */
+function VentureGrantRequestsSection({ advisors }: { advisors: AdvisorDTO[] }) {
+  const [rows, setRows] = useState<AdvisorVentureProjectRowDTO[] | null>(null);
+  const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
+  const { show, node } = useToast();
+
+  const load = () => {
+    Promise.all(advisors.map(a => api.advisorVentureProjects(a.id))).then(perAdvisor => setRows(perAdvisor.flat()));
+  };
+  useEffect(load, [advisors]);
+
+  if (!rows) return <Loading label="Loading venture grant requests…" />;
+
+  const pending = rows.filter(r => r.project.grantRequest?.status === 'pending');
+  const advisorNameFor = (advisorId: string) => advisors.find(a => a.id === advisorId)?.name ?? 'Unknown advisor';
+
+  const decide = async (projectId: string, decision: 'approved' | 'declined') => {
+    setBusyProjectId(projectId);
+    try {
+      await api.decideVentureGrantRequest(projectId, decision);
+      show(decision === 'approved' ? 'Grant approved.' : 'Grant declined.');
+      load();
+    } finally {
+      setBusyProjectId(null);
+    }
+  };
+
+  return (
+    <Section eyebrow="Venture Board" title="Venture Grant Requests" subtitle="Advisors' funding asks for their own venture projects, across every advisor — approve or decline directly here." className="su-mt-16">
+      {pending.length === 0 ? (
+        <Empty>No pending venture grant requests right now.</Empty>
+      ) : (
+        <div className="su-flex" style={{ flexDirection: 'column', gap: 14 }}>
+          {pending.map(r => (
+            <div key={r.project.id} className="su-card" style={{ padding: 14 }}>
+              <div className="su-flex su-justify-between su-items-center" style={{ flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <b>{r.project.title}</b>
+                  <div className="su-muted" style={{ fontSize: 12 }}>Requested by {advisorNameFor(r.project.professorId)}</div>
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  <b>{r.project.grantRequest!.amount.toLocaleString()} EGP</b>
+                  {r.project.grantRequest!.note && <span className="su-muted"> — {r.project.grantRequest!.note}</span>}
+                </div>
+              </div>
+              <div className="su-flex su-gap-8 su-mt-16">
+                <button type="button" className="su-btn su-btn-sm" style={{ background: 'var(--su-good)' }} disabled={busyProjectId === r.project.id} onClick={() => decide(r.project.id, 'approved')}>Approve</button>
+                <button type="button" className="su-btn su-btn-sm su-btn-outline" disabled={busyProjectId === r.project.id} onClick={() => decide(r.project.id, 'declined')}>Decline</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {node}
+    </Section>
+  );
+}
+
 export function VpInnovationTopography() {
   const [cells, setCells] = useState<TopographyCell[] | null>(null);
   const [projects, setProjects] = useState<ColliderProjectDTO[] | null>(null);
@@ -175,6 +239,8 @@ export function VpInnovationTopography() {
           ))}
         </div>
       </Section>
+
+      <VentureGrantRequestsSection advisors={advisors} />
     </>
   );
 }

@@ -1,16 +1,24 @@
-// "Venture board" tab — rebuilt to match venture-board-advisor.pdf: an
-// advisor owns and sees only THEIR OWN ventures (post/edit/archive, review
-// candidates) — a real fix, not the original design: this used to show
-// every advisor's postings pooled together under one shared 'advisor-owned'
-// attribution anchor, a leftover from before 5 real advisor identities
-// existed (see seedVentureProjects.ts's PROFESSORS comment). The Vice
-// President's own board (VpVentureBoard.tsx) reuses this same component
-// with `viewAllAdvisors` — cross-advisor oversight is the VP's whole point
-// elsewhere in this app too, so that one deliberately stays unscoped. A
-// three-pane live dashboard: My venture (left) → Pending approvals (middle,
-// filterable by venture) → selected candidate's full profile (right,
-// Accept/Reject). "View all ventures" expands full project management
-// (create/edit/archive) below.
+// "Venture board" tab — rebuilt to match venture-board-advisor.pdf: a
+// professor (advisor OR the Vice President, when posting their own
+// ventures) owns and sees only THEIR OWN ventures — post/edit/archive,
+// review candidates for the projects they themselves posted, never anyone
+// else's. This used to show every advisor's postings pooled together under
+// one shared 'advisor-owned' attribution anchor (fixed once 5 real advisor
+// identities existed), and the VP's own board used to ALSO cross-view
+// every advisor's ventures — per explicit request, that cross-advisor view
+// has been removed from the Venture Board entirely: the VP's own board
+// (VpVentureBoard.tsx) now reuses this exact same component, scoped to
+// 'vp-owned' only, with no special-cased "view everyone" mode left in this
+// file at all. Cross-advisor oversight of funding now lives on the VP's
+// Innovation Topography page instead (see VpInnovationTopography.tsx's
+// "Venture Grant Requests" section) — this file only ever shows one
+// professor's own postings, whoever's logged in. A three-pane live
+// dashboard: My venture (left) → Pending approvals (middle, filterable by
+// venture) → selected candidate's full profile (right, Accept/Reject).
+// "View all ventures" expands full project management (create/edit/
+// archive) below. Students are the only role that ever sees every
+// professor's projects together — PortalVentureBoard.tsx, unrelated to
+// this file, is intentionally unscoped for exactly that reason.
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api, AdvisorVentureProjectRowDTO, StudentDetail, VentureCandidateDTO, VentureProjectType, VentureQuizQuestionDTO } from '../../api/client';
@@ -39,15 +47,14 @@ function initials(name: string) {
 
 /** `professorId` overrides the attribution new projects get created
  *  under — VpVentureBoard.tsx passes `professorId="vp-owned"` (its own
- *  singleton anchor) plus `viewAllAdvisors`. Left unset, both default to
- *  the real logged-in advisor's own id (from AuthContext) — new projects
- *  attribute to them by name, and the board only ever fetches/shows their
- *  own ventures, never another advisor's. */
-export function AdvisorVentureBoard({ professorId, viewAllAdvisors = false }: { professorId?: string; viewAllAdvisors?: boolean } = {}) {
+ *  singleton anchor). Left unset, it defaults to the real logged-in
+ *  advisor's own id (from AuthContext) — new projects attribute to them by
+ *  name, and the board always fetches/shows only that one professorId's
+ *  own ventures, never anyone else's — whoever is logged in. */
+export function AdvisorVentureBoard({ professorId }: { professorId?: string } = {}) {
   const { auth } = useAuth();
   const ownAdvisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
   const effectiveProfessorId = professorId ?? ownAdvisorId ?? '';
-  const scopeAdvisorId = viewAllAdvisors ? undefined : ownAdvisorId;
 
   const [rows, setRows] = useState<AdvisorVentureProjectRowDTO[] | null>(null);
   const [ventureQuiz, setVentureQuiz] = useState<VentureQuizQuestionDTO[] | null>(null);
@@ -57,13 +64,13 @@ export function AdvisorVentureBoard({ professorId, viewAllAdvisors = false }: { 
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
-    api.advisorVentureProjects(scopeAdvisorId).then(setRows).catch(e => setError(e instanceof Error ? e.message : String(e)));
+    api.advisorVentureProjects(effectiveProfessorId).then(setRows).catch(e => setError(e instanceof Error ? e.message : String(e)));
   };
   useEffect(() => {
     load();
     api.ventureQuiz().then(setVentureQuiz);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeAdvisorId]);
+  }, [effectiveProfessorId]);
 
   if (!rows) return <Loading label="Loading your ventures…" />;
 
@@ -185,7 +192,7 @@ export function AdvisorVentureBoard({ professorId, viewAllAdvisors = false }: { 
         </div>
       </div>
 
-      {manageOpen && <ManageVentures rows={rows} onChanged={load} viewAllAdvisors={viewAllAdvisors} />}
+      {manageOpen && <ManageVentures rows={rows} onChanged={load} />}
     </div>
   );
 }
@@ -262,12 +269,31 @@ function CreateVentureCard({ professorId, onCreated }: { professorId: string; on
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <input className="su-input" placeholder="Title" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
         <input className="su-input" placeholder="Description" required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-        <div className="su-flex su-gap-10">
-          <select className="su-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value as VentureProjectType })}>
+        {/* Real bug reported live: this row's capacity number input was
+            overflowing the create-venture card at narrower widths — the
+            type select can run wide ("Academic research"/"Commercial
+            spin-off") with no room left for the number input beside it,
+            and this row had no wrap behavior to fall back on unlike the
+            rest of this form. flexWrap + a stable min/max width on the
+            select fixes it without changing the layout at normal widths. */}
+        <div className="su-flex su-gap-10" style={{ flexWrap: 'wrap' }}>
+          <select
+            className="su-input"
+            value={form.type}
+            onChange={e => setForm({ ...form, type: e.target.value as VentureProjectType })}
+            style={{ flex: '1 1 200px', minWidth: 0 }}
+          >
             <option value="academic_research">Academic research</option>
             <option value="commercial_spinoff">Commercial spin-off</option>
           </select>
-          <input className="su-input" type="number" min="1" value={form.capacity} onChange={e => setForm({ ...form, capacity: Number(e.target.value) })} style={{ width: 90 }} />
+          <input
+            className="su-input"
+            type="number"
+            min="1"
+            value={form.capacity}
+            onChange={e => setForm({ ...form, capacity: Number(e.target.value) })}
+            style={{ width: 90, flexShrink: 0 }}
+          />
         </div>
         <label className="su-flex su-gap-8 su-items-center" style={{ fontSize: 13, cursor: 'pointer' }}>
           <input type="checkbox" checked={form.isGraduationProject} onChange={e => setForm({ ...form, isGraduationProject: e.target.checked })} />
@@ -441,13 +467,19 @@ function CandidateDetail({
   );
 }
 
-/** "Request grant" (advisor) / "Approve · Decline" (VP, viewAllAdvisors)
- *  for one project's funding ask — separate from Project Collider's own
- *  VP-initiated micro-funding tool. Shown inline on each project card in
- *  ManageVentures below, regardless of the project's active/archived
- *  status (an archived project's team might still need funding to wrap
- *  up). */
-function GrantRequestPanel({ row, viewAllAdvisors, onChanged }: { row: AdvisorVentureProjectRowDTO; viewAllAdvisors: boolean; onChanged: () => void }) {
+/** "Request grant" for one project's funding ask — separate from Project
+ *  Collider's own VP-initiated micro-funding tool. Always shown inline on
+ *  each project card in ManageVentures below, regardless of the project's
+ *  active/archived status (an archived project's team might still need
+ *  funding to wrap up) — including a project that's currently active and
+ *  fully registered, per explicit request that this option be genuinely
+ *  obvious rather than easy to miss. The VP's decision (approve/decline)
+ *  no longer happens here — it's moved to the VP's Innovation Topography
+ *  page (see VpInnovationTopography.tsx's "Venture Grant Requests"
+ *  section) alongside Project Collider's own funding oversight, so all
+ *  cross-professor funding review lives in one place instead of being
+ *  split across two pages. */
+function GrantRequestPanel({ row, onChanged }: { row: AdvisorVentureProjectRowDTO; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -471,34 +503,17 @@ function GrantRequestPanel({ row, viewAllAdvisors, onChanged }: { row: AdvisorVe
     }
   };
 
-  const decide = async (decision: 'approved' | 'declined') => {
-    setBusy(true);
-    try {
-      await api.decideVentureGrantRequest(row.project.id, decision);
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (request?.status === 'pending') {
     return (
       <div className="su-note warn su-mt-16" style={{ fontSize: 12 }}>
         <div><b>Grant requested:</b> {request.amount.toLocaleString()} EGP{request.note ? ` — ${request.note}` : ''}</div>
-        {viewAllAdvisors ? (
-          <div className="su-flex su-gap-8 su-mt-16">
-            <button type="button" className="su-btn su-btn-sm" style={{ background: 'var(--su-good)' }} disabled={busy} onClick={() => decide('approved')}>Approve</button>
-            <button type="button" className="su-btn su-btn-sm su-btn-outline" disabled={busy} onClick={() => decide('declined')}>Decline</button>
-          </div>
-        ) : (
-          <div className="su-muted su-mt-16">Awaiting the Vice President's decision.</div>
-        )}
+        <div className="su-muted su-mt-16">Awaiting the Vice President's decision (Innovation Topography).</div>
       </div>
     );
   }
 
   return (
-    <div className="su-mt-16">
+    <div className="su-mt-16" style={{ borderTop: '1px dashed var(--su-border)', paddingTop: 12 }}>
       {request && (
         <div className="su-muted" style={{ fontSize: 11.5, marginBottom: 6 }}>
           Last request: {request.amount.toLocaleString()} EGP —{' '}
@@ -506,24 +521,25 @@ function GrantRequestPanel({ row, viewAllAdvisors, onChanged }: { row: AdvisorVe
           {request.decisionNote ? ` (${request.decisionNote})` : ''}
         </div>
       )}
-      {!viewAllAdvisors && (
-        open ? (
-          <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-            <input className="su-input" style={{ maxWidth: 110 }} type="number" min={1} placeholder="Amount (EGP)" value={amount} onChange={e => setAmount(e.target.value)} />
-            <input className="su-input" style={{ maxWidth: 200 }} placeholder="What it's for" value={note} onChange={e => setNote(e.target.value)} />
-            <button type="button" className="su-btn su-btn-sm" disabled={busy || !amount} onClick={submitRequest}>{busy ? 'Requesting…' : 'Send request'}</button>
-            <button type="button" className="su-btn su-btn-sm su-btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
-          </div>
-        ) : (
-          <button type="button" className="su-btn su-btn-sm su-btn-outline" onClick={() => setOpen(true)}>Request grant</button>
-        )
+      {open ? (
+        <div className="su-flex su-gap-8" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+          <input className="su-input" style={{ maxWidth: 110 }} type="number" min={1} placeholder="Amount (EGP)" value={amount} onChange={e => setAmount(e.target.value)} />
+          <input className="su-input" style={{ maxWidth: 200 }} placeholder="What it's for" value={note} onChange={e => setNote(e.target.value)} />
+          <button type="button" className="su-btn su-btn-sm" disabled={busy || !amount} onClick={submitRequest}>{busy ? 'Requesting…' : 'Send request'}</button>
+          <button type="button" className="su-btn su-btn-sm su-btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
+        </div>
+      ) : (
+        // A real, filled button — not a subtle ghost/outline one — so the
+        // option to apply for funding is obvious on every project card,
+        // active or not, rather than something an advisor has to notice.
+        <button type="button" className="su-btn su-btn-sm su-btn-block" onClick={() => setOpen(true)}>💰 Apply for a grant</button>
       )}
       {error && <div className="su-note danger su-mt-16" style={{ fontSize: 11.5 }}>{error}</div>}
     </div>
   );
 }
 
-function ManageVentures({ rows, onChanged, viewAllAdvisors }: { rows: AdvisorVentureProjectRowDTO[]; onChanged: () => void; viewAllAdvisors: boolean }) {
+function ManageVentures({ rows, onChanged }: { rows: AdvisorVentureProjectRowDTO[]; onChanged: () => void }) {
   const [query, setQuery] = useState('');
   const filtered = rows.filter(r => !query.trim() || r.project.title.toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -545,7 +561,6 @@ function ManageVentures({ rows, onChanged, viewAllAdvisors }: { rows: AdvisorVen
               <div className="su-title" style={{ fontSize: 15 }}>{r.project.title}</div>
               <span className={`su-badge ${r.project.isActive ? 'ok' : 'neutral'}`}>{r.project.isActive ? 'active' : 'archived'}</span>
             </div>
-            {viewAllAdvisors && r.project.professorName && <div className="su-muted" style={{ fontSize: 11.5 }}>Owned by {r.project.professorName}</div>}
             <div className="su-subtitle">{r.project.description}</div>
             {r.project.isGraduationProject && <span className="su-badge info" style={{ marginBottom: 8 }}>Graduation project</span>}
             <div className="su-muted" style={{ fontSize: 12, marginBottom: 12 }}>
@@ -553,7 +568,7 @@ function ManageVentures({ rows, onChanged, viewAllAdvisors }: { rows: AdvisorVen
             </div>
             <ResearchDetails project={r.project} />
             <button className="su-btn su-btn-sm su-btn-ghost" onClick={() => toggleActive(r)}>{r.project.isActive ? 'Archive' : 'Reactivate'}</button>
-            <GrantRequestPanel row={r} viewAllAdvisors={viewAllAdvisors} onChanged={onChanged} />
+            <GrantRequestPanel row={r} onChanged={onChanged} />
           </div>
         ))}
         {filtered.length === 0 && <div className="su-empty">No ventures match “{query}”.</div>}

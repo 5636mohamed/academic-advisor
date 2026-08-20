@@ -332,6 +332,16 @@
    so the theme toggle and log-out controls read as clickable buttons at a
    glance instead of blending into the header. */
 .su-icon-btn {
+  /* True root cause of a real overflow bug, not just its symptom: this
+   * rule never declared its own `padding`, so the legacy un-scoped
+   * `button { padding: 9px 18px }` (styles.css) — the SAME leak this
+   * file's own comment already calls out for `color` — was silently
+   * adding 36px of horizontal padding no icon button was ever designed
+   * to have. It happened to go unnoticed until the topbar got tight
+   * enough (NotificationBell added) for it to visibly push the mobile
+   * menu button off a 375px viewport — the actual button was rendering
+   * ~2x its intended 30-34px width the whole time. */
+  padding: 0;
   width: 34px; height: 34px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--su-border-strong);
@@ -433,6 +443,22 @@
   .su-body { padding: 14px 12px 32px; }
   .su-card, .su-stat-card { padding: 14px 16px; }
   .su-wizard-steps { display: flex; flex-wrap: wrap; gap: 6px 14px; } /* sidebar step list -> compact wrapped row on a phone */
+  /* Real, live-caught regression: the 860px breakpoint's own comment
+   * claimed every topbar child's fixed-width sum "fits under the
+   * narrowest supported viewport for Student/Advisor" — true when that
+   * fix landed, but NotificationBell was added to the topbar afterward
+   * (one more full-size icon button, on every role's topbar), silently
+   * pushing the hamburger menu button off-screen again at 375px even for
+   * the SHORT role labels this time — a 375px screenshot caught it
+   * (~43px overflow), not assumed. Tightening the icon-button cluster's
+   * own size/gaps here (phones only — .su-topbar-nav-desktop is already
+   * gone by 860px, so this never affects tablet/desktop) reclaims more
+   * than enough width without touching anything the 860px fix already
+   * covers correctly. */
+  .su-icon-btn { width: 30px; height: 30px; }
+  .su-avatar { width: 32px; height: 32px; font-size: 12px; }
+  .su-topbar { gap: 10px; }
+  .su-topbar-user { gap: 6px; }
 }
 /* Wide data tables already scroll horizontally within their own
    .su-table-wrap rather than squeezing columns unreadably — max-width
