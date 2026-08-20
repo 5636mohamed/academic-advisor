@@ -13,7 +13,7 @@ import { EQUIVALENCY_MAP } from '../seed/seedEquivalency';
 import { OFFERINGS_BY_COURSE } from '../seed/seedCourseOfferings';
 import { PROFESSORS, VENTURE_PROJECTS, COURSE_SKILL_TAGS, ELECTIVE_COURSE_CODES } from '../seed/seedVentureProjects';
 import { COLLIDER_PROJECTS } from '../seed/seedColliderProjects';
-import { ADVISORS, NAMED_STUDENT_ADVISOR, fillerCountFor, STANDING_CYCLE, STANDING_TARGET_PCT, StandingBucket } from '../seed/seedAdvisors';
+import { ADVISORS, NAMED_STUDENT_ADVISOR, fillerCountForDepartment, buildGeneratedStudentAdvisorSlots, STANDING_CYCLE, STANDING_TARGET_PCT, StandingBucket } from '../seed/seedAdvisors';
 import { computeCGPA, latestAttemptPerCourse } from '../../modules/grading/cgpa';
 import { levelFromCredits } from '../../modules/grading/level';
 import { gradeFromPct } from '@advisor/shared';
@@ -603,11 +603,16 @@ function buildCgpaSnapshots(targetPct: number, semestersClosed: number, studentI
   return snapshots;
 }
 
-function generateFillerStudents(advisorId: string, count: number, facultyId: string, departmentId: string): SeedStudent[] {
+/** Generates a department's filler students — deliberately NOT keyed by
+ *  advisor (see seedAdvisors.ts's header comment): which advisor ends up
+ *  with which student is a separate, later step
+ *  (buildGeneratedStudentAdvisorSlots + the zip in seedStudents below), so
+ *  a student's own id/identity never encodes an advisor at all. */
+function generateDepartmentStudents(departmentId: string, facultyId: string, count: number): SeedStudent[] {
   const out: SeedStudent[] = [];
   const deptCatalog = coursesForDepartment(departmentId);
   for (let i = 0; i < count; i++) {
-    const id = `${advisorId}-gen-${i + 1}`;
+    const id = `${departmentId}-gen-${i + 1}`;
     const bucket: StandingBucket = STANDING_CYCLE[fillerHash(`${id}:bucket`) % STANDING_CYCLE.length];
     const targetPct = STANDING_TARGET_PCT[bucket];
     // 2-7 closed semesters (Level 1 through Level 4-ish), varied but
@@ -634,7 +639,7 @@ function generateFillerStudents(advisorId: string, count: number, facultyId: str
       activeBaseSnapshotId: null,
       cumulativeEarnedCredits: 0, // recomputed by completeTranscript() from the filled-in transcript
       level: 1, // same — recomputed once the transcript is complete
-      advisorId,
+      advisorId: '', // assigned below, after every department's students are generated — see seedStudents
       quizAnswers: {},
       allAttempts,
       cgpaSnapshots: buildCgpaSnapshots(targetPct, semestersClosed, id),
@@ -735,9 +740,32 @@ function deriveStudent(s: SeedStudent): StoredStudent {
 // The full 125-student roster: the 13 hand-authored §11 personas (each
 // now tagged with its owning advisor via NAMED_STUDENT_ADVISOR) plus
 // generated filler students bringing every advisor up to 25.
+// 35 students per real department (10*35=350), 25 per advisor (14*25=350) —
+// the two totals agree, but a department's 35 and an advisor's 25 don't
+// divide evenly against each other, by design: the assignment below is a
+// genuine random (deterministic) cross-department mix, not "one advisor
+// owns one department" like the model's first version. Generated in a
+// stable department-by-department order (Object.keys(CATALOG_BY_DEPARTMENT)
+// is insertion-order-stable, rebuilt identically every seed) and then
+// zipped 1:1 against buildGeneratedStudentAdvisorSlots()'s shuffled advisor
+// list — same length by construction (both sum to the same 336 = 350 minus
+// the 14 named ECE personas), so every generated student gets exactly one
+// advisor and every advisor's capacity is filled exactly.
+const generatedStudentsByDepartment: SeedStudent[] = Object.keys(CATALOG_BY_DEPARTMENT).flatMap(departmentId => {
+  const facultyId = DEPARTMENTS.find(d => d.id === departmentId)?.facultyId ?? 'ENG';
+  return generateDepartmentStudents(departmentId, facultyId, fillerCountForDepartment(departmentId));
+});
+const advisorSlots = buildGeneratedStudentAdvisorSlots();
+if (advisorSlots.length !== generatedStudentsByDepartment.length) {
+  throw new Error(
+    `seedStudents: generated-student count (${generatedStudentsByDepartment.length}) doesn't match the advisor-assignment slot count (${advisorSlots.length}) — STUDENTS_PER_DEPARTMENT/STUDENTS_PER_ADVISOR/NAMED_STUDENT_ADVISOR have drifted out of sync (see seedAdvisors.ts).`
+  );
+}
+const generatedStudentsWithAdvisors: SeedStudent[] = generatedStudentsByDepartment.map((s, i) => ({ ...s, advisorId: advisorSlots[i] }));
+
 const seedStudents: SeedStudent[] = [
   ...namedSeedStudentLiterals.map(s => ({ ...s, advisorId: NAMED_STUDENT_ADVISOR[s.id] })),
-  ...ADVISORS.flatMap(a => generateFillerStudents(a.id, fillerCountFor(a.id), a.facultyId, a.departmentId)),
+  ...generatedStudentsWithAdvisors,
 ];
 
 const students = new Map<string, StoredStudent>(seedStudents.map(s => [s.id, deriveStudent(completeTranscript(s))]));
@@ -766,18 +794,21 @@ seedInitialVentureMatches();
  *  covering the real variety of CV-upload states a live venture board
  *  actually sees: applied-with-a-CV, applied-with-no-CV-yet, a still-
  *  unapplied system suggestion, and a declined application that DID have a
- *  CV attached. Each pick is a deterministic generated filler student
- *  (`${advisorId}-gen-N}`) genuinely Level 3+ (checked against the real
- *  computed level, not assumed) — the Venture Gate is never even shown
- *  below Level 3 (§16.1/§16.8), so a lower-level fixture would be
- *  unrealistic even though nothing at the data layer strictly forbids it.
- *  Also opts each one into the Venture Gate (YES) so they show up on the
- *  owning advisor's real candidate list, same as the pre-seeded ECE cohort
- *  below. */
+ *  CV attached. Each pick is found dynamically by department (not a
+ *  hardcoded id — since advisors now get a random cross-department roster,
+ *  there's no fixed "advisor X's first generated student" id any more) and
+ *  genuinely Level 3+ (checked against the real computed level, not
+ *  assumed) — the Venture Gate is never even shown below Level 3
+ *  (§16.1/§16.8), so a lower-level fixture would be unrealistic even
+ *  though nothing at the data layer strictly forbids it. Also opts each
+ *  one into the Venture Gate (YES) so they show up on the owning advisor's
+ *  real candidate list, same as the pre-seeded ECE cohort below. */
 function seedCrossDepartmentVentureApplications(): void {
   const SAMPLE_CV: CvAttachment = { fileName: 'cv.pdf', dataUrl: 'data:text/plain;base64,U2FtcGxlIENWIGNvbnRlbnQ=' };
+  const firstLevel3PlusIn = (departmentId: string) =>
+    [...students.values()].find(s => s.departmentId === departmentId && s.id.includes('-gen-') && s.level >= 3);
 
-  const cseStudent = students.get('advisor-heba-gen-1'); // CSE, Level 3
+  const cseStudent = firstLevel3PlusIn('CSE');
   if (cseStudent) {
     setVentureGateAnswer(cseStudent.id, true);
     cseStudent.ventureMatches.push({
@@ -792,7 +823,7 @@ function seedCrossDepartmentVentureApplications(): void {
     });
   }
 
-  const mteStudent = students.get('advisor-mostafa-gen-2'); // MTE, Level 3
+  const mteStudent = firstLevel3PlusIn('MTE');
   if (mteStudent) {
     setVentureGateAnswer(mteStudent.id, true);
     mteStudent.ventureMatches.push({
@@ -805,7 +836,7 @@ function seedCrossDepartmentVentureApplications(): void {
     });
   }
 
-  const mseStudent = students.get('advisor-dina-gen-1'); // MSE, Level 3
+  const mseStudent = firstLevel3PlusIn('MSE');
   if (mseStudent) {
     setVentureGateAnswer(mseStudent.id, true);
     mseStudent.ventureMatches.push({
@@ -818,7 +849,7 @@ function seedCrossDepartmentVentureApplications(): void {
     });
   }
 
-  const epeStudent = students.get('advisor-rania-gen-2'); // EPE, Level 4
+  const epeStudent = firstLevel3PlusIn('EPE');
   if (epeStudent) {
     setVentureGateAnswer(epeStudent.id, true);
     epeStudent.ventureMatches.push({

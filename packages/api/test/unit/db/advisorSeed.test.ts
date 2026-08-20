@@ -1,26 +1,28 @@
-// Multi-advisor epic, extended by the real-FoE-department expansion — one
-// advisor per real seeded department (see db/seed/seedAdvisors.ts's
-// ADVISORS and seedCatalog.ts's CATALOG_BY_DEPARTMENT), each owning a
-// 25-35-student roster (deterministic per-advisor size, not a fixed 25).
-// See db/seed/seedAdvisors.ts and inMemoryDb.ts's generateFillerStudents().
+// Multi-advisor epic, extended by the real-FoE-department expansion, then
+// re-modeled for a genuinely random cross-department roster: 35 students
+// per real department (10*35=350), 25 per advisor (14*25=350) — the two
+// totals agree, but an advisor's roster is a real (deterministic) random
+// mix across departments, not "one advisor per department". See
+// db/seed/seedAdvisors.ts and inMemoryDb.ts's generateDepartmentStudents().
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as db from '../../../src/db/memory/inMemoryDb';
-import { ADVISORS, NAMED_STUDENT_ADVISOR, rosterSizeFor } from '../../../src/db/seed/seedAdvisors';
+import { ADVISORS, NAMED_STUDENT_ADVISOR, STUDENTS_PER_DEPARTMENT, STUDENTS_PER_ADVISOR } from '../../../src/db/seed/seedAdvisors';
 import { CATALOG_BY_DEPARTMENT } from '../../../src/db/seed/seedCatalog';
 
-const TOTAL_ROSTER_SIZE = ADVISORS.reduce((sum, a) => sum + rosterSizeFor(a.id), 0);
+const TOTAL_ROSTER_SIZE = ADVISORS.length * STUDENTS_PER_ADVISOR;
+const REAL_DEPARTMENT_IDS = Object.keys(CATALOG_BY_DEPARTMENT);
 
 beforeEach(() => {
   db.__resetForTests();
 });
 
-describe(`advisor seed — ${ADVISORS.length} advisors, ${TOTAL_ROSTER_SIZE} students total`, () => {
+describe(`advisor seed — ${ADVISORS.length} advisors, ${REAL_DEPARTMENT_IDS.length} departments, ${TOTAL_ROSTER_SIZE} students total`, () => {
   it(`seeds exactly ${ADVISORS.length} advisors`, () => {
     expect(db.listAdvisors()).toHaveLength(ADVISORS.length);
     expect(ADVISORS).toHaveLength(ADVISORS.length);
   });
 
-  it('every advisor\'s departmentId has a real seeded catalog', () => {
+  it('every advisor\'s home departmentId has a real seeded catalog', () => {
     for (const a of ADVISORS) {
       expect(CATALOG_BY_DEPARTMENT[a.departmentId]).toBeDefined();
       expect(CATALOG_BY_DEPARTMENT[a.departmentId].length).toBeGreaterThan(0);
@@ -34,8 +36,21 @@ describe(`advisor seed — ${ADVISORS.length} advisors, ${TOTAL_ROSTER_SIZE} stu
     expect(db.getAdvisor('nobody')).toBeUndefined();
   });
 
-  it('seeds the expected total student count (sum of each advisor\'s own 25-35 roster size)', () => {
-    expect(db.listStudents()).toHaveLength(TOTAL_ROSTER_SIZE);
+  it(`seeds exactly ${STUDENTS_PER_DEPARTMENT} students per department (${REAL_DEPARTMENT_IDS.length} * ${STUDENTS_PER_DEPARTMENT} = ${TOTAL_ROSTER_SIZE})`, () => {
+    const students = db.listStudents();
+    expect(students).toHaveLength(TOTAL_ROSTER_SIZE);
+    for (const deptId of REAL_DEPARTMENT_IDS) {
+      const count = students.filter(s => s.departmentId === deptId).length;
+      expect(count, `department ${deptId}`).toBe(STUDENTS_PER_DEPARTMENT);
+    }
+  });
+
+  it(`every advisor owns exactly ${STUDENTS_PER_ADVISOR} students (named + randomly-assigned generated)`, () => {
+    const students = db.listStudents();
+    for (const a of ADVISORS) {
+      const count = students.filter(s => s.advisorId === a.id).length;
+      expect(count, a.id).toBe(STUDENTS_PER_ADVISOR);
+    }
   });
 
   it('every student has a valid advisorId pointing at a real seeded advisor', () => {
@@ -45,21 +60,13 @@ describe(`advisor seed — ${ADVISORS.length} advisors, ${TOTAL_ROSTER_SIZE} stu
     }
   });
 
-  it('every generated/named student\'s departmentId matches their advisor\'s own department', () => {
-    const advisorById = new Map(ADVISORS.map(a => [a.id, a]));
-    for (const s of db.listStudents()) {
-      expect(s.departmentId).toBe(advisorById.get(s.advisorId)!.departmentId);
-    }
-  });
-
-  it('every advisor owns exactly their own deterministic 25-35 roster size', () => {
+  it('at least one advisor genuinely has students from more than one department — the whole point of the random cross-department assignment, not just technically possible', () => {
     const students = db.listStudents();
-    for (const a of ADVISORS) {
-      const count = students.filter(s => s.advisorId === a.id).length;
-      expect(count).toBe(rosterSizeFor(a.id));
-      expect(count).toBeGreaterThanOrEqual(25);
-      expect(count).toBeLessThanOrEqual(35);
-    }
+    const anyMixedAdvisor = ADVISORS.some(a => {
+      const deptsForThisAdvisor = new Set(students.filter(s => s.advisorId === a.id).map(s => s.departmentId));
+      return deptsForThisAdvisor.size > 1;
+    });
+    expect(anyMixedAdvisor).toBe(true);
   });
 
   it('the hand-authored named personas keep their original ids and are assigned per NAMED_STUDENT_ADVISOR', () => {
@@ -69,7 +76,8 @@ describe(`advisor seed — ${ADVISORS.length} advisors, ${TOTAL_ROSTER_SIZE} stu
       expect(student!.advisorId).toBe(advisorId);
     }
     // exactly the 14 ECE-only named ones (13 original + the cold-start
-    // trial persona) — every new non-ECE advisor's roster is 100% generated.
+    // trial persona) — every other student (across every department) is
+    // generated and randomly assigned.
     expect(Object.keys(NAMED_STUDENT_ADVISOR)).toHaveLength(14);
   });
 
@@ -82,7 +90,7 @@ describe(`advisor seed — ${ADVISORS.length} advisors, ${TOTAL_ROSTER_SIZE} stu
 
   it('generated filler students show a real spread of standing, not identical CGPAs', () => {
     const generated = db.listStudents().filter(s => s.id.includes('-gen-'));
-    expect(generated.length).toBeGreaterThan(TOTAL_ROSTER_SIZE - 20); // total minus the 14 named
+    expect(generated.length).toBe(TOTAL_ROSTER_SIZE - 14); // total minus the 14 named
     const cgpas = generated.map(s => db.getCurrentCgpa(s.id));
     const distinctBuckets = new Set(cgpas.map(c => Math.floor(c * 2))); // coarse buckets of 0.5
     expect(distinctBuckets.size).toBeGreaterThan(3); // real variety, not a flat line
@@ -99,9 +107,8 @@ describe(`advisor seed — ${ADVISORS.length} advisors, ${TOTAL_ROSTER_SIZE} stu
     }
   });
 
-  it('a non-ECE generated student\'s filled-in courses are all real courses from their OWN department\'s catalog', () => {
-    const cseAdvisor = ADVISORS.find(a => a.departmentId === 'CSE')!;
-    const cseStudents = db.listStudents().filter(s => s.advisorId === cseAdvisor.id && s.id.includes('-gen-'));
+  it('a generated student\'s filled-in courses are all real courses from their OWN department\'s catalog, regardless of which advisor they were randomly assigned to', () => {
+    const cseStudents = db.listStudents().filter(s => s.departmentId === 'CSE' && s.id.includes('-gen-'));
     expect(cseStudents.length).toBeGreaterThan(0);
     const cseCodes = new Set(CATALOG_BY_DEPARTMENT['CSE'].map(c => c.code));
     for (const s of cseStudents) {
@@ -112,7 +119,7 @@ describe(`advisor seed — ${ADVISORS.length} advisors, ${TOTAL_ROSTER_SIZE} stu
     }
   });
 
-  it('the generator is deterministic — resetting produces byte-identical rosters', () => {
+  it('the generator is deterministic — resetting produces byte-identical rosters and advisor assignments', () => {
     const before = db.listStudents().map(s => ({ id: s.id, advisorId: s.advisorId, cgpa: db.getCurrentCgpa(s.id), level: s.level }));
     db.__resetForTests();
     const after = db.listStudents().map(s => ({ id: s.id, advisorId: s.advisorId, cgpa: db.getCurrentCgpa(s.id), level: s.level }));
@@ -125,10 +132,10 @@ describe('getAdvisorReport — per-advisor roster scoping (real server-side filt
     expect(db.getAdvisorReport()).toHaveLength(TOTAL_ROSTER_SIZE);
   });
 
-  it('scoped to one advisor returns exactly that advisor\'s own roster size', () => {
+  it(`scoped to one advisor returns exactly ${STUDENTS_PER_ADVISOR} students`, () => {
     for (const a of ADVISORS) {
       const rows = db.getAdvisorReport(a.id);
-      expect(rows).toHaveLength(rosterSizeFor(a.id));
+      expect(rows).toHaveLength(STUDENTS_PER_ADVISOR);
     }
   });
 

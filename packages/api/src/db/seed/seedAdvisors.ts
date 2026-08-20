@@ -1,10 +1,20 @@
-// The named advisors that replace the old single global "advisor" account —
-// one per real seeded department (see seedCatalog.ts's CATALOG_BY_DEPARTMENT
-// for which departments have a real catalog), each owning a real 25-35
-// student roster. Pure data only (mirrors seedVentureProjects.ts's
-// PROFESSORS export); the actual student-generation logic lives in
-// inMemoryDb.ts alongside the private helpers (attempt(), fillerHash(),
-// completeTranscript()) it depends on.
+// The named advisors that replace the old single global "advisor" account.
+// Pure data only (mirrors seedVentureProjects.ts's PROFESSORS export); the
+// actual student-generation logic lives in inMemoryDb.ts alongside the
+// private helpers (attempt(), fillerHash(), completeTranscript()) it
+// depends on.
+//
+// Roster model: each of the 10 real departments (see seedCatalog.ts's
+// CATALOG_BY_DEPARTMENT) has exactly 35 students; each of the 14 advisors
+// has exactly 25. Those numbers don't divide evenly per-department-per-
+// advisor (10*35 = 350 = 14*25, but 35 and 25 share no simple per-advisor
+// split across 10 departments) — by design: an advisor's roster is a
+// genuinely RANDOM (deterministic, not Math.random) cross-department mix,
+// not "one advisor per department" like the very first version of this
+// multi-advisor model. `Advisor.departmentId` below is kept as each
+// advisor's own home-department affiliation (a real thing — an advisor is
+// still formally based in one department) but no longer determines who
+// they advise.
 import { Advisor } from '@advisor/shared';
 
 export const ADVISORS: Advisor[] = [
@@ -32,11 +42,11 @@ export const ADVISORS: Advisor[] = [
 ];
 
 /** Which of the hand-authored named personas belongs to which advisor —
- *  keeps every existing id/scenario exactly as-is, just gives each a real
- *  roster owner. Distributed so no advisor's "story" cluster (e.g. the
- *  warning-ladder examples) is entirely on one advisor's desk. The new
- *  non-ECE advisors start with no named personas — every one of their
- *  students is generated. */
+ *  keeps every existing id/scenario exactly as-is. All 14 named personas
+ *  are ECE (the only department with hand-authored worked examples), so
+ *  only ECE advisors carry any named-persona load; every other advisor's
+ *  entire 25-student roster is generated (and, per the random cross-
+ *  department assignment below, is NOT limited to ECE students either). */
 export const NAMED_STUDENT_ADVISOR: Record<string, string> = {
   'ahmed-1': 'advisor-nabil',
   'sara-1': 'advisor-nabil',
@@ -54,6 +64,30 @@ export const NAMED_STUDENT_ADVISOR: Record<string, string> = {
   'youssef-adel-1': 'advisor-waleed',
 };
 
+/** Every named persona today is ECE — see NAMED_STUDENT_ADVISOR's own
+ *  comment. Kept as an explicit map (not derived from the literal list, to
+ *  avoid a circular import with inMemoryDb.ts) so a future department
+ *  gaining its own named personas is a one-line change here. */
+const NAMED_STUDENTS_PER_DEPARTMENT: Record<string, number> = { ECE: 14 };
+
+export const STUDENTS_PER_DEPARTMENT = 35;
+export const STUDENTS_PER_ADVISOR = 25;
+
+/** How many students a department needs GENERATED (on top of any named
+ *  personas already seeded there) to reach its 35-student total. */
+export function fillerCountForDepartment(departmentId: string): number {
+  return STUDENTS_PER_DEPARTMENT - (NAMED_STUDENTS_PER_DEPARTMENT[departmentId] ?? 0);
+}
+
+/** How many GENERATED students an advisor still needs (on top of any named
+ *  personas already assigned to them) to reach their 25-student total —
+ *  this is their share of the random cross-department assignment below,
+ *  not tied to their own home department. */
+export function generatedCapacityForAdvisor(advisorId: string): number {
+  const namedCount = Object.values(NAMED_STUDENT_ADVISOR).filter(id => id === advisorId).length;
+  return STUDENTS_PER_ADVISOR - namedCount;
+}
+
 // FNV-1a-style 32-bit hash — same shape/purpose as inMemoryDb.ts's private
 // fillerHash(), duplicated here (rather than imported) to avoid a circular
 // dependency (inMemoryDb.ts already imports this file). Deterministic: same
@@ -67,23 +101,48 @@ function advisorSeedHash(str: string): number {
   return Math.abs(h);
 }
 
-const MIN_STUDENTS_PER_ADVISOR = 25;
-const MAX_STUDENTS_PER_ADVISOR = 35;
-
-/** Each advisor's total roster size — a deterministic 25-35 spread (not a
- *  fixed 25) per the user's ask, seeded off the advisor's own id so re-
- *  seeding the server always reproduces the same roster sizes. */
-export function rosterSizeFor(advisorId: string): number {
-  const span = MAX_STUDENTS_PER_ADVISOR - MIN_STUDENTS_PER_ADVISOR + 1;
-  return MIN_STUDENTS_PER_ADVISOR + (advisorSeedHash(`${advisorId}:roster-size`) % span);
+// A tiny, well-known deterministic PRNG (mulberry32) — used only to shuffle
+// the advisor-assignment slots below. Still fully deterministic (seeded off
+// a fixed string via advisorSeedHash, not the system clock), so re-seeding
+// the server always reproduces byte-identical rosters — same discipline as
+// every other "deterministic, not Math.random" generator in this codebase.
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-/** How many generated filler students each advisor needs, given how many
- *  named personas they already have and their own (possibly-varied) roster
- *  size target. */
-export function fillerCountFor(advisorId: string): number {
-  const namedCount = Object.values(NAMED_STUDENT_ADVISOR).filter(id => id === advisorId).length;
-  return rosterSizeFor(advisorId) - namedCount;
+function seededShuffle<T>(arr: T[], seedStr: string): T[] {
+  const rand = mulberry32(advisorSeedHash(seedStr));
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/** The real "random assignment" mechanism: a flat, shuffled list of advisor
+ *  ids — advisor X appears exactly `generatedCapacityForAdvisor(X)` times —
+ *  meant to be zipped 1:1 against a stably-ordered list of every generated
+ *  student across all 10 departments (see inMemoryDb.ts's seedStudents
+ *  construction). Because the list being zipped against is grouped by
+ *  department but the slots here are shuffled, each advisor ends up with a
+ *  genuine cross-department mix rather than "one advisor per department" —
+ *  exactly the "more general test case" the roster was redesigned for.
+ *  Deterministic: the shuffle is seeded off a fixed string, not the clock,
+ *  so re-seeding the server reproduces the exact same assignment. */
+export function buildGeneratedStudentAdvisorSlots(): string[] {
+  const slots: string[] = [];
+  for (const advisor of ADVISORS) {
+    const capacity = generatedCapacityForAdvisor(advisor.id);
+    for (let i = 0; i < capacity; i++) slots.push(advisor.id);
+  }
+  return seededShuffle(slots, 'generated-student-advisor-assignment-v1');
 }
 
 /** A generated student's standing bucket — deliberately not a uniform
@@ -95,9 +154,9 @@ export function fillerCountFor(advisorId: string): number {
 export type StandingBucket = 'strong' | 'good' | 'average' | 'at_risk' | 'probation';
 
 /** 12-long cycle: 3 strong, 4 good, 3 average, 1 at-risk, 1 probation-bound
- *  — roughly a 25/33/25/8/8% split, applied per-advisor so every advisor's
- *  roster gets its own realistic mix rather than one global shuffle that
- *  could unluckily cluster all the risk cases together. */
+ *  — roughly a 25/33/25/8/8% split, applied per-student so the whole
+ *  system gets a realistic mix rather than one global shuffle that could
+ *  unluckily cluster all the risk cases together. */
 export const STANDING_CYCLE: StandingBucket[] = [
   'strong', 'good', 'good', 'average', 'strong', 'good',
   'average', 'good', 'strong', 'average', 'at_risk', 'probation',

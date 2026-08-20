@@ -1640,10 +1640,12 @@ approves/declines).
 
 > **Superseded by §18**: this section's "5 advisors, 125 ECE-only students"
 > figures describe the system as of this epic. §18's real department
-> catalog expansion later grew this to 14 advisors (one per real FoE
-> department) with a 25-35-student roster each — the mechanisms described
-> below (per-advisor scoping, VP oversight, transfer chain, responsibility
-> workflow) are unchanged, just running over more advisors/departments now.
+> catalog expansion later grew this to 14 advisors and 350 students across
+> all 10 real FoE departments (35 students per department, 25 per advisor,
+> randomly assigned across department lines rather than one advisor per
+> department) — the mechanisms described below (per-advisor scoping, VP
+> oversight, transfer chain, responsibility workflow) are unchanged, just
+> running over more advisors/departments now.
 
 The system was rebuilt around a more realistic, hierarchical advising
 structure — a single shared advisor account became 5 real advisor
@@ -1940,13 +1942,31 @@ a normalization, all flagged in the source files themselves:
 
 ### 18.5 Roster scale
 
-One advisor per real department (14 total: the original 5 ECE advisors +
-1 each for CSE/MIE/EPE/MTE/MSE/IME/ERE/ENV/CPE), each with a deterministic
-**25-35-student roster** (seeded per advisor id, not a fixed 25) — see
-`seedAdvisors.ts`'s `rosterSizeFor`. The 14 hand-authored named personas
-(13 original + the cold-start trial persona) remain ECE-only; every other
-student across all 14 advisors is generated from their own department's
-real catalog.
+14 advisors total (the original 5 ECE advisors + 1 each for CSE/MIE/EPE/
+MTE/MSE/IME/ERE/ENV/CPE) — one per real department, but that "home
+department" is now only each advisor's own formal affiliation, not who
+they advise. Two independent, deliberately-non-aligning totals:
+
+- **35 students per real department** (10 × 35 = 350) — see
+  `seedAdvisors.ts`'s `STUDENTS_PER_DEPARTMENT`/`fillerCountForDepartment`.
+- **25 students per advisor** (14 × 25 = 350) — see `STUDENTS_PER_ADVISOR`/
+  `generatedCapacityForAdvisor`.
+
+The two totals agree (both 350) but a department's 35 doesn't divide evenly
+against an advisor's 25 — by design: `buildGeneratedStudentAdvisorSlots()`
+builds a flat, deterministically-shuffled (mulberry32, seeded — never
+`Math.random`) list of advisor ids, one entry per open seat, and zips it
+against every generated student across all 10 departments (generated in a
+stable department-by-department order). The result is a genuine random
+cross-department roster per advisor — an advisor typically ends up
+advising students from most or all 10 departments, not just their own —
+which is deliberately what makes the seed data a "more general test case"
+(the user's own framing) than the original one-advisor-per-department
+model. The 14 hand-authored named personas (13 original + the cold-start
+trial persona) remain ECE-only and keep their original, hand-picked
+advisor assignments (`NAMED_STUDENT_ADVISOR`), unaffected by the random
+assignment; every other student across all 14 advisors is generated from
+their own department's real catalog and randomly assigned.
 
 ### 18.6 Other real EJUST faculties — documented, not built
 

@@ -70,26 +70,40 @@ describe('student-facing course views are department-scoped, not the global 10-p
     db.__resetForTests();
   });
 
-  it('getCurriculum only ever shows a student courses from their own department\'s real catalog', () => {
-    for (const advisor of ADVISORS) {
-      const student = db.listStudents().find(s => s.advisorId === advisor.id);
-      expect(student).toBeDefined();
+  it('getCurriculum only ever shows a student courses from their OWN department\'s real catalog — real-department expansion now assigns advisors a random cross-department roster, so this is keyed off the student\'s own departmentId, never their advisor\'s', () => {
+    for (const deptId of Object.keys(CATALOG_BY_DEPARTMENT)) {
+      const student = db.listStudents().find(s => s.departmentId === deptId);
+      expect(student, deptId).toBeDefined();
       const view = db.getCurriculum(student!.id);
-      const ownDeptCodes = new Set(CATALOG_BY_DEPARTMENT[advisor.departmentId].map(c => c.code));
+      const ownDeptCodes = new Set(CATALOG_BY_DEPARTMENT[deptId].map(c => c.code));
       const foreignCodes = view.map(v => v.course.code).filter(code => !ownDeptCodes.has(code));
-      expect(foreignCodes, `student ${student!.id} (${advisor.departmentId}) saw foreign codes`).toEqual([]);
+      expect(foreignCodes, `student ${student!.id} (${deptId}) saw foreign codes`).toEqual([]);
       // and it's not vacuously small — a real department's own catalog, not nothing
       expect(view.length).toBe(ownDeptCodes.size);
     }
   });
 
-  it('getEligibleCourses never recommends a course from a different department', () => {
-    for (const advisor of ADVISORS) {
-      const student = db.listStudents().find(s => s.advisorId === advisor.id);
+  it('getEligibleCourses never recommends a course from a different department than the STUDENT\'s own (not their randomly-assigned advisor\'s)', () => {
+    for (const deptId of Object.keys(CATALOG_BY_DEPARTMENT)) {
+      const student = db.listStudents().find(s => s.departmentId === deptId);
       const eligible = db.getEligibleCourses(student!.id);
-      const ownDeptCodes = new Set(CATALOG_BY_DEPARTMENT[advisor.departmentId].map(c => c.code));
+      const ownDeptCodes = new Set(CATALOG_BY_DEPARTMENT[deptId].map(c => c.code));
       const foreign = eligible.filter(e => !ownDeptCodes.has(e.course.code));
-      expect(foreign, `student ${student!.id} (${advisor.departmentId}) had foreign-department eligible courses`).toEqual([]);
+      expect(foreign, `student ${student!.id} (${deptId}) had foreign-department eligible courses`).toEqual([]);
+    }
+  });
+
+  it('an advisor\'s own roster can genuinely span multiple departments, and every one of those students still only ever sees their own department\'s courses', () => {
+    const mixedAdvisor = ADVISORS.find(a => {
+      const depts = new Set(db.listStudents().filter(s => s.advisorId === a.id).map(s => s.departmentId));
+      return depts.size > 1;
+    });
+    expect(mixedAdvisor, 'expected at least one advisor with a genuinely mixed-department roster').toBeDefined();
+    const roster = db.listStudents().filter(s => s.advisorId === mixedAdvisor!.id);
+    for (const student of roster) {
+      const ownDeptCodes = new Set(CATALOG_BY_DEPARTMENT[student.departmentId].map(c => c.code));
+      const view = db.getCurriculum(student.id);
+      expect(view.every(v => ownDeptCodes.has(v.course.code)), `${student.id} (${student.departmentId}) under advisor ${mixedAdvisor!.id}`).toBe(true);
     }
   });
 

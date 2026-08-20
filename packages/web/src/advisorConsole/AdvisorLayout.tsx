@@ -36,9 +36,18 @@ export function AdvisorLayout() {
   const { theme, toggleTheme } = useTheme();
   const advisorId = auth?.role === 'advisor' ? auth.advisorId : undefined;
   const [advisor, setAdvisor] = useState<AdvisorDTO | null>(null);
+  // Real bug found by audit: this used to be a hardcoded "25 students"
+  // string, never actually reflecting the logged-in advisor's real roster
+  // size — now doubly wrong now that rosters are a random cross-department
+  // mix rather than a uniform per-advisor number set at build time.
+  const [studentCount, setStudentCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (advisorId) api.advisor(advisorId).then(setAdvisor);
+  }, [advisorId]);
+
+  useEffect(() => {
+    if (advisorId) api.listStudents(advisorId).then(list => setStudentCount(list.length));
   }, [advisorId]);
 
   const tabs = [
@@ -86,7 +95,7 @@ export function AdvisorLayout() {
             {advisor && (
               <div className="su-user-meta">
                 <div className="su-user-name">{advisor.name}</div>
-                <div className="su-user-id">{advisor.facultyId}/{advisor.departmentId} · 25 students</div>
+                <div className="su-user-id">{advisor.facultyId}/{advisor.departmentId} · {studentCount ?? '…'} students</div>
               </div>
             )}
             <div className="su-avatar">{advisor ? initials(advisor.name) : 'A'}</div>

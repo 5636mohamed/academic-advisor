@@ -135,11 +135,13 @@ retaking courses you could improve on?"*
 
 ## Multi-advisor model & Vice President oversight
 
-- **Every student has exactly one advisor**, one of 14 named advisors (one
-  per real seeded department — see Spec §18), each with a deterministic
-  25-35-student roster. An advisor only ever sees their own roster —
-  enforced server-side (`?advisorId=`), not just hidden in the UI.
-  *Spec §17.1/§18 · [`seedAdvisors.ts`](../packages/api/src/db/seed/seedAdvisors.ts)*
+- **Every student has exactly one advisor**, one of 14 named advisors, each
+  with exactly 25 students — a real, deterministic, RANDOM cross-department
+  mix (not "one advisor per department"; each of the 10 real departments
+  has exactly 35 students of its own, spread across all 14 advisors). An
+  advisor only ever sees their own roster — enforced server-side
+  (`?advisorId=`), not just hidden in the UI.
+  *Spec §17.1/§18.5 · [`seedAdvisors.ts`](../packages/api/src/db/seed/seedAdvisors.ts)*
 - **The Vice President oversees all 14 advisors** without a full "browse
   every student" view: per-advisor summaries and roster drill-down, plus
   a flat queue of every student's still-pending system recommendation the

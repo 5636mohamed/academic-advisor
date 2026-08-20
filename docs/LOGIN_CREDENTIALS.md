@@ -29,27 +29,36 @@ All 14 advisors share one password: **`Advisor@123`**
 One advisor per real seeded department — the 5 original ECE advisors, plus
 one per department in the FoE Handbook's other 9 real programs (see
 `docs/BUILD_SPEC.md`'s "Real department catalog" section for the full
-program list and sourcing). Each advisor's roster is a deterministic
-25-35-student spread (not a fixed 25) — the exact count is seeded per
-advisor id, so it's stable across restarts but genuinely varies
-advisor-to-advisor.
+program list and sourcing) — but that "home department" is now just each
+advisor's own formal affiliation, not who they advise: every advisor has
+exactly **25 students**, randomly (deterministically) assigned across all
+10 departments, so a typical advisor's roster is a real cross-department
+mix rather than 25 students all from their own department. Each real
+department has exactly **35 students** total (10 × 35 = 350 = 14 × 25).
 
-| Name | Email | Department | Roster |
-|---|---|---|---|
-| Prof. Nabil Fathy | `nabil.fathy@aegis.edu.eg` | ECE | 25-35 students (incl. Ahmed, Sara, Karim) |
-| Prof. Mervat Aziz | `mervat.aziz@aegis.edu.eg` | ECE | 25-35 students (incl. Omar, Mona, Youssef) |
-| Prof. Tarek Younis | `tarek.younis@aegis.edu.eg` | ECE | 25-35 students (incl. Laila, Salma, Yara) |
-| Prof. Hoda Sami | `hoda.sami@aegis.edu.eg` | ECE | 25-35 students (incl. Nourhan, Hassan) |
-| Prof. Waleed Kassem | `waleed.kassem@aegis.edu.eg` | ECE | 25-35 students (incl. Fatma, Mohamed) |
-| Prof. Heba Zaki | `heba.zaki@aegis.edu.eg` | CSE | 25-35 students, all generated |
-| Prof. Sherif Adly | `sherif.adly@aegis.edu.eg` | MIE | 25-35 students, all generated |
-| Prof. Rania Gaber | `rania.gaber@aegis.edu.eg` | EPE | 25-35 students, all generated |
-| Prof. Mostafa Hegazy | `mostafa.hegazy@aegis.edu.eg` | MTE | 25-35 students, all generated |
-| Prof. Dina Farouk | `dina.farouk@aegis.edu.eg` | MSE | 25-35 students, all generated |
-| Prof. Ayman Nabil | `ayman.nabil@aegis.edu.eg` | IME | 25-35 students, all generated |
-| Prof. Khaled Ramzy | `khaled.ramzy@aegis.edu.eg` | ERE | 25-35 students, all generated |
-| Prof. Nagwa Fahmy | `nagwa.fahmy@aegis.edu.eg` | ENV | 25-35 students, all generated |
-| Prof. Amr Shawky | `amr.shawky@aegis.edu.eg` | CPE | 25-35 students, all generated |
+| Name | Email | Home department |
+|---|---|---|
+| Prof. Nabil Fathy | `nabil.fathy@aegis.edu.eg` | ECE (incl. Ahmed, Sara, Karim) |
+| Prof. Mervat Aziz | `mervat.aziz@aegis.edu.eg` | ECE (incl. Omar, Mona, Youssef) |
+| Prof. Tarek Younis | `tarek.younis@aegis.edu.eg` | ECE (incl. Laila, Salma, Yara) |
+| Prof. Hoda Sami | `hoda.sami@aegis.edu.eg` | ECE (incl. Nourhan, Hassan) |
+| Prof. Waleed Kassem | `waleed.kassem@aegis.edu.eg` | ECE (incl. Fatma, Mohamed) |
+| Prof. Heba Zaki | `heba.zaki@aegis.edu.eg` | CSE |
+| Prof. Sherif Adly | `sherif.adly@aegis.edu.eg` | MIE |
+| Prof. Rania Gaber | `rania.gaber@aegis.edu.eg` | EPE |
+| Prof. Mostafa Hegazy | `mostafa.hegazy@aegis.edu.eg` | MTE |
+| Prof. Dina Farouk | `dina.farouk@aegis.edu.eg` | MSE |
+| Prof. Ayman Nabil | `ayman.nabil@aegis.edu.eg` | IME |
+| Prof. Khaled Ramzy | `khaled.ramzy@aegis.edu.eg` | ERE |
+| Prof. Nagwa Fahmy | `nagwa.fahmy@aegis.edu.eg` | ENV |
+| Prof. Amr Shawky | `amr.shawky@aegis.edu.eg` | CPE |
+
+Every advisor's 14 named personas above are ECE (the only department with
+hand-authored worked examples); the rest of every advisor's 25-student
+roster — including the 5 ECE advisors' remaining seats — is generated and
+randomly assigned, so e.g. Prof. Nabil Fathy's roster is really 3 named ECE
+students plus 22 randomly-assigned students who could be from any of the
+10 departments.
 
 Each advisor sees only their own roster (real server-side scoping — see
 `?advisorId=` on the `/api/students`/`/api/advisor/report` routes, not just
@@ -81,11 +90,12 @@ All students share one password: **`Student@123`**
 | Mohamed Farag (venture match — Scenario N) | `mohamed.farag@aegis.edu.eg` | Prof. Waleed Kassem | §16 venture-match demo |
 | Youssef Adel (cold start — new Level 1) | `youssef.adel@aegis.edu.eg` | Prof. Waleed Kassem | Zero completed courses — cold-start G12/entrance-exam recommendation demo |
 
-Every other student across all 14 advisors (ids like `advisor-nabil-gen-1`
-or `advisor-heba-gen-1`) is deterministically generated with their own
-realistic first+last name (from a fixed name pool) and logs in the same
-way — `firstname.lastname@aegis.edu.eg`, same shared password, no
-individual listing here.
+Every other student (336 of the 350 total — ids like `ECE-gen-1` or
+`CSE-gen-12`, named by their own department rather than their randomly-
+assigned advisor) is deterministically generated with their own realistic
+first+last name (from a fixed name pool) and logs in the same way —
+`firstname.lastname@aegis.edu.eg`, same shared password, no individual
+listing here.
 
 Every id above (`ahmed-1`, `advisor-nabil`, …) still exists and still works
 exactly as before for anything that isn't the login screen itself — API

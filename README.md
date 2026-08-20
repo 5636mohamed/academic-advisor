@@ -150,8 +150,9 @@ student/advisor/Vice-President access separation):
 
 - **§17 Multi-advisor model & Vice President oversight** — a single shared
   advisor account became 14 real advisor identities, each with their own
-  25-35-student roster (real server-side scoping, not just a UI narrowing),
-  and a new Vice President role oversees all 14: per-advisor summaries and
+  25-student roster — a real, deterministic random mix across all 10
+  departments, not one advisor per department (real server-side scoping,
+  not just a UI narrowing) — and a new Vice President role oversees all 14: per-advisor summaries and
   roster drill-down, a flat cross-advisor pending-approvals queue the VP
   can act on directly, per-advisor transfer-in-flight counters, and its
   own Venture Board.

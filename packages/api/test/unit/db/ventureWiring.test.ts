@@ -207,37 +207,47 @@ describe('§16.4 — CV attachment flows through to the professor\'s candidate l
 });
 
 describe('real-department expansion — venture-application variety from non-ECE students', () => {
+  // Real-department expansion + random cross-department advisor assignment
+  // means there's no fixed "advisor X's first generated student" id any
+  // more — find each department's real fixture student the same dynamic
+  // way inMemoryDb.ts's own seedCrossDepartmentVentureApplications() does.
+  function firstGeneratedIn(departmentId: string): string {
+    const s = db.listStudents().find(s => s.departmentId === departmentId && s.id.includes('-gen-') && s.level >= 3);
+    expect(s, `expected a Level 3+ generated student in ${departmentId}`).toBeDefined();
+    return s!.id;
+  }
+
   it('a CSE student applied with a CV attached', () => {
-    const matches = db.getVentureMatchesForStudent('advisor-heba-gen-1');
+    const matches = db.getVentureMatchesForStudent(firstGeneratedIn('CSE'));
     const row = matches.find(m => m.ventureProjectId === 'proj-edge-ml');
     expect(row?.status).toBe('applied');
     expect(row?.cvFileName).toBe('cv.pdf');
   });
 
   it('an MTE student applied but hasn\'t attached a CV yet', () => {
-    const matches = db.getVentureMatchesForStudent('advisor-mostafa-gen-2');
+    const matches = db.getVentureMatchesForStudent(firstGeneratedIn('MTE'));
     const row = matches.find(m => m.ventureProjectId === 'proj-lora');
     expect(row?.status).toBe('applied');
     expect(row?.cvFileName).toBeUndefined();
   });
 
   it('an MSE student has a system-suggested match, not yet applied — no CV', () => {
-    const matches = db.getVentureMatchesForStudent('advisor-dina-gen-1');
+    const matches = db.getVentureMatchesForStudent(firstGeneratedIn('MSE'));
     const row = matches.find(m => m.ventureProjectId === 'proj-grad-federated');
     expect(row?.status).toBe('suggested');
     expect(row?.cvFileName).toBeUndefined();
   });
 
   it('an EPE student\'s CV-attached application was declined', () => {
-    const matches = db.getVentureMatchesForStudent('advisor-rania-gen-2');
+    const matches = db.getVentureMatchesForStudent(firstGeneratedIn('EPE'));
     const row = matches.find(m => m.ventureProjectId === 'proj-edge-ml');
     expect(row?.status).toBe('declined');
     expect(row?.cvFileName).toBe('cv.pdf');
   });
 
-  it('these applicants show up on the owning advisor\'s real candidate list', () => {
+  it('these applicants show up on the real candidate list for the project they applied to', () => {
     const candidates = db.getVentureProjectCandidates('proj-edge-ml');
     const ids = candidates.map(c => c.studentId);
-    expect(ids).toEqual(expect.arrayContaining(['advisor-heba-gen-1', 'advisor-rania-gen-2']));
+    expect(ids).toEqual(expect.arrayContaining([firstGeneratedIn('CSE'), firstGeneratedIn('EPE')]));
   });
 });
