@@ -15,6 +15,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { api } from '../../api/client';
 import { IconMoon, IconSun } from '../../portal/ui/Icons';
 import { BrandMark } from '../../portal/ui/BrandMark';
+import { HeartOutline } from '../../portal/ui/HeartOutline';
 import { Typewriter } from '../../components/Typewriter';
 import '../../portal/student-theme.css';
 
@@ -127,6 +128,10 @@ export function Login() {
             <Typewriter className="su-login-typewriter" />
           </div>
         </div>
+      </div>
+
+      <div className="su-login-page-footer">
+        Made with <HeartOutline size={14} className="su-heartbeat" /> by AEGIS
       </div>
     </div>
   );
