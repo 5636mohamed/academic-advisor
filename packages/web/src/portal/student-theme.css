@@ -863,6 +863,20 @@
  * only had a max-height/overflow-y at the sub-640px fullscreen breakpoint
  * — real desktop windows with a merely-short viewport had nothing. */
 .su-modal { animation: su-pop-in 260ms var(--su-ease) both; max-width: 420px; width: calc(100% - 40px); max-height: 85vh; overflow-y: auto; }
+/* Themed scrollbar for the modal above — the raw OS/browser default
+ * scrollbar (a stark, always-opaque gray bar) looked out of place against
+ * the card's own light/dark surface. Firefox reads scrollbar-color, every
+ * Chromium/WebKit browser reads the ::-webkit-scrollbar-* rules; both use
+ * the same --su-* tokens so this flips with the theme automatically
+ * instead of needing its own light/dark rules. */
+.su-modal {
+  scrollbar-width: thin;
+  scrollbar-color: var(--su-border-strong) transparent;
+}
+.su-modal::-webkit-scrollbar { width: 8px; }
+.su-modal::-webkit-scrollbar-track { background: transparent; }
+.su-modal::-webkit-scrollbar-thumb { background: var(--su-border-strong); border-radius: 8px; }
+.su-modal::-webkit-scrollbar-thumb:hover { background: var(--su-text-muted); }
 /* Below the shell's own mobile breakpoint, a boxed dialog with margin on
  * every side reads small and fiddly to dismiss with a thumb — every
  * ordinary (non-fullscreen-variant) modal takes the entire screen instead,
