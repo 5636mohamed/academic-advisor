@@ -856,7 +856,13 @@
   position: fixed; inset: 0; background: rgba(10, 10, 12, 0.45); backdrop-filter: blur(2px);
   display: flex; align-items: center; justify-content: center; z-index: 100; animation: su-fade-in 200ms var(--su-ease) both;
 }
-.su-modal { animation: su-pop-in 260ms var(--su-ease) both; max-width: 420px; width: calc(100% - 40px); }
+/* max-height + overflow-y so a heavy week's task list (FrictionTimeline.tsx
+ * — e.g. Week 5, or any week with enough milestones to exceed the
+ * viewport) scrolls internally instead of being clipped with no way to
+ * reach the remaining tasks or even the Close button. Previously this
+ * only had a max-height/overflow-y at the sub-640px fullscreen breakpoint
+ * — real desktop windows with a merely-short viewport had nothing. */
+.su-modal { animation: su-pop-in 260ms var(--su-ease) both; max-width: 420px; width: calc(100% - 40px); max-height: 85vh; overflow-y: auto; }
 /* Below the shell's own mobile breakpoint, a boxed dialog with margin on
  * every side reads small and fiddly to dismiss with a thumb — every
  * ordinary (non-fullscreen-variant) modal takes the entire screen instead,
@@ -946,6 +952,13 @@
  * repeating red-ring pattern behind it. The pattern is one small inline SVG
  * tile (a stroked circle, no fill) repeated via background-size — no image
  * asset, no network request.
+ *
+ * The pattern is confined to a 3-tile-row band at the very top and another
+ * at the very bottom (via ::before/::after) rather than tiling across the
+ * whole page — keeps the area directly behind the card clean. Each band's
+ * height is exactly 3 × the tile size below, so "3 rows" stays true if the
+ * tile size ever changes again. Matches ejust-academic-advisor's own
+ * treatment of this same page.
  * ---------------------------------------------------------------------- */
 .su-login-page {
   min-height: 100%;
@@ -953,15 +966,26 @@
   padding: 24px;
   position: relative;
   background-color: var(--su-bg);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23d6241f' stroke-opacity='0.16' stroke-width='1.5'/%3E%3C/svg%3E");
-  background-size: 48px 48px;
 }
-:root[data-theme='dark'] .su-login-page {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23ef5b53' stroke-opacity='0.14' stroke-width='1.5'/%3E%3C/svg%3E");
+.su-login-page::before,
+.su-login-page::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 84px; /* 3 rows × 28px tile */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14' r='9' fill='none' stroke='%23d6241f' stroke-opacity='0.16' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-size: 28px 28px;
+}
+.su-login-page::before { top: 0; }
+.su-login-page::after { bottom: 0; }
+:root[data-theme='dark'] .su-login-page::before,
+:root[data-theme='dark'] .su-login-page::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14' r='9' fill='none' stroke='%23ef5b53' stroke-opacity='0.14' stroke-width='1.2'/%3E%3C/svg%3E");
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .su-login-page {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23ef5b53' stroke-opacity='0.14' stroke-width='1.5'/%3E%3C/svg%3E");
+  :root:not([data-theme='light']) .su-login-page::before,
+  :root:not([data-theme='light']) .su-login-page::after {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14' r='9' fill='none' stroke='%23ef5b53' stroke-opacity='0.14' stroke-width='1.2'/%3E%3C/svg%3E");
   }
 }
 
