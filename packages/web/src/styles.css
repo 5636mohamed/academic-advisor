@@ -44,6 +44,14 @@
   --letter-b: #2a5f8a;
   --letter-d: #b5560c;
   --radius: 4px;
+  /* Same values as student-theme.css's --su-border-strong/--su-text-muted
+   * (that file's tokens are scoped under .su, a descendant of body/html —
+   * unreachable from a page-level html/body selector, same reasoning as
+   * the portal-scoping gotcha documented there) — duplicated here at
+   * :root so the page's own scrollbar (styled below) can follow the same
+   * theme instead of the raw OS/browser default. */
+  --scrollbar-thumb: #d7dae2;
+  --scrollbar-thumb-hover: #6b7080;
   font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
 }
 
@@ -74,6 +82,8 @@
     --venture-fill: #d1a53e;
     --letter-b: #7fb2e0;
     --letter-d: #e2965a;
+    --scrollbar-thumb: #383a43;
+    --scrollbar-thumb-hover: #a3a7b1;
   }
 }
 :root[data-theme="dark"] {
@@ -97,11 +107,27 @@
   --venture-fill: #d1a53e;
   --letter-b: #7fb2e0;
   --letter-d: #e2965a;
+  --scrollbar-thumb: #383a43;
+  --scrollbar-thumb-hover: #a3a7b1;
 }
 
 * { box-sizing: border-box; }
 
 html, body, #root { height: 100%; }
+
+/* Themed page scrollbar — same treatment as the .su-modal scrollbar
+ * (student-theme.css), just using the plain :root tokens above since this
+ * one has to work outside the .su-scoped subtree. Firefox reads
+ * scrollbar-color, every Chromium/WebKit browser reads the
+ * ::-webkit-scrollbar-* rules. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+html::-webkit-scrollbar { width: 8px; }
+html::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
+html::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 body {
   margin: 0;
