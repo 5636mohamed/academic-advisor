@@ -110,6 +110,14 @@ export interface StudentDetail extends StudentSummary {
   cgpaSnapshots: CgpaSnapshot[];
   quizAnswers: Record<string, string>;
   transferRecords: TransferRecordDTO[];
+  // The server already spreads the full stored student into this endpoint's
+  // response (server.ts's `res.json({ ...student, ... })`), so this field
+  // was already on the wire — just never declared here. It's the single
+  // authoritative "earned credit hours" figure `level` itself is derived
+  // from (`levelFromCredits`), so it can never disagree with Level the way
+  // a UI-side re-derivation from the (department-scoped) Curriculum tab
+  // could — see Overview.tsx/PortalHome.tsx's Completed Credits stat.
+  cumulativeEarnedCredits: number;
 }
 
 // The full catalog, one row per course, annotated with this student's

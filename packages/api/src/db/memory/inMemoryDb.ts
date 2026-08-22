@@ -716,8 +716,22 @@ function completeTranscript(s: SeedStudent): SeedStudent {
   // trusting the separately hand-typed `cumulativeEarnedCredits`/`level`
   // fields, which is exactly what let a student be credited with a level
   // their actual (incomplete) course history didn't support.
+  //
+  // Real bug (live user report): this used to sum credits for every
+  // attempted course regardless of grade, so an F still "earned" its
+  // credit hours — a student who failed literally everything could still
+  // be computed as Level 3 while the Curriculum tab (which correctly only
+  // counts non-F attempts as earned, same rule as
+  // executeInternalTransferForStudent/previewExternalTransfer's own
+  // "'passed courses' = anything but F" convention below) showed 0
+  // completed credits for that same student. Excluding F here makes
+  // `cumulativeEarnedCredits`/`level` agree with that existing convention
+  // instead of contradicting it.
   const latest = latestAttemptPerCourse(allAttempts);
-  const cumulativeEarnedCredits = latest.reduce((sum, rec) => sum + (courseByCode[rec.courseCode]?.credits ?? 0), 0);
+  const cumulativeEarnedCredits = latest.reduce(
+    (sum, rec) => sum + (rec.letter === 'F' ? 0 : (courseByCode[rec.courseCode]?.credits ?? 0)),
+    0
+  );
 
   return { ...s, allAttempts, cumulativeEarnedCredits, level: levelFromCredits(cumulativeEarnedCredits) };
 }

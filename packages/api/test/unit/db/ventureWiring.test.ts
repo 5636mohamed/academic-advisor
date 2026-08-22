@@ -15,12 +15,17 @@ describe('§16.8 — level/gate short-circuit', () => {
   });
 
   it('a Level 3+ student who never answered the gate gets nothing (indistinguishable from NO)', () => {
-    // nourhan-1 is Level 3 but dismissed — correctly excluded from the
-    // demo's pre-seeded opt-in cohort (see inMemoryDb.ts's
-    // PRESEEDED_VENTURE_OPT_INS comment), so her gate is genuinely unset,
-    // unlike every other Level 3+ seeded student.
-    expect(db.getStudent('nourhan-1')?.level).toBeGreaterThanOrEqual(3);
-    expect(db.getVentureMatches('nourhan-1')).toEqual([]);
+    // Any dismissed Level 3+ student works here — dismissed students are
+    // correctly excluded from the demo's pre-seeded opt-in cohort (see
+    // inMemoryDb.ts's PRESEEDED_VENTURE_OPT_INS comment), so their gate is
+    // genuinely unset, unlike every other Level 3+ seeded student. Found
+    // dynamically (rather than a hardcoded named id) since which specific
+    // generated student clears Level 3 depends on the real, honest
+    // cumulativeEarnedCredits computation (only non-F attempts earn
+    // credit — see completeTranscript's doc comment), not a fixed list.
+    const dismissedL3 = db.listStudents().find(s => s.status === 'dismissed' && s.level >= 3);
+    expect(dismissedL3, 'expected at least one dismissed Level 3+ seeded student').toBeDefined();
+    expect(db.getVentureMatches(dismissedL3!.id)).toEqual([]);
   });
 
   it('answering NO also yields nothing', () => {
@@ -120,12 +125,20 @@ describe('demo fixture — pre-seeded Venture Gate opt-ins for the whole eligibl
   it('every Level 3+, non-dismissed seeded student shows up in every project\'s candidate list out of the box, no live gate/form click required', () => {
     const candidates = db.getVentureProjectCandidates('proj-lora');
     const ids = candidates.map(c => c.studentId);
+    // mona-2/youssef-3/laila-4 are pre-seeded opt-ins (PRESEEDED_VENTURE_OPT_INS)
+    // but, with cumulativeEarnedCredits now honestly excluding F attempts
+    // (see completeTranscript's doc comment), their real earned-credit
+    // total no longer clears the Level 3 threshold — correctly excluded
+    // below, same as any other sub-Level-3 student.
     expect(ids).toEqual(
-      expect.arrayContaining(['ahmed-1', 'omar-1', 'mona-2', 'youssef-3', 'laila-4', 'salma-1', 'mohamed-1'])
+      expect.arrayContaining(['ahmed-1', 'omar-1', 'salma-1', 'mohamed-1'])
     );
     // Level < 3 (never asked the gate) and dismissed (self-service blocked
     // entirely) are the only two exclusions, both real business rules.
-    expect(ids).not.toEqual(expect.arrayContaining(['sara-1', 'karim-1', 'yara-1', 'hassan-1', 'fatma-1', 'nourhan-1']));
+    expect(ids).not.toEqual(expect.arrayContaining([
+      'sara-1', 'karim-1', 'yara-1', 'hassan-1', 'fatma-1', 'nourhan-1',
+      'mona-2', 'youssef-3', 'laila-4',
+    ]));
   });
 
   it('Mohamed and Ahmed both clear the match threshold without any live gate/form interaction', () => {
@@ -137,34 +150,38 @@ describe('demo fixture — pre-seeded Venture Gate opt-ins for the whole eligibl
     }
   });
 
-  it('a below-threshold opt-in (e.g. a probation-ladder student) still appears ranked, just unscored/no card', () => {
-    const card = db.getTopVentureCardMatch('mona-2');
-    expect(card).toBeNull(); // her transcript never crosses 0.80 for any seeded project
-    const matches = db.getVentureMatches('mona-2');
-    expect(matches.length).toBeGreaterThan(0); // still ranked/visible on her Venture Board
+  it('a below-threshold opt-in still appears ranked, just unscored/no card', () => {
+    // omar-1 (Level 3, pre-seeded opt-in) never clears 0.80 for any seeded
+    // project — the same "ranked but unscored" shape mona-2 used to
+    // demonstrate before her honestly-computed credits dropped her below
+    // Level 3 (see the test above).
+    const card = db.getTopVentureCardMatch('omar-1');
+    expect(card).toBeNull();
+    const matches = db.getVentureMatches('omar-1');
+    expect(matches.length).toBeGreaterThan(0); // still ranked/visible on their Venture Board
   });
 });
 
 describe('product-owner follow-up — expressing interest regardless of match score', () => {
   it('a below-threshold ("unscored") project can still be applied to, creating a fresh applied row', () => {
-    // mona-2 is opted in (pre-seeded) but never clears 0.80 for any project.
-    const before = db.getVentureMatches('mona-2').find(m => m.project.id === 'proj-lora');
+    // omar-1 is opted in (pre-seeded) but never clears 0.80 for any project.
+    const before = db.getVentureMatches('omar-1').find(m => m.project.id === 'proj-lora');
     expect(before?.matchId).toBeNull();
     expect(before?.status).toBe('unscored');
 
-    const created = db.applyToVentureProject('mona-2', 'proj-lora', { fileName: 'mona-cv.pdf', dataUrl: 'data:application/pdf;base64,ZGVtbw==' });
+    const created = db.applyToVentureProject('omar-1', 'proj-lora', { fileName: 'omar-cv.pdf', dataUrl: 'data:application/pdf;base64,ZGVtbw==' });
     expect(created.status).toBe('applied');
-    expect(created.cvFileName).toBe('mona-cv.pdf');
+    expect(created.cvFileName).toBe('omar-cv.pdf');
 
-    const after = db.getVentureMatches('mona-2').find(m => m.project.id === 'proj-lora');
+    const after = db.getVentureMatches('omar-1').find(m => m.project.id === 'proj-lora');
     expect(after?.matchId).toBe(created.id);
     expect(after?.status).toBe('applied');
   });
 
   it('applying a second time to the same project reuses the existing row instead of duplicating it', () => {
-    db.applyToVentureProject('mona-2', 'proj-lora', { fileName: 'v1.pdf', dataUrl: 'data:application/pdf;base64,AA==' });
-    const second = db.applyToVentureProject('mona-2', 'proj-lora', { fileName: 'v2.pdf', dataUrl: 'data:application/pdf;base64,BB==' });
-    const rows = db.getVentureMatchesForStudent('mona-2').filter(m => m.ventureProjectId === 'proj-lora');
+    db.applyToVentureProject('omar-1', 'proj-lora', { fileName: 'v1.pdf', dataUrl: 'data:application/pdf;base64,AA==' });
+    const second = db.applyToVentureProject('omar-1', 'proj-lora', { fileName: 'v2.pdf', dataUrl: 'data:application/pdf;base64,BB==' });
+    const rows = db.getVentureMatchesForStudent('omar-1').filter(m => m.ventureProjectId === 'proj-lora');
     expect(rows.length).toBe(1);
     expect(second.cvFileName).toBe('v2.pdf');
   });
@@ -197,7 +214,7 @@ describe('product-owner follow-up — expressing interest regardless of match sc
   });
 
   it('throws for a nonexistent project', () => {
-    expect(() => db.applyToVentureProject('mona-2', 'proj-does-not-exist')).toThrow();
+    expect(() => db.applyToVentureProject('omar-1', 'proj-does-not-exist')).toThrow();
   });
 });
 

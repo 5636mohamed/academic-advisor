@@ -64,10 +64,18 @@ export function Overview() {
     return m;
   }, [curriculum]);
 
-  const completedCredits = useMemo(
-    () => curriculum?.filter(r => r.status === 'passed').reduce((s, r) => s + r.course.credits, 0) ?? null,
-    [curriculum]
-  );
+  // Real bug (live user report): this used to re-derive "Completed Credits"
+  // from the (department-scoped) Curriculum tab's `status === 'passed'`
+  // rows, which is a STRICTER bar than earned-credit-hours (it also
+  // excludes D/D+, "needs retake" grades that still earned their credit —
+  // see completeTranscript's doc comment in inMemoryDb.ts) and silently
+  // drops any credit earned before an internal/external transfer, since
+  // those old-department course codes aren't in the new department's
+  // catalog at all. That combination is exactly what could show "0
+  // completed credits" for a student who was nonetheless Level 2/3.
+  // `student.cumulativeEarnedCredits` is the same authoritative figure
+  // `level` itself is derived from, so it can never disagree with Level.
+  const completedCredits = student?.cumulativeEarnedCredits ?? null;
 
   if (!id) return null;
   if (!student) return <Loading label="Loading student overview…" />;
