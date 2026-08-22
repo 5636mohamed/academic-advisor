@@ -179,7 +179,10 @@ function VentureGrantRequestsSection({ advisors }: { advisors: AdvisorDTO[] }) {
                 </div>
               </div>
               <div className="su-flex su-gap-8 su-mt-16" style={{ flexWrap: 'wrap' }}>
-                <button type="button" className="su-btn su-btn-sm" style={{ background: 'var(--su-good)' }} disabled={busyProjectId === r.project.id} onClick={() => decide(r.project.id, 'approved')}>Approve</button>
+                {/* Contrast audit: --su-good-text (darkened for the same
+                    reason on badges/notes) pairs safely with white .su-btn
+                    text here — plain --su-good measured 2.54:1, failing. */}
+                <button type="button" className="su-btn su-btn-sm" style={{ background: 'var(--su-good-text)' }} disabled={busyProjectId === r.project.id} onClick={() => decide(r.project.id, 'approved')}>Approve</button>
                 <button type="button" className="su-btn su-btn-sm su-btn-outline" disabled={busyProjectId === r.project.id} onClick={() => decide(r.project.id, 'declined')}>Decline</button>
                 {r.project.grantRequest!.timelinePlanDataUrl && (
                   <button type="button" className="su-btn su-btn-sm su-btn-ghost" onClick={() => setViewingPlanFor(r)}>📄 View timeline plan</button>

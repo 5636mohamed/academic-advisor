@@ -19,14 +19,29 @@
   --su-border: #e4e6ec;
   --su-border-strong: #d7dae2;
   --su-text: #16181d;
-  --su-text-muted: #6b7080;
-  --su-text-faint: #9498a3;
+  /* Full-app contrast audit (live user request): both darkened a hair from
+   * their original values — #6b7080 measured 3.85:1 against the topbar
+   * background and 4.45:1 against the page background (both fail WCAG
+   * AA's 4.5:1), and #9498a3 measured 2.88:1 against a plain white card.
+   * Darkened just enough to clear 4.5:1 against every background either
+   * token is actually used on (surface/bg/topbar-bg), same margin-of-
+   * safety approach as --su-warn-text below — visually near-identical,
+   * the muted/faint hierarchy between the two is unchanged. */
+  --su-text-muted: #5f6371;
+  --su-text-faint: #71747c;
 
   --su-accent: #d6241f;
   --su-accent-hover: #b81d19;
   --su-accent-soft: #fce9e7;
   --su-accent-soft-strong: #f8d4d1;
   --su-accent-contrast: #ffffff;
+  /* Same pattern as --su-warn-text: --su-accent itself reads fine as a
+   * fill/border/icon (and as text on a plain white surface, ~5.1:1) but
+   * dips under 4.5:1 as TEXT on the two tinted backgrounds it sometimes
+   * sits on (the topbar chip, --su-accent-soft badges) — 3.96:1 and
+   * 4.34:1 respectively. Used only at those specific call sites; every
+   * accent-as-text-on-white spot is untouched since it already passes. */
+  --su-accent-text: #bd201b;
 
   /* Brand palette (light mode) — Main/Background pairs as specified:
    * Yellow F4D30F / FEF6C7, Red EB2028 / FEF2F2, Green 10B981 / C9FFED.
@@ -38,15 +53,50 @@
    * small TEXT specifically (both are high-luminance yellows) — it still
    * reads fine everywhere it's used as a fill/dot/border/icon color, which
    * is most places; flagging this rather than silently picking a different
-   * shade than the one specified. */
+   * shade than the one specified.
+   *
+   * FIXED (live user report — advisor's "confirm responsibility" warning
+   * note was unreadable in light mode): the three spots that actually put
+   * --su-warn on TEXT (.su-note.warn, .su-badge.warn, the C/C+ letter-grade
+   * class) now use --su-warn-text instead — a darkened same-hue gold that
+   * clears WCAG AA (~5.5:1) against both --su-warn-soft and a plain white
+   * card, while --su-warn itself is untouched everywhere else (dots/fills/
+   * borders/icons), so this doesn't relitigate the brand-color choice
+   * above, just the one genuinely-broken text pairing.
+   *
+   * The same audit found --su-good and --su-danger have the identical
+   * problem (--su-info only on its own soft background), each given its
+   * own darkened "-text" variant below for the same reason and by the
+   * same method — original color untouched everywhere it's a fill/dot/
+   * border/icon, "-text" variant swapped in only at the specific
+   * call sites that put it on readable text. */
   --su-good: #10b981;
   --su-good-soft: #c9ffed;
+  /* #10b981 measured 2.30:1 on --su-good-soft and 2.54:1 directly on a
+   * white card (the A/A+ letter-grade class) — both badly fail. */
+  --su-good-text: #0a7954;
   --su-warn: #f4d30f;
   --su-warn-soft: #fef6c7;
+  --su-warn-text: #796907;
   --su-danger: #eb2028;
   --su-danger-soft: #fef2f2;
+  /* #eb2028 measured 4.02:1 on --su-danger-soft and 4.40:1 directly on a
+   * white card (the F letter-grade class) — both fail, if less severely
+   * than --su-good's case. */
+  --su-danger-text: #d01c23;
   --su-info: #2f6fed;
   --su-info-soft: #e6edfe;
+  /* #2f6fed measured 3.88:1 on --su-info-soft (its one text use, the info
+   * badge) — its other use, the B/B+ letter grade, sits directly on a
+   * white card and already passes at 4.55:1, untouched. */
+  --su-info-text: #2a62d2;
+  /* The D/D+ letter-grade color was a hardcoded, never-themed #d2691e
+   * ("chocolate") — not a design-system token at all, found in the same
+   * contrast audit: 3.63:1 against a white card, failing (it happened to
+   * pass, 4.68:1, against the dark-mode surface purely by coincidence,
+   * since it was never given a dark-mode value of its own). Given its own
+   * proper token pair now, same pattern as every other grade color. */
+  --su-grade-d-text: #a55218;
   --su-neutral-soft: #eef0f3;
   --su-neutral-text: #575c66;
 
@@ -89,22 +139,41 @@
     --su-border-strong: #383a43;
     --su-text: #f1f1ef;
     --su-text-muted: #a3a7b1;
-    --su-text-faint: #7b7f8a;
+    /* Dark mode's own contrast pass: #7b7f8a measured 4.25:1 on a dark
+     * card, just under 4.5:1 — lightened a touch (--su-text-muted already
+     * passed everywhere, untouched). */
+    --su-text-faint: #838791;
 
     --su-accent: #ef5b53;
     --su-accent-hover: #f57972;
     --su-accent-soft: #3a201d;
     --su-accent-soft-strong: #4a2723;
     --su-accent-contrast: #1a1213;
+    /* #ef5b53 measured 4.48:1 as text on --su-accent-soft, just under —
+     * every other dark-mode use already clears 4.5:1 (topbar chip 5.31:1,
+     * plain surface 5.10:1), so this is a small, single-purpose lighten. */
+    --su-accent-text: #ef6058;
 
     --su-good: #57c785;
     --su-good-soft: #17301f;
+    /* Dark mode's good/danger/info already clear 4.5:1 everywhere they're
+     * used as text (6.7-8.0:1) — these "-text" tokens exist so the shared
+     * light+dark CSS rules below always have one to reference, they're
+     * just aliases here, not a separate fix. */
+    --su-good-text: #57c785;
     --su-warn: #e4b451;
     --su-warn-soft: #33290f;
+    --su-warn-text: #e4b451;
     --su-danger: #ef6f68;
     --su-danger-soft: #3a1f1d;
+    --su-danger-text: #ef6f68;
     --su-info: #74a1ff;
     --su-info-soft: #1c2740;
+    --su-info-text: #74a1ff;
+    /* The original hardcoded #d2691e already cleared 4.5:1 against dark
+     * mode's own surface (4.68:1) — kept as-is here, just promoted to a
+     * real token so both themes go through the same variable. */
+    --su-grade-d-text: #d2691e;
     --su-neutral-soft: #24262c;
     --su-neutral-text: #b3b7c1;
 
@@ -136,22 +205,28 @@
   --su-border-strong: #383a43;
   --su-text: #f1f1ef;
   --su-text-muted: #a3a7b1;
-  --su-text-faint: #7b7f8a;
+  --su-text-faint: #838791;
 
   --su-accent: #ef5b53;
   --su-accent-hover: #f57972;
   --su-accent-soft: #3a201d;
   --su-accent-soft-strong: #4a2723;
   --su-accent-contrast: #1a1213;
+  --su-accent-text: #ef6058;
 
   --su-good: #57c785;
   --su-good-soft: #17301f;
+  --su-good-text: #57c785;
   --su-warn: #e4b451;
   --su-warn-soft: #33290f;
+  --su-warn-text: #e4b451;
   --su-danger: #ef6f68;
   --su-danger-soft: #3a1f1d;
+  --su-danger-text: #ef6f68;
   --su-info: #74a1ff;
   --su-info-soft: #1c2740;
+  --su-info-text: #74a1ff;
+  --su-grade-d-text: #d2691e;
   --su-neutral-soft: #24262c;
   --su-neutral-text: #b3b7c1;
 
@@ -352,7 +427,7 @@
 .su-brand-text .su-brand-name { font-weight: 800; font-size: 13.5px; letter-spacing: 0.02em; }
 .su-brand-text .su-brand-sub { font-size: 9.5px; letter-spacing: 0.08em; color: var(--su-text-muted); text-transform: uppercase; }
 .su-brand-divider { width: 1px; height: 26px; background: var(--su-topbar-border); flex-shrink: 0; }
-.su-role-tag { font-weight: 700; color: var(--su-accent); font-size: 14px; flex-shrink: 0; white-space: nowrap; }
+.su-role-tag { font-weight: 700; color: var(--su-accent-text); font-size: 14px; flex-shrink: 0; white-space: nowrap; }
 
 .su-topbar-user { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-left: auto; }
 .su-topbar-user .su-user-meta { text-align: right; line-height: 1.25; }
@@ -360,8 +435,25 @@
 .su-topbar-user .su-user-id { font-size: 11px; color: var(--su-text-muted); }
 .su-avatar {
   width: 36px; height: 36px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--su-accent), #f08b6d);
-  color: #fff; display: flex; align-items: center; justify-content: center;
+  /* Contrast audit (live user request): the old lighter coral end-stop
+   * (#f08b6d) measured only 2.44:1 against the white initials text at
+   * that end of the diagonal — badly fails WCAG AA even accounting for
+   * the bold weight. --su-accent-hover is already a darker red token used
+   * elsewhere for hover states; reusing it as the gradient's second stop
+   * keeps a real two-tone gradient (not a flat fill) while both ends —
+   * and everything interpolated between them — clear 4.5:1+ (5.08:1 /
+   * 6.51:1 at the two stops) in LIGHT mode. */
+  background: linear-gradient(135deg, var(--su-accent), var(--su-accent-hover));
+  /* Same audit, a second real bug on top of the light-mode one: this was
+   * hardcoded white regardless of theme. Dark mode's --su-accent is a
+   * bright, light red MEANT to read against a dark page background, so
+   * white-on-it is only 3.34:1/2.67:1 at the two gradient stops — worse
+   * than the light-mode bug, not better. --su-accent-contrast already
+   * exists as the theme-aware "readable text color for something sitting
+   * on --su-accent" token (white in light mode, near-black in dark mode —
+   * used the same way by .su-badge.solid/.su-modetab.active elsewhere);
+   * this just needed to use it too instead of a hardcoded color. */
+  color: var(--su-accent-contrast); display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 13px; flex-shrink: 0; box-shadow: var(--su-shadow-sm);
 }
 /* A transparent-on-gray icon button was nearly invisible against the
@@ -388,8 +480,8 @@
   box-shadow: var(--su-shadow-sm);
   cursor: pointer; flex-shrink: 0;
 }
-.su-icon-btn:hover { background: var(--su-accent-soft); color: var(--su-accent); border-color: var(--su-accent-soft-strong); transform: translateY(-1px); box-shadow: var(--su-shadow-md); }
-.su-icon-btn.danger:hover { background: var(--su-danger-soft); color: var(--su-danger); border-color: var(--su-danger); }
+.su-icon-btn:hover { background: var(--su-accent-soft); color: var(--su-accent-text); border-color: var(--su-accent-soft-strong); transform: translateY(-1px); box-shadow: var(--su-shadow-md); }
+.su-icon-btn.danger:hover { background: var(--su-danger-soft); color: var(--su-danger-text); border-color: var(--su-danger); }
 .su-icon-btn:active { transform: translateY(0) scale(0.94); }
 
 .su-body { flex: 1; padding: 26px 30px 60px; min-width: 0; }
@@ -430,7 +522,7 @@
   color: var(--su-text);
   border-bottom: 1px solid var(--su-border);
 }
-.su-mobile-menu-nav a.active { color: var(--su-accent); background: var(--su-accent-soft); }
+.su-mobile-menu-nav a.active { color: var(--su-accent-text); background: var(--su-accent-soft); }
 
 /* ---------------------------------------------------------------------- *
  * Responsiveness — every portal in the system shares this shell
@@ -559,7 +651,7 @@
 .su-stat-value .unit { font-size: 14px; font-weight: 600; color: var(--su-text-muted); margin-left: 3px; }
 .su-stat-value.accent { color: var(--su-accent); }
 .su-stat-sub { font-size: 12px; color: var(--su-text-muted); margin-top: 5px; }
-.su-stat-sub.warn { color: var(--su-danger); font-weight: 600; }
+.su-stat-sub.warn { color: var(--su-danger-text); font-weight: 600; }
 
 /* Icon-badge stat card (Venture board) */
 .su-stat-icon-card { display: flex; flex-direction: column; gap: 10px; }
@@ -599,12 +691,12 @@
   padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 800;
   text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
 }
-.su-badge.ok { background: var(--su-good-soft); color: var(--su-good); }
-.su-badge.warn { background: var(--su-warn-soft); color: var(--su-warn); }
-.su-badge.danger { background: var(--su-danger-soft); color: var(--su-danger); }
+.su-badge.ok { background: var(--su-good-soft); color: var(--su-good-text); }
+.su-badge.warn { background: var(--su-warn-soft); color: var(--su-warn-text); }
+.su-badge.danger { background: var(--su-danger-soft); color: var(--su-danger-text); }
 .su-badge.neutral { background: var(--su-neutral-soft); color: var(--su-neutral-text); }
-.su-badge.info { background: var(--su-info-soft); color: var(--su-info); }
-.su-badge.accent { background: var(--su-accent-soft); color: var(--su-accent); }
+.su-badge.info { background: var(--su-info-soft); color: var(--su-info-text); }
+.su-badge.accent { background: var(--su-accent-soft); color: var(--su-accent-text); }
 .su-badge.solid { background: var(--su-accent); color: var(--su-accent-contrast); }
 
 /* ---------------------------------------------------------------------- *
@@ -680,11 +772,11 @@
 .su-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--su-text-faint); pointer-events: none; }
 
 /* letters */
-.su-letter-A, .su-letter-Ap { color: var(--su-good); font-weight: 800; }
+.su-letter-A, .su-letter-Ap { color: var(--su-good-text); font-weight: 800; }
 .su-letter-B, .su-letter-Bp { color: var(--su-info); font-weight: 700; }
-.su-letter-C, .su-letter-Cp { color: var(--su-warn); font-weight: 700; }
-.su-letter-D, .su-letter-Dp { color: #d2691e; font-weight: 700; }
-.su-letter-F { color: var(--su-danger); font-weight: 800; }
+.su-letter-C, .su-letter-Cp { color: var(--su-warn-text); font-weight: 700; }
+.su-letter-D, .su-letter-Dp { color: var(--su-grade-d-text); font-weight: 700; }
+.su-letter-F { color: var(--su-danger-text); font-weight: 800; }
 
 /* ---------------------------------------------------------------------- *
  * Tabs (mode switcher — Course Plan)
@@ -703,7 +795,7 @@
   border: 1px solid transparent; background: transparent; color: var(--su-text-muted); cursor: pointer;
 }
 .su-subtab:hover { background: var(--su-bg-soft); color: var(--su-text); }
-.su-subtab.active { background: var(--su-accent-soft); color: var(--su-accent); border-color: var(--su-accent-soft-strong); }
+.su-subtab.active { background: var(--su-accent-soft); color: var(--su-accent-text); border-color: var(--su-accent-soft-strong); }
 
 /* ---------------------------------------------------------------------- *
  * Confidence / progress bars (course plan roster, pathways)
@@ -820,9 +912,9 @@
 .su-input:focus { outline: none; border-color: var(--su-accent); box-shadow: 0 0 0 3px var(--su-accent-soft); }
 
 .su-note { padding: 12px 14px; border-radius: var(--su-radius-sm); background: var(--su-accent-soft); color: var(--su-text); font-size: 12.5px; line-height: 1.5; }
-.su-note.danger { background: var(--su-danger-soft); color: var(--su-danger); }
-.su-note.good { background: var(--su-good-soft); color: var(--su-good); }
-.su-note.warn { background: var(--su-warn-soft); color: var(--su-warn); }
+.su-note.danger { background: var(--su-danger-soft); color: var(--su-danger-text); }
+.su-note.good { background: var(--su-good-soft); color: var(--su-good-text); }
+.su-note.warn { background: var(--su-warn-soft); color: var(--su-warn-text); }
 
 .su-choice-card {
   border: 1.5px solid var(--su-border); border-radius: var(--su-radius); padding: 18px 20px;

@@ -109,7 +109,7 @@ export function PortalVentureBoard() {
             <div><b style={{ fontSize: 13 }}>Short and easy</b><div className="su-muted">A few quick questions</div></div>
           </div>
           <div className="su-flex su-gap-10" style={{ marginTop: 10, alignItems: 'flex-start' }}>
-            <IconTrendUp width={16} height={16} style={{ color: 'var(--su-good)', marginTop: 2 }} />
+            <IconTrendUp width={16} height={16} style={{ color: 'var(--su-good-text)', marginTop: 2 }} />
             <div><b style={{ fontSize: 13 }}>Better opportunities</b><div className="su-muted">Find roles that match your goals</div></div>
           </div>
           <button className="su-btn su-btn-block su-mt-16" onClick={() => setWizardOpen(true)}>Discover venture</button>

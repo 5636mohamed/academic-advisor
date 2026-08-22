@@ -162,7 +162,7 @@ export function TargetChainCalculator({
                         }}
                       />
                     </td>
-                    <td style={{ fontWeight: 700, color: r.cumulativeCgpa >= targetNum ? 'var(--su-good)' : 'var(--su-warn)' }}>
+                    <td style={{ fontWeight: 700, color: r.cumulativeCgpa >= targetNum ? 'var(--su-good-text)' : 'var(--su-warn-text)' }}>
                       {r.cumulativeCgpa.toFixed(2)}
                     </td>
                     <td className={r.stillNeededAvg > MAX_GPA ? 'su-badge danger' : 'su-muted'} style={r.stillNeededAvg > MAX_GPA ? { display: 'inline-block' } : undefined}>

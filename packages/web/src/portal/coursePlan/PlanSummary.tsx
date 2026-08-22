@@ -43,12 +43,12 @@ export function PlanSummary({
       </div>
       <div className="su-stat-card">
         <div className="su-stat-label">Projected GPA this semester</div>
-        <div className="su-stat-value" style={{ color: 'var(--su-good)' }}>{semesterGpa.toFixed(2)}</div>
+        <div className="su-stat-value" style={{ color: 'var(--su-good-text)' }}>{semesterGpa.toFixed(2)}</div>
       </div>
       <div className="su-stat-card">
         <div className="su-stat-label">Projected post-GPA</div>
         <div className="su-stat-value">{postGpa.toFixed(2)}</div>
-        <div className={`su-stat-sub${exits ? '' : ''}`} style={{ color: exits ? 'var(--su-good)' : undefined }}>
+        <div className={`su-stat-sub${exits ? '' : ''}`} style={{ color: exits ? 'var(--su-good-text)' : undefined }}>
           {exits ? 'Exits probation' : currentCgpa < 2.0 ? 'Probation continues' : 'Estimate — actual results may vary'}
         </div>
       </div>

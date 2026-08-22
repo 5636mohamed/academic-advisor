@@ -378,7 +378,13 @@ function CandidateDetail({
         </div>
         {candidate.matchId && (candidate.status === 'applied' || candidate.status === 'suggested') ? (
           <div className="su-flex su-gap-8">
-            <button className="su-btn su-btn-sm" style={{ background: 'var(--su-good)' }} onClick={() => onAct(candidate.matchId!, 'accepted')}>Accept</button>
+            {/* Contrast audit (live user request): --su-good is too light
+                for its own white .su-btn text (2.54:1, fails) — --su-good-
+                text (already darkened for the same reason on badges/notes)
+                pairs safely with white here too (5.14:1); dark mode is
+                unaffected since --su-good-text just aliases --su-good
+                there, where it was already fine against near-black text. */}
+            <button className="su-btn su-btn-sm" style={{ background: 'var(--su-good-text)' }} onClick={() => onAct(candidate.matchId!, 'accepted')}>Accept</button>
             <button className="su-btn su-btn-sm su-btn-outline" onClick={() => onAct(candidate.matchId!, 'declined')}>Reject</button>
           </div>
         ) : (
@@ -394,7 +400,7 @@ function CandidateDetail({
 
       {student && (
         <div className="su-stat-grid su-mt-16" style={{ gridTemplateColumns: 'repeat(2, minmax(140px,1fr))' }}>
-          <div className="su-stat-card"><div className="su-stat-label">Cumulative GPA</div><div className="su-stat-value" style={{ color: student.cgpa < 2.0 ? 'var(--su-danger)' : undefined }}>{student.cgpa.toFixed(2)}</div></div>
+          <div className="su-stat-card"><div className="su-stat-label">Cumulative GPA</div><div className="su-stat-value" style={{ color: student.cgpa < 2.0 ? 'var(--su-danger-text)' : undefined }}>{student.cgpa.toFixed(2)}</div></div>
           <div className="su-stat-card"><div className="su-stat-label">Warning counter</div><div className="su-stat-value">{student.probationCounter.count} / 6</div></div>
         </div>
       )}
@@ -521,7 +527,7 @@ function GrantRequestPanel({ row, onChanged }: { row: AdvisorVentureProjectRowDT
       {request && (
         <div className="su-muted" style={{ fontSize: 11.5, marginBottom: 6 }}>
           Last request: {request.amount.toLocaleString()} EGP —{' '}
-          <span className={request.status === 'approved' ? 'su-good' : 'su-danger'} style={{ color: request.status === 'approved' ? 'var(--su-good)' : 'var(--su-danger)' }}>{request.status}</span>
+          <span className={request.status === 'approved' ? 'su-good' : 'su-danger'} style={{ color: request.status === 'approved' ? 'var(--su-good-text)' : 'var(--su-danger-text)' }}>{request.status}</span>
           {request.decisionNote ? ` (${request.decisionNote})` : ''}
         </div>
       )}

@@ -159,7 +159,7 @@ export function MyRecommendationsTab({ studentId, studentName }: { studentId: st
       {impact && (
         <div className="su-stat-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(160px,1fr))', marginBottom: 18 }}>
           <div className="su-stat-card"><div className="su-stat-label">Expected CGPA</div><div className="su-stat-value">{impact.expectedProjectedCGPA.toFixed(2)}</div></div>
-          <div className="su-stat-card"><div className="su-stat-label">At your best</div><div className="su-stat-value" style={{ color: 'var(--su-good)' }}>{impact.bestCaseProjectedCGPA.toFixed(2)}</div></div>
+          <div className="su-stat-card"><div className="su-stat-label">At your best</div><div className="su-stat-value" style={{ color: 'var(--su-good-text)' }}>{impact.bestCaseProjectedCGPA.toFixed(2)}</div></div>
         </div>
       )}
 

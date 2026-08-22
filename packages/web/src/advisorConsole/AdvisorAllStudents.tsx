@@ -112,7 +112,7 @@ export function AdvisorAllStudents() {
                         <tr>
                           <td style={{ cursor: 'pointer' }} onClick={() => navigate(`/students/${s.id}`)}><b>{s.name}</b></td>
                           <td className="su-muted">{s.id}</td>
-                          <td style={{ fontWeight: 700, color: s.cgpa < 2.0 ? 'var(--su-danger)' : s.cgpa >= 3.0 ? 'var(--su-good)' : undefined }}>{s.cgpa.toFixed(2)}</td>
+                          <td style={{ fontWeight: 700, color: s.cgpa < 2.0 ? 'var(--su-danger-text)' : s.cgpa >= 3.0 ? 'var(--su-good-text)' : undefined }}>{s.cgpa.toFixed(2)}</td>
                           <td><span className={`su-badge ${RISK_TONE[risk]}`}>{risk}</span></td>
                           <td>
                             <div className="su-flex su-items-center su-gap-8">
@@ -189,7 +189,10 @@ function OverviewRow({ label, value, tone }: { label: string; value: ReactNode; 
   return (
     <div className="su-flex su-justify-between su-items-center">
       <span className="su-muted" style={{ fontSize: 13 }}>{label}</span>
-      <span style={{ fontWeight: 800, color: tone ? `var(--su-${tone})` : undefined }}>{value}</span>
+      {/* Contrast audit: needs the darkened "-text" variant, same as
+          CgpaBarChart's su-bar-value — plain --su-danger/warn/good all
+          fail WCAG AA as readable text (warn worst of all, 1.48:1 here). */}
+      <span style={{ fontWeight: 800, color: tone ? `var(--su-${tone}-text)` : undefined }}>{value}</span>
     </div>
   );
 }

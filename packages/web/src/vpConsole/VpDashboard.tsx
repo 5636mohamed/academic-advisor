@@ -111,7 +111,11 @@ export function VpDashboard() {
                     <td><b>{s.advisor.name}</b></td>
                     <td className="su-muted">{s.advisor.facultyId}/{s.advisor.departmentId}</td>
                     <td>{s.studentCount}</td>
-                    <td style={{ color: `var(--su-${s.averageCgpa >= 3.0 ? 'good' : s.averageCgpa < 2.0 ? 'danger' : 'warn'})`, fontWeight: 700 }}>{s.averageCgpa.toFixed(2)}</td>
+                    {/* Contrast audit: needs the darkened "-text" variant
+                        (plain --su-good/warn/danger all fail WCAG AA as
+                        readable text — see student-theme.css's token
+                        comments). */}
+                    <td style={{ color: `var(--su-${s.averageCgpa >= 3.0 ? 'good' : s.averageCgpa < 2.0 ? 'danger' : 'warn'}-text)`, fontWeight: 700 }}>{s.averageCgpa.toFixed(2)}</td>
                     <td>
                       {pendingCount === 0
                         ? <span className="su-badge ok">All registered</span>

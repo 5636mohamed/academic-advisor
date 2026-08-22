@@ -116,7 +116,12 @@ export function CgpaBarChart({ points }: { points: { label: string; value: numbe
       <div className="su-barchart-rows">
         {points.map((p, i) => (
           <div className="su-bar-col" key={p.label}>
-            <div className="su-bar-value" style={{ color: `var(--su-${barTone(p.value)})` }}>{p.value.toFixed(2)}</div>
+            {/* Contrast audit (live user request): text needs the darkened
+                "-text" variant (--su-good/danger/warn all fail WCAG AA as
+                plain readable text — see student-theme.css's own token
+                comments) — the bar's own fill below stays the original
+                token, since a solid-color fill was never the problem. */}
+            <div className="su-bar-value" style={{ color: `var(--su-${barTone(p.value)}-text)` }}>{p.value.toFixed(2)}</div>
             <div
               className="su-bar-shape"
               style={{
