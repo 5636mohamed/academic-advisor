@@ -8,7 +8,12 @@
     "decliningPenalty": 3,
     "inconsistencyPenalty": 2,
     "trendSlopePerTermThreshold": 1.5,
-    "inconsistencyStdDevThreshold": 10
+    "inconsistencyStdDevThreshold": 10,
+    "studentRisingBonus": 3,
+    "studentDecliningPenalty": 3,
+    "studentInconsistencyPenalty": 2,
+    "studentTrendSlopePerTermThreshold": 1.5,
+    "studentInconsistencyStdDevThreshold": 10
   },
   "candidateScore": {
     "gradeQuality": 46,

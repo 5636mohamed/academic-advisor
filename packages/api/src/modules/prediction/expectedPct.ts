@@ -16,6 +16,12 @@
 // student"), plus an explicit rising/declining/consistent/inconsistent
 // trend adjustment for the subject — replacing the old flat difficulty-
 // tier nudge, which only ever looked at a static average, never direction.
+//
+// Follow-up (live user request): a flat mean/mode blend can't distinguish
+// a student climbing toward their average from one sliding away from it.
+// `studentTrendAdjustment` (studentStats.ts) adds that personal counterpart
+// alongside the subject's own cohort-wide trend — both are additive nudges
+// applied once each, never re-derived here.
 import { clamp } from './linearRegression';
 import weights from '../../config/predictionWeights.json';
 
@@ -26,8 +32,14 @@ export interface ExpectedPctInputs {
   cohortModePct: number | null;
   /** Additive nudge from cohortTrend.ts's own trendAdjustment — already
    *  scaled (±risingBonus/decliningPenalty/inconsistencyPenalty), applied
-   *  once here, not re-derived. */
-  trendAdjustment: number;
+   *  once here, not re-derived. Renamed from the old single `trendAdjustment`
+   *  field now that there are two independent trend signals to blend. */
+  cohortTrendAdjustment: number;
+  /** Additive nudge from studentStats.ts's own trendAdjustment — this
+   *  student's personal rising/declining/inconsistent trend in this
+   *  subject's comparable category, independent of (and summed with)
+   *  cohortTrendAdjustment above. */
+  studentTrendAdjustment: number;
   /** Used only when studentMean/cohortMean are both unavailable (a course
    *  or student with literally zero history) — the same "there is
    *  genuinely nothing else to lean on" fallback the old formula had. */
@@ -52,7 +64,8 @@ export function expectedPct(inputs: ExpectedPctInputs): number {
     cfg.studentModeWeight * studentModePct +
     cfg.cohortMeanWeight * cohortMean +
     cfg.cohortModeWeight * cohortModePct +
-    inputs.trendAdjustment;
+    inputs.cohortTrendAdjustment +
+    inputs.studentTrendAdjustment;
 
   return clamp(Math.round(blended * 10) / 10, 0, 100);
 }

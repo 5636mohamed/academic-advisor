@@ -33,7 +33,14 @@ import { simulateUnderDepartment as simulateUnderDepartmentReal } from '../fitEn
  *  grade on BOTH sides (studentStats.ts / cohortTrend.ts) plus an
  *  explicit trend classification for the subject (rising/declining/
  *  consistent/inconsistent) — see expectedPct.ts's own header for the
- *  full before/after and a real worked example. */
+ *  full before/after and a real worked example.
+ *
+ *  Follow-up (live user request): predictions should also reflect whether
+ *  THIS student's own performance in this subject's comparable category
+ *  has been trending up or down, not just the subject's cohort-wide
+ *  history — studentStats.ts's studentMeanAndMode() now returns that
+ *  personal trend alongside the mean/mode it already computed, summed
+ *  here with the cohort's own trend rather than replacing it. */
 function scoreEligibleCourse(student: StudentWithCgpa, c: EligibleCourse, retakeGateYes: boolean): ScoredCandidate {
   const history = Object.values(db.getTranscript(student.id));
   const courseByCode = Object.fromEntries(CATALOG.map(course => [course.code, { category: course.category }]));
@@ -46,7 +53,8 @@ function scoreEligibleCourse(student: StudentWithCgpa, c: EligibleCourse, retake
     studentModePct: studentStats?.modePct ?? null,
     cohortMean: cohort?.mean ?? null,
     cohortModePct: cohort?.modePct ?? null,
-    trendAdjustment: cohort?.trendAdjustment ?? 0,
+    cohortTrendAdjustment: cohort?.trendAdjustment ?? 0,
+    studentTrendAdjustment: studentStats?.trendAdjustment ?? 0,
     neutralFallback: 72, // only reached if a course AND the student both somehow have zero history
   });
   const band = pct >= 95 ? 'A+' : pct >= 90 ? 'A' : pct >= 85 ? 'B+' : pct >= 80 ? 'B' : pct >= 75 ? 'C+' : pct >= 70 ? 'C' : pct >= 65 ? 'D+' : pct >= 60 ? 'D' : 'F';
